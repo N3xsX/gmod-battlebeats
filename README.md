@@ -7,8 +7,16 @@ BattleBeats is a powerful music management system for Garry's Mod, allowing you 
 ## Table of Contents
 - [Core Variables](#core-variables)
 - [Tables Structure](#tables)
+    - [Music Packs](#music-packs)
+    - [Current Tracks](#current-tracks)
+    - [Excluded Tracks](#excluded-tracks)
 - [Essential Functions](#essential-functions)
+  - [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade)
+  - [FadeMusic](#battlebeatsfademusicstation-fadein-fadetime-ispreview)
+  - [GetRandomTrack](#battlebeatsgetrandomtrackpacks-iscombat-excluded-lasttrack2-exclusiveplayonly)
 - [Semi-Useful Functions](#semi-useful-functions)
+    - [HideNotification](#battlebeatshidenotification)
+    - [ShowTrackNotification](#battlebeatsshowtracknotificationtrackname-incombat-ispreviewedtrack)
 - [Quick Start](#quick-start)
 
 ---
@@ -28,7 +36,7 @@ Here are the key variables you’ll interact with:
 
 # Tables
 
-### Music Pack
+### Music Packs
 
 Each music pack in `BATTLEBEATS.musicPacks` is stored like this:
 
@@ -114,7 +122,7 @@ Starts playing the specified track and schedules the next track automatically
 ### `BATTLEBEATS.FadeMusic(station, fadeIn, fadeTime, isPreview)`
 
 Fades a music station in or out  
-This function is **used internally** by `PlayNextTrack()`, but can be called manually if needed
+This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade), but can be called manually if needed
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -124,6 +132,8 @@ This function is **used internally** by `PlayNextTrack()`, but can be called man
 | isPreview | boolean | If true, uses master volume instead of ambient/combat volume |
 
 ### `BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePlayOnly)`
+
+This function is the **core mechanism** BattleBeats uses for track selection and is called internally by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade)
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -149,8 +159,6 @@ This function is **used internally** by `PlayNextTrack()`, but can be called man
 **Avoid repeats**:  
    - If more than one track is available after exclusions, the last played track (`lastCombatTrack` or `lastAmbienceTrack`) is skipped to avoid immediate repetition
 
-#### This function is the **core mechanism** BattleBeats uses for track selection and is called internally by `PlayNextTrack`
-
 # Semi-Useful Functions
 
 ### `BATTLEBEATS.HideNotification()`
@@ -158,7 +166,7 @@ Hides the current track notification if one exists
 
 ### `BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)`
 
-This function is **used internally** by `PlayNextTrack()`, but can be called manually if needed
+This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade), but can be called manually if needed
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
