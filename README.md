@@ -90,10 +90,10 @@ BattleBeats provides a function to save the current state of exclusions to disk:
 
 After modifying `BATTLEBEATS.excludedTracks`, call `BATTLEBEATS.SaveExcludedTracks()` to persist your changes
 
-> ⚠️ **WARNING**: This function is automatically called whenever a player excludes a track via the UI
+> ⚠️ **WARNING**: This function is automatically called whenever a player excludes a track via the UI.
 You can call it manually in code, but doing so carelessly may overwrite or corrupt players exclusions
 
-The function only saves tracks that are marked `true`, ignoring any `nil` or `false` values
+> The function only saves tracks that are marked `true`, ignoring any `nil` or `false` values
 
 # Essential Functions
 
