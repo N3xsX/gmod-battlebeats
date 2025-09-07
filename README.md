@@ -17,7 +17,7 @@ BattleBeats is a powerful music management system for Garry's Mod, allowing you 
 - [Semi-Useful Functions](#semi-useful-functions)
     - [HideNotification](#battlebeatshidenotification)
     - [ShowTrackNotification](#battlebeatsshowtracknotificationtrackname-incombat-ispreviewedtrack)
-- [Quick Start](#quick-start)
+- [Examples](#examples)
 
 ---
 
@@ -174,7 +174,7 @@ This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttrac
 | inCombat | boolean | Determines notification color: green (ambient) or orange (combat) |
 | isPreviewedTrack | boolean | Overrides color to yellow if true |
 
-# Quick Start
+# Examples
 
 ```lua
 -- Play an ambient track immediately
