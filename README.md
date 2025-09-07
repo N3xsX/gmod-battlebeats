@@ -14,7 +14,7 @@ BattleBeats is a powerful music management system for Garry's Mod, allowing you 
   - [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade)
   - [FadeMusic](#battlebeatsfademusicstation-fadein-fadetime-ispreview)
   - [GetRandomTrack](#battlebeatsgetrandomtrackpacks-iscombat-excluded-lasttrack2-exclusiveplayonly)
-- [Semi-Useful Functions](#semi-useful-functions)
+- [Utility Functions](#utility-functions)
     - [HideNotification](#battlebeatshidenotification)
     - [ShowTrackNotification](#battlebeatsshowtracknotificationtrackname-incombat-ispreviewedtrack)
 - [Examples](#examples)
@@ -161,7 +161,7 @@ This function is the **core mechanism** BattleBeats uses for track selection and
 **Avoid repeats**:  
    - If more than one track is available after exclusions, the last played track (`lastCombatTrack` or `lastAmbienceTrack`) is skipped to avoid immediate repetition
 
-# Semi-Useful Functions
+# Utility Functions
 
 ### `BATTLEBEATS.HideNotification()`  
 [📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_notifications.lua#L57)  
