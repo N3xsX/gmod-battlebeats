@@ -119,6 +119,8 @@ Starts playing the specified track and schedules the next track automatically
 - Automatically handles combat vs ambient music and respects excluded tracks
 - If `noFade` is false, `FadeMusic` is called internally to smoothly fade in the track
 
+> ⚠️ **WARNING**: This internally calls `sound.PlayFile` with the `"noplay"` flag
+
 ### `BATTLEBEATS.FadeMusic(station, fadeIn, fadeTime, isPreview)`  
 [📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L106)  
 Fades a music station in or out  
@@ -165,6 +167,8 @@ This function is the **core mechanism** BattleBeats uses for track selection and
 [📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_notifications.lua#L57)  
 Hides the current track notification if one exists
 
+> ⚠️ **WARNING**: Do NOT call this immediately after `ShowTrackNotification` or `PlayNextTrack`
+
 ### `BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)`  
 [📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_notifications.lua#L163)  
 This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade), but can be called manually if needed
@@ -174,6 +178,8 @@ This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttrac
 | trackName | string | Path to the track (automatically trimmed) |
 | inCombat | boolean | Determines notification color: green (ambient) or orange (combat) |
 | isPreviewedTrack | boolean | Overrides color to yellow if true |
+
+> ⚠️ **WARNING**: This function internally calls `BATTLEBEATS.currentStation` or `BATTLEBEATS.currentPreviewStation` to display track progress
 
 # Examples
 
