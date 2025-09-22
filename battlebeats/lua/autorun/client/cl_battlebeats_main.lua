@@ -54,6 +54,8 @@ local alwaysContinue = CreateClientConVar("battlebeats_always_continue", "0", tr
 local continueMode = CreateClientConVar("battlebeats_continue_mode", "0", true, false, "", 0, 1)
 local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_notification", "1", true, false, "", 0, 1)
 local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "0", true, false, "", 0, 1)
+-- fork features!
+local syncMode = CreateClientConVar("battlebeats_sync_mode", "1", true, false, "", 0, 1)
 
 local ambientVolume = CreateClientConVar("battlebeats_volume_ambient", "100", true, false, "", 0, 100)
 local combatVolume = CreateClientConVar("battlebeats_volume_combat", "100", true, false, "", 0, 100)
@@ -356,12 +358,19 @@ local function PlayNextTrack(track, time, noFade)
             --instantly store the current music position to prevent rare issue
             --where a newly switched track would incorrectly use the position of the previous one
             --(only saw this twice in 40+ hours of gameplay but hey might as well fix it)
-            if not isInCombat then
+            if syncMode:GetInt() == 1 then
                 lastAmbiencePosition = station:GetTime()
                 lastAmbienceTotalLength = station:GetLength()
-            else
                 lastCombatPosition = station:GetTime()
                 lastCombatTotalLength = station:GetLength()
+            else -- fork feature!
+                if not isInCombat then
+                    lastAmbiencePosition = station:GetTime()
+                    lastAmbienceTotalLength = station:GetLength()
+                else
+                    lastCombatPosition = station:GetTime()
+                    lastCombatTotalLength = station:GetLength()
+                end
             end
 
             local startTime = time or 0
@@ -391,12 +400,19 @@ local function PlayNextTrack(track, time, noFade)
                 end
                 -- update playback length and position
                 if IsValid(station) then
-                    if not isInCombat then
+                    if syncMode:GetInt() == 1 then -- fork feature!
+                        lastCombatPosition = station:GetTime()
+                        lastCombatLength = lastCombatLength + 1
                         lastAmbiencePosition = station:GetTime()
                         lastAmbienceLength = lastAmbienceLength + 1
                     else
-                        lastCombatPosition = station:GetTime()
-                        lastCombatLength = lastCombatLength + 1
+                        if not isInCombat then
+                            lastAmbiencePosition = station:GetTime()
+                            lastAmbienceLength = lastAmbienceLength + 1
+                        else
+                            lastCombatPosition = station:GetTime()
+                            lastCombatLength = lastCombatLength + 1
+                        end
                     end
                 end
             end)
