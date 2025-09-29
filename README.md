@@ -10,8 +10,10 @@ BattleBeats is a powerful music management system for Garry's Mod, allowing you 
     - [Music Packs](#music-packs)
     - [Current Tracks](#current-tracks)
     - [Excluded Tracks](#excluded-tracks)
+    - [Mapped Tracks](#mapped-tracks)
+    - [Track Offests](#track-offsets)
 - [Essential Functions](#essential-functions)
-  - [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade)
+  - [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade-priority)
   - [FadeMusic](#battlebeatsfademusicstation-fadein-fadetime-ispreview)
   - [GetRandomTrack](#battlebeatsgetrandomtrackpacks-iscombat-excluded-lasttrack2-exclusiveplayonly)
 - [Utility Functions](#utility-functions)
@@ -32,6 +34,8 @@ Here are the key variables you’ll interact with:
 | `BATTLEBEATS.musicPacks` | table | Contains all music packs loaded by BattleBeats |
 | `BATTLEBEATS.currentPacks` | table | Tracks which packs are currently enabled |
 | `BATTLEBEATS.excludedTracks` | table | Tracks that have been disabled from playback |
+| `BATTLEBEATS.npcTrackMappings` | table | Contains mapping data linking NPCs to specific tracks |
+| `BATTLEBEATS.trackOffsets` | table | Stores offset information for tracks |
 | `BATTLEBEATS.isInCombat` | boolean | Indicates if the player is in combat. Updates every second |
 
 # Tables
@@ -76,7 +80,7 @@ BATTLEBEATS.currentPacks = {
 The `BATTLEBEATS.excludedTracks` table is used to **disable specific tracks** from being played automatically. 
 All excluded tracks are stored as keys with the value `true`
 
-This table is **saved to disk** in GMod under: `data/battlebeats_excluded_tracks.txt` as JSON. Example content:
+This table is **saved to disk** in GMod under: `data/battlebeats/battlebeats_excluded_tracks.txt` as JSON. Example content:
 
 ```json
 {
@@ -95,10 +99,47 @@ You can call it manually in code, but doing so carelessly may overwrite or corru
 
 > The function only saves tracks that are marked `true`, ignoring any `nil` or `false` values
 
+---
+
+### Mapped Tracks
+
+The `BATTLEBEATS.npcTrackMappings` table defines custom music assignments for NPCs.
+Each entry maps a track file path to metadata describing which NPC class should trigger it and how important the mapping is compared to others  
+
+This table is **saved to disk** in GMod under: `data/battlebeats/battlebeats_npc_mappings.txt` as JSON. Example content:
+
+```json
+{
+	"sound/battlebeats/cyberpunk2077/combat/patri(di)ots.mp3": {
+		"priority": 2,
+		"class": "npc_headcrab_black"
+	},
+	"sound/battlebeats/cyberpunk2077/combat/force projection.mp3": {
+		"priority": 1,
+		"class": "npc_zombie"
+	}
+}
+```
+
+---
+
+### Track Offsets
+
+The `BATTLEBEATS.trackOffsets` table defines custom playback offsets for specific tracks.
+If a track has an offset set, it will always start from that time (in seconds) instead of the beginning  
+
+This table is **saved to disk** in GMod under: `data/battlebeats/battlebeats_track_offsets.txt` as JSON. Example content:
+
+```json
+{"sound/battlebeats/dmc5ostt/combat/devil trigger.mp3":48,"sound/battlebeats/dmc5ostt/combat/bury the light.mp3":120}
+```
+
+---
+
 # Essential Functions
 
-### `BATTLEBEATS.PlayNextTrack(track, time, noFade)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L277)  
+### `BATTLEBEATS.PlayNextTrack(track, time, noFade, priority)`  
+[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L330)  
 Starts playing the specified track and schedules the next track automatically
 
 | Parameter | Type | Description |
@@ -106,6 +147,7 @@ Starts playing the specified track and schedules the next track automatically
 | track | string | Path to the track file (starts from sound/ folder) |
 | time | int/float | Time (in seconds) to start playback. Leave empty to start from the beginning |
 | noFade | boolean | If true, skips the fade-in effect |
+| priority | int | Determines track importance when saving track data in mapped tracks. Higher values take precedence |
 
 ### Behavior
 
@@ -119,10 +161,8 @@ Starts playing the specified track and schedules the next track automatically
 - Automatically handles combat vs ambient music and respects excluded tracks
 - If `noFade` is false, `FadeMusic` is called internally to smoothly fade in the track
 
-> ⚠️ **WARNING**: This internally calls `sound.PlayFile` with the `"noplay"` flag
-
 ### `BATTLEBEATS.FadeMusic(station, fadeIn, fadeTime, isPreview)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L106)  
+[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L121)  
 Fades a music station in or out  
 This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade), but can be called manually if needed
 
@@ -134,7 +174,7 @@ This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttrac
 | isPreview | boolean | If true, uses master volume instead of ambient/combat volume |
 
 ### `BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePlayOnly)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L186)  
+[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L203)  
 This function is the **core mechanism** BattleBeats uses for track selection and is called internally by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade)
 
 | Parameter | Type | Description |
