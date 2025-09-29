@@ -3,6 +3,8 @@ local loadLocalPacks = CreateClientConVar("battlebeats_load_local_packs", "0", t
 local debugMode = GetConVar("battlebeats_debug_mode")
 local enableAmbient = GetConVar("battlebeats_enable_ambient")
 
+file.CreateDir("battlebeats")
+
 local function debugPrint(...)
     if debugMode:GetBool() then print("[BattleBeats Debug] " .. ...) end
 end
@@ -141,16 +143,16 @@ local function LoadBattleBeatsMusicPacks(isDebug)
             continue
         end
 
-        local ambientMp3   = file.Find("sound/battlebeats/" .. packName .. "/ambient/*.mp3", "GAME") or {}
-        local ambientOgg   = file.Find("sound/battlebeats/" .. packName .. "/ambient/*.ogg", "GAME") or {}
-        local combatMp3    = file.Find("sound/battlebeats/" .. packName .. "/combat/*.mp3", "GAME") or {}
-        local combatOgg    = file.Find("sound/battlebeats/" .. packName .. "/combat/*.ogg", "GAME") or {}
+        local ambientMp3 = file.Find("sound/battlebeats/" .. packName .. "/ambient/*.mp3", "GAME") or {}
+        local ambientOgg = file.Find("sound/battlebeats/" .. packName .. "/ambient/*.ogg", "GAME") or {}
+        local combatMp3 = file.Find("sound/battlebeats/" .. packName .. "/combat/*.mp3", "GAME") or {}
+        local combatOgg = file.Find("sound/battlebeats/" .. packName .. "/combat/*.ogg", "GAME") or {}
 
-        local ambient      = table.Add(ambientMp3, ambientOgg) or ambientMp3
-        local combat       = table.Add(combatMp3, combatOgg) or combatMp3
+        local ambient = table.Add(ambientMp3, ambientOgg) or ambientMp3
+        local combat = table.Add(combatMp3, combatOgg) or combatMp3
 
         local builtAmbient = buildPaths("sound/battlebeats/" .. packName .. "/ambient/", ambient)
-        local builtCombat  = buildPaths("sound/battlebeats/" .. packName .. "/combat/", combat)
+        local builtCombat = buildPaths("sound/battlebeats/" .. packName .. "/combat/", combat)
 
         if not isDebug then
             local alreadyLoaded = false
@@ -211,6 +213,18 @@ local function LoadBattleBeatsMusicPacks(isDebug)
     end
 end
 
+local function CleanupInvalidTracks(tbl)
+    local toRemove = {}
+    for trackPath, _ in pairs(tbl) do
+        if not file.Exists(trackPath, "GAME") then
+            table.insert(toRemove, trackPath)
+        end
+    end
+    for _, trackPath in ipairs(toRemove) do
+        tbl[trackPath] = nil
+    end
+end
+
 function BATTLEBEATS.SaveExcludedTracks()
     local validExcluded = {}
     for track, isExcluded in pairs(BATTLEBEATS.excludedTracks) do
@@ -219,49 +233,110 @@ function BATTLEBEATS.SaveExcludedTracks()
         end
     end
     local jsonData = util.TableToJSON(validExcluded)
-    file.Write("battlebeats_excluded_tracks.txt", jsonData)
+    file.Write("battlebeats/battlebeats_excluded_tracks.txt", jsonData)
+
+    --note to myself: remove it later
+    if file.Exists("battlebeats_excluded_tracks.txt", "DATA") then
+        file.Delete("battlebeats_excluded_tracks.txt")
+    end
 end
 
 local function LoadExcludedTracks()
     BATTLEBEATS.excludedTracks = {}
 
-    if file.Exists("battlebeats_excluded_tracks.txt", "DATA") then
-        local jsonData = file.Read("battlebeats_excluded_tracks.txt", "DATA")
-        local loadedTracks = util.JSONToTable(jsonData) or {}
+    local paths = { "battlebeats/battlebeats_excluded_tracks.txt", "battlebeats_excluded_tracks.txt" }
+    local jsonData
+    for _, path in ipairs(paths) do
+        if file.Exists(path, "DATA") then
+            jsonData = file.Read(path, "DATA")
+            break
+        end
+    end
 
-        for track, _ in pairs(loadedTracks) do
-            for _, packData in pairs(BATTLEBEATS.musicPacks) do
-                if (istable(packData.ambient) and table.HasValue(packData.ambient, track)) or
-                    (istable(packData.combat) and table.HasValue(packData.combat, track)) then
-                    BATTLEBEATS.excludedTracks[track] = true
-                    break
-                end
+    local loadedTracks = util.JSONToTable(jsonData or "") or {}
+    for track, _ in pairs(loadedTracks) do
+        for _, packData in pairs(BATTLEBEATS.musicPacks) do
+            if (istable(packData.ambient) and table.HasValue(packData.ambient, track)) or
+                (istable(packData.combat) and table.HasValue(packData.combat, track)) then
+                BATTLEBEATS.excludedTracks[track] = true
+                break
             end
         end
     end
+    CleanupInvalidTracks(BATTLEBEATS.excludedTracks)
+    BATTLEBEATS.SaveExcludedTracks()
 end
 
 function BATTLEBEATS.SaveFavoriteTracks()
     local jsonFavorites = util.TableToJSON(BATTLEBEATS.favoriteTracks)
-    file.Write("battlebeats_favorite_tracks.txt", jsonFavorites)
+    file.Write("battlebeats/battlebeats_favorite_tracks.txt", jsonFavorites)
+
+    --note to myself: remove it later
+    if file.Exists("battlebeats_favorite_tracks.txt", "DATA") then
+        file.Delete("battlebeats_favorite_tracks.txt")
+    end
 end
 
 local function LoadFavoriteTracks()
     BATTLEBEATS.favoriteTracks = {}
 
-    if file.Exists("battlebeats_favorite_tracks.txt", "DATA") then
-        local jsonData = file.Read("battlebeats_favorite_tracks.txt", "DATA")
-        local loadedFavorites = util.JSONToTable(jsonData) or {}
+    local paths = { "battlebeats/battlebeats_favorite_tracks.txt", "battlebeats_favorite_tracks.txt" }
+    local jsonData
+    for _, path in ipairs(paths) do
+        if file.Exists(path, "DATA") then
+            jsonData = file.Read(path, "DATA")
+            break
+        end
+    end
 
-        for track, _ in pairs(loadedFavorites) do
-            for _, packData in pairs(BATTLEBEATS.musicPacks) do
-                if (istable(packData.ambient) and table.HasValue(packData.ambient, track)) or
-                    (istable(packData.combat) and table.HasValue(packData.combat, track)) then
-                    BATTLEBEATS.favoriteTracks[track] = true
-                    break
-                end
+    local loadedFavorites = util.JSONToTable(jsonData or "") or {}
+    for track, _ in pairs(loadedFavorites) do
+        for _, packData in pairs(BATTLEBEATS.musicPacks) do
+            if (istable(packData.ambient) and table.HasValue(packData.ambient, track)) or
+                (istable(packData.combat) and table.HasValue(packData.combat, track)) then
+                BATTLEBEATS.favoriteTracks[track] = true
+                break
             end
         end
+    end
+    CleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+    BATTLEBEATS.SaveFavoriteTracks()
+end
+
+function BATTLEBEATS.SaveNPCMappings()
+    local data = {}
+    for track, mapping in pairs(BATTLEBEATS.npcTrackMappings or {}) do
+        data[track] = { class = mapping.class, priority = mapping.priority }
+    end
+    file.Write("battlebeats/battlebeats_npc_mappings.txt", util.TableToJSON(data, true))
+end
+
+local function LoadMappedTracks()
+    BATTLEBEATS.npcTrackMappings = {}
+
+    if file.Exists("battlebeats/battlebeats_npc_mappings.txt", "DATA") then
+        local jsonData = file.Read("battlebeats/battlebeats_npc_mappings.txt", "DATA")
+        BATTLEBEATS.npcTrackMappings = util.JSONToTable(jsonData) or {}
+
+        CleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
+        BATTLEBEATS.SaveNPCMappings()
+    end
+end
+
+function BATTLEBEATS.SaveTrackOffsets()
+    local jsonFavorites = util.TableToJSON(BATTLEBEATS.trackOffsets)
+    file.Write("battlebeats/battlebeats_track_offsets.txt", jsonFavorites)
+end
+
+local function LoadTrackOffsets()
+    BATTLEBEATS.trackOffsets = {}
+
+    if file.Exists("battlebeats/battlebeats_track_offsets.txt", "DATA") then
+        local jsonData = file.Read("battlebeats/battlebeats_track_offsets.txt", "DATA")
+        BATTLEBEATS.trackOffsets = util.JSONToTable(jsonData) or {}
+
+        CleanupInvalidTracks(BATTLEBEATS.trackOffsets)
+        BATTLEBEATS.SaveTrackOffsets()
     end
 end
 
@@ -269,7 +344,7 @@ local function LoadSavedPacks()
     local savedPacks = cookie.GetString("battlebeats_selected_packs", "")
     if savedPacks ~= "" then
         BATTLEBEATS.currentPacks = util.JSONToTable(savedPacks) or {}
-        for packName, enabled in pairs(BATTLEBEATS.currentPacks) do
+        for packName, _ in pairs(BATTLEBEATS.currentPacks) do
             if not BATTLEBEATS.musicPacks[packName] then BATTLEBEATS.currentPacks[packName] = nil end
         end
         if not table.IsEmpty(BATTLEBEATS.currentPacks) then
@@ -283,14 +358,16 @@ local function LoadSavedPacks()
     else
         print("[BattleBeats Client] No saved packs found")
     end
-    if not table.IsEmpty(BATTLEBEATS.musicPacks) and table.IsEmpty(BATTLEBEATS.currentPacks) and autoPopup:GetBool() then
+    /*if not table.IsEmpty(BATTLEBEATS.musicPacks) and table.IsEmpty(BATTLEBEATS.currentPacks) and autoPopup:GetBool() then
         RunConsoleCommand("battlebeats_menu")
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "You can disable this popup in battlebeats settings"
         )
-    end
+    end*/
 end
+
+local versionConVar = GetConVar("battlebeats_seen_version")
 
 hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     LoadGenericMusicPacks()
@@ -298,7 +375,9 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     LoadBattleBeatsMusicPacks(false)
     LoadExcludedTracks()
     LoadFavoriteTracks()
+    LoadMappedTracks()
     LoadSavedPacks()
+    LoadTrackOffsets()
     BATTLEBEATS.ValidatePacks()
     timer.Simple(2, function()
         local conflicts = {
@@ -324,6 +403,23 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+        chat.AddText(
+            Color(255, 255, 0), "[BattleBeats] ",
+            Color(255, 255, 255), "Welcome to version ",
+            Color(100, 255, 100), BATTLEBEATS.currentVersion,
+            Color(255, 255, 255), "! Check out the new features:"
+        )
+        chat.AddText(
+            Color(150, 255, 150), "- You can now assign NPCs to combat tracks\n",
+            Color(150, 255, 150), "- You can now add offsets to tracks"
+        )
+        chat.AddText(
+            Color(255, 255, 255), "See workshop page for detailed changelog!"
+        )
+
+        RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
@@ -335,4 +431,4 @@ concommand.Add("battlebeats_reload_packs", function()
     BATTLEBEATS.ValidatePacks()
 end)
 
-print("BattleBeats Loaded")
+print("BattleBeats " .. BATTLEBEATS.currentVersion .. " loaded")

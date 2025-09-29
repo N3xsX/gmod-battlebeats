@@ -1,4 +1,5 @@
 local frame
+local assignFrame
 local isLooping = false
 local skipExcluded = false
 
@@ -76,6 +77,12 @@ local function OpenMusicMenu()
         draw.RoundedBox(4, 0, 0, w, h, Color(0, 0, 0, 200))
     end
     frame.isMinimalized = false
+
+    local versionLabel = vgui.Create("DLabel", frame)
+    versionLabel:SetFont("DermaDefault")
+    versionLabel:SetText(BATTLEBEATS.currentVersion)
+    versionLabel:SetTextColor(Color(200, 200, 200))
+    versionLabel:SetPos(870, 3)
 
     for _, child in ipairs(frame:GetChildren()) do -- cheesy way to enable minimalize button
         if child:GetClassName() == "Label" then
@@ -566,6 +573,37 @@ local function OpenMusicMenu()
             local panelWidth = 820
             local scrollSpeed = 60
 
+            local npcAssigned = BATTLEBEATS.npcTrackMappings[track] ~= nil
+            local offsetAssigned = BATTLEBEATS.trackOffsets[track] ~= nil
+            if npcAssigned then
+                local tooltipFrame = vgui.Create("DPanel", row)
+                tooltipFrame:SetSize(16, 16)
+                tooltipFrame:SetPos(840, 17)
+                tooltipFrame:SetPaintBackground(false)
+                tooltipFrame:SetTooltip("This track has an assigned NPC")
+
+                local npcIcon = vgui.Create("DImage", tooltipFrame)
+                npcIcon:SetSize(16, 16)
+                npcIcon:SetPos(0, 0)
+                npcIcon:SetImage("icon16/user.png")
+            end
+            if offsetAssigned then
+                local tooltipFrame = vgui.Create("DPanel", row)
+                tooltipFrame:SetSize(16, 16)
+                if not npcAssigned then
+                    tooltipFrame:SetPos(840, 17)
+                else
+                    tooltipFrame:SetPos(820, 17)
+                end
+                tooltipFrame:SetPaintBackground(false)
+                tooltipFrame:SetTooltip("This track has an assigned offset")
+
+                local offsetIcon = vgui.Create("DImage", tooltipFrame)
+                offsetIcon:SetSize(16, 16)
+                offsetIcon:SetPos(0, 0)
+                offsetIcon:SetImage("icon16/time.png")
+            end
+
             local customCheckbox = vgui.Create("DPanel", row)
             customCheckbox:SetSize(80, 20)
             customCheckbox:SetPos(860, 15)
@@ -584,12 +622,12 @@ local function OpenMusicMenu()
             checkboxText:SetTextColor(Color(255, 255, 255))
             checkboxText:Dock(FILL)
             checkboxText:SetContentAlignment(5)
-            customCheckbox:SetTooltip(excluded and "Excluded tracks won't play at all" or "Included packs play normally")
+            customCheckbox:SetTooltip(excluded and "Excluded tracks won’t be selected by the music player" or "Included packs play normally")
             customCheckbox:SetBackgroundColor(targetColor)
 
             local function updateCheckboxVisual()
                 checkboxText:SetText(excluded and "✖ Excluded" or "✔ Included")
-                customCheckbox:SetTooltip(excluded and "Excluded tracks won't play at all" or "Included packs play normally")
+                customCheckbox:SetTooltip(excluded and "Excluded tracks won’t be selected by the music player" or "Included packs play normally")
                 customCheckbox:SetBackgroundColor(excluded and Color(255, 0, 0) or Color(0, 255, 0))
                 surface.PlaySound(excluded and "btb_button_disable.mp3" or "btb_button_enable.mp3")
             end
@@ -721,6 +759,191 @@ local function OpenMusicMenu()
                         local nofavorite = menu:AddOption("Add to Favorites (Limit Reached [25])", function() end)
                         nofavorite:SetEnabled(false)
                         nofavorite:SetImage("icon16/error_delete.png")
+                    end
+                    local offsetValue = BATTLEBEATS.trackOffsets[track] or 0
+                    local offsetOption = menu:AddOption(offsetValue > 0 and "Edit Offset (" .. offsetValue .. "s)" or "Set Offset", function()
+                        local offsetFrame = vgui.Create("DFrame")
+                        offsetFrame:SetTitle("Set Track Offset")
+                        offsetFrame:SetSize(250, 110)
+                        offsetFrame:Center()
+                        offsetFrame:MakePopup()
+                        offsetFrame.Paint = function(self, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, Color(0, 0, 0, 200))
+                        end
+
+                        local label = vgui.Create("DLabel", offsetFrame)
+                        label:SetPos(10, 30)
+                        label:SetSize(230, 20)
+                        label:SetText("Offset (in seconds):")
+
+                        local textEntry = vgui.Create("DTextEntry", offsetFrame)
+                        textEntry:SetPos(10, 50)
+                        textEntry:SetSize(230, 20)
+                        textEntry:SetNumeric(true)
+                        textEntry:SetValue(offsetValue)
+
+                        local saveButton = vgui.Create("DButton", offsetFrame)
+                        saveButton:SetPos(10, 75)
+                        saveButton:SetSize(110, 25)
+                        saveButton:SetText("Save")
+                        saveButton.DoClick = function()
+                            local newOffset = tonumber(textEntry:GetValue()) or 0
+                            if newOffset > 0 then
+                                BATTLEBEATS.trackOffsets[track] = newOffset
+                                notification.AddLegacy("Set offset " .. newOffset .. "s for track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
+                                surface.PlaySound("buttons/button14.wav")
+                                changesMade = true
+                                CreateTrackList(parent, trackType, selectedPack)
+                            else
+                                BATTLEBEATS.trackOffsets[track] = nil
+                                notification.AddLegacy("Removed offset from track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
+                                surface.PlaySound("buttons/button14.wav")
+                                changesMade = true
+                                CreateTrackList(parent, trackType, selectedPack)
+                            end
+                            BATTLEBEATS.SaveTrackOffsets()
+                            offsetFrame:Close()
+                        end
+
+                        local cancelButton = vgui.Create("DButton", offsetFrame)
+                        cancelButton:SetPos(130, 75)
+                        cancelButton:SetSize(110, 25)
+                        cancelButton:SetText("Cancel")
+                        cancelButton.DoClick = function()
+                            offsetFrame:Close()
+                        end
+                    end)
+                    offsetOption:SetImage("icon16/time.png")
+                    offsetOption:SetTooltip("Adds an offset to the track\nOn first play, it will start from this offset")
+                    if trackType == "combat" then
+                        local currentNPC = BATTLEBEATS.npcTrackMappings[track]
+                        local npcOptionText = currentNPC and "Edit assigned NPC" or "Assign NPC Class"
+
+                        if currentNPC then
+                            local assignInfo = menu:AddOption("Assigned NPC: " .. currentNPC.class .. " (Priority: " .. currentNPC.priority .. ")", function() end)
+                            assignInfo:SetImage("icon16/vcard.png")
+                        end
+
+                        local assignNPC = menu:AddOption(npcOptionText, function()
+                            assignFrame = vgui.Create("DFrame")
+                            assignFrame:SetTitle("Assign NPC to Track")
+                            assignFrame:SetSize(400, 110)
+                            assignFrame:Center()
+                            assignFrame:MakePopup()
+                            assignFrame.Paint = function(self, w, h)
+                                draw.RoundedBox(4, 0, 0, w, h, Color(0, 0, 0, 200))
+                            end
+
+                            local classLabel = vgui.Create("DLabel", assignFrame)
+                            classLabel:SetPos(10, 25)
+                            classLabel:SetSize(270, 20)
+                            classLabel:SetText("Class:")
+
+                            local textEntry = vgui.Create("DTextEntry", assignFrame)
+                            textEntry:SetPos(10, 45)
+                            textEntry:SetSize(270, 20)
+                            textEntry:SetPlaceholderText("Enter NPC class (e.g npc_zombie)")
+                            if currentNPC then textEntry:SetText(currentNPC.class) end
+
+                            local priorityNames = {
+                                [1] = "1 (Highest)",
+                                [2] = "2",
+                                [3] = "3",
+                                [4] = "4",
+                                [5] = "5 (Lowest)"
+                            }
+
+                            local priorityLabel = vgui.Create("DLabel", assignFrame)
+                            priorityLabel:SetPos(290, 25)
+                            priorityLabel:SetSize(100, 20)
+                            priorityLabel:SetText("Priority:")
+
+                            local priorityCombo = vgui.Create("DComboBox", assignFrame)
+                            priorityCombo:SetPos(290, 45)
+                            priorityCombo:SetSize(100, 20)
+                            for i = 1, 5 do
+                                priorityCombo:AddChoice(priorityNames[i])
+                            end
+                            priorityCombo:SetValue(currentNPC and tostring(currentNPC.priority) or "1 (Highest)")
+
+                            local saveButton = vgui.Create("DButton", assignFrame)
+                            saveButton:SetPos(45, 75)
+                            saveButton:SetSize(150, 25)
+                            saveButton:SetText(currentNPC and "Save/Remove" or "Save")
+                            saveButton:SetFont("CreditsText")
+                            saveButton:SetTextColor(Color(255, 255, 255))
+                            saveButton.DoClick = function()
+                                local class = textEntry:GetText()
+                                local _, priorityStr = priorityCombo:GetSelected()
+                                local priority = tonumber(priorityStr) or 1
+
+                                if not class or class == "" then
+                                    if currentNPC then
+                                        BATTLEBEATS.npcTrackMappings[track] = nil
+                                        notification.AddLegacy("Removed NPC class from track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
+                                        surface.PlaySound("buttons/button14.wav")
+                                    else
+                                        notification.AddLegacy("No NPC class entered", NOTIFY_ERROR, 3)
+                                        surface.PlaySound("buttons/button11.wav")
+                                    end
+                                    BATTLEBEATS.SaveNPCMappings()
+                                    changesMade = true
+                                    assignFrame:Close()
+                                    CreateTrackList(parent, trackType, selectedPack)
+                                    return
+                                end
+
+                                local oldTrack = nil
+                                for t, info in pairs(BATTLEBEATS.npcTrackMappings) do
+                                    if t ~= track and info.class == class then
+                                        oldTrack = t
+                                        break
+                                    end
+                                end
+
+                                local function assignNPCToTrack()
+                                    BATTLEBEATS.npcTrackMappings[track] = { class = class, priority = math.Clamp(priority, 1, 5) }
+                                    if oldTrack then
+                                        BATTLEBEATS.npcTrackMappings[oldTrack] = nil
+                                    end
+                                    notification.AddLegacy("Assigned NPC class " .. class .. " with priority " .. priority .. " to track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
+                                    surface.PlaySound("buttons/button14.wav")
+                                    BATTLEBEATS.SaveNPCMappings()
+                                    changesMade = true
+                                    assignFrame:Close()
+                                    CreateTrackList(parent, trackType, selectedPack)
+                                end
+
+                                if oldTrack then
+                                    surface.PlaySound("buttons/button17.wav")
+                                    Derma_Query("NPC: (" .. class .. ") is already assigned to track: (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). Overwrite?",
+                                        "Confirm Overwrite", "Yes", function() assignNPCToTrack() end, "No", function() end)
+                                else
+                                    assignNPCToTrack()
+                                end
+                            end
+                            saveButton.Paint = function(self, w, h)
+                                local bgColor = self:IsHovered() and Color(80, 80, 80, 255) or Color(70, 70, 70, 255)
+                                draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                            end
+
+                            local cancelButton = vgui.Create("DButton", assignFrame)
+                            cancelButton:SetPos(205, 75)
+                            cancelButton:SetSize(150, 25)
+                            cancelButton:SetText("Cancel")
+                            cancelButton:SetFont("CreditsText")
+                            cancelButton:SetTextColor(Color(255, 255, 255))
+                            cancelButton.Paint = function(self, w, h)
+                                local bgColor = self:IsHovered() and Color(80, 80, 80, 255) or Color(70, 70, 70, 255)
+                                draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                            end
+                            cancelButton.DoClick = function()
+                                assignFrame:Close()
+                            end
+                        end)
+
+                        assignNPC:SetImage(currentNPC and "icon16/user_edit.png" or "icon16/user_add.png")
+                        assignNPC:SetTooltip("Assign an NPC class to this combat track with a priority (1-5)\nThe track with the highest priority will play when fighting multiple NPCs")
                     end
                     menu:Open()
                 end
@@ -1254,6 +1477,7 @@ local function OpenMusicMenu()
     frame.OnClose = function()
         BATTLEBEATS.ValidatePacks()
         if IsValid(BATTLEBEATS.optionsFrame) then BATTLEBEATS.optionsFrame:Close() end
+        if IsValid(assignFrame) then assignFrame:Close() end
         if timer.Exists("BattleBeats_NextPreviewTrack") then
             timer.Remove("BattleBeats_NextPreviewTrack")
         end

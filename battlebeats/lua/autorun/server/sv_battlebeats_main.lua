@@ -1,9 +1,9 @@
 local lastCombatTime = {}
 local playerCombatTargets = {}
 
-local combatCooldown = CreateConVar("battlebeats_server_combat_cooldown", "5", {FCVAR_ARCHIVE}, "", 3, 30)
-local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", {FCVAR_ARCHIVE}, "", 100, 10000)
-local pvpEnabled = CreateConVar("battlebeats_pvp_enable", "1", { FCVAR_ARCHIVE }, "", 0, 1)
+local combatCooldown = CreateConVar("battlebeats_server_combat_cooldown", "5", { FCVAR_ARCHIVE }, "", 3, 30)
+local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", { FCVAR_ARCHIVE, FCVAR_REPLICATED }, "", 100, 10000)
+local pvpEnabled = CreateConVar("battlebeats_pvp_enable", "1", { FCVAR_ARCHIVE, FCVAR_NOTIFY }, "", 0, 1)
 local pvpMode = CreateConVar("battlebeats_pvp_mode", "1", { FCVAR_ARCHIVE }, "", 0, 2)
 local pvpCombatTime = CreateConVar("battlebeats_pvp_combat_time", "30", { FCVAR_ARCHIVE }, "", 5, 120)
 local pvpTeam = CreateConVar("battlebeats_pvp_allow_team_combat", "1", { FCVAR_ARCHIVE }, "", 0, 1)

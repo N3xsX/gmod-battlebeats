@@ -35,9 +35,17 @@ BATTLEBEATS.musicPacks = {}
 BATTLEBEATS.excludedTracks = {}
 BATTLEBEATS.favoriteTracks = {}
 BATTLEBEATS.isInCombat = false
+BATTLEBEATS.npcTrackMappings = {}
+BATTLEBEATS.priorityStates = {}
+BATTLEBEATS.trackOffsets = {}
+
+BATTLEBEATS.currentVersion = "v2.0.1"
+CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
 CreateClientConVar("battlebeats_npc_combat", "0", true, true, "", 0, 1)
+
+local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", { FCVAR_ARCHIVE, FCVAR_REPLICATED }, "", 100, 10000)
 
 local volumeSet = CreateClientConVar("battlebeats_volume", "100", true, false, "", 0, 1000)
 local debugMode = CreateClientConVar("battlebeats_debug_mode", "0", true, false, "", 0, 1)
@@ -57,6 +65,13 @@ local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "0", 
 
 local ambientVolume = CreateClientConVar("battlebeats_volume_ambient", "100", true, false, "", 0, 100)
 local combatVolume = CreateClientConVar("battlebeats_volume_combat", "100", true, false, "", 0, 100)
+
+local switchOnLower = CreateClientConVar("battlebeats_switch_on_lower_priority", "1", true, false, "", 0, 1)
+local enableAssignedTracks = CreateClientConVar("battlebeats_enable_assigned_tracks", "1", true, false, "", 0, 1)
+local switchOnNoNPC = CreateClientConVar("battlebeats_switch_on_no_npc_track", "1", true, false, "", 0, 1)
+local excludeMappedTracks = CreateClientConVar("battlebeats_exclude_mapped_tracks", "0", true, false, "", 0, 1)
+local lastCombatTrackPriority = 0
+local lastCombatPriorityTrack = nil
 
 local muteVolume = nil
 
@@ -123,6 +138,7 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
             debugPrint("[FadeMusic][Failsafe] Stopping station " .. tostring(station))
             station:SetVolume(0)
             station:Stop()
+            station = nil
         end
     end)
     
@@ -139,6 +155,7 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
             debugPrint("[FadeMusic] Fade out complete, stopping station " .. tostring(station))
             station:SetVolume(0)
             station:Stop()
+            station = nil
             timer.Remove(timerName)
         elseif progress >= 0.95 and fadeIn then -- this is redundant but well it looks nice :)
             debugPrint("[FadeMusic] Fade in complete, removing timer " .. tostring(station))
@@ -229,7 +246,9 @@ local function GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePl
     if #allTracks > 0 then
         local availableTracks = {}
         for _, track in ipairs(allTracks) do -- filter out excluded tracks
-            if not excluded[track] then table.insert(availableTracks, track) end
+            if not excluded[track] and (not excludeMappedTracks:GetBool() or not BATTLEBEATS.npcTrackMappings[track]) then
+                table.insert(availableTracks, track)
+            end
         end
         debugPrint("[GetRandomTrack] Available after exclusion: " .. #availableTracks)
         if #availableTracks > 1 then
@@ -308,7 +327,7 @@ function BATTLEBEATS.PlayNextTrackPreview(track, time, isLooped, errCallback)
     PlayNextTrackPreview(track, time, isLooped, errCallback)
 end
 
-local function PlayNextTrack(track, time, noFade)
+local function PlayNextTrack(track, time, noFade, priority)
     if not track or track == "" then
         debugPrint("[PlayNextTrack] Attempted to play nil/empty track! Aborting...")
         return
@@ -341,7 +360,8 @@ local function PlayNextTrack(track, time, noFade)
             BATTLEBEATS.currentStation = station
             station:SetVolume(0)
             station:Play()
-            station:SetTime(time or 0, true)
+            local offset = BATTLEBEATS.trackOffsets[track] or 0
+            station:SetTime(time or offset, true)
             local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
             local masterVolume = volumeSet:GetInt() / 100
             if not noFade then
@@ -373,9 +393,16 @@ local function PlayNextTrack(track, time, noFade)
             timer.Create("BattleBeats_NextTrack", playDuration, 1, function() -- timer to play next track when current finishes
                 debugPrint("[PlayNextTrack] Timer reached end. Selecting next track")
                 if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
-                if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-                    local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
-                    if nextTrack then PlayNextTrack(nextTrack) end
+                if priority then -- looping assigned tracks
+                    PlayNextTrack(track, 0, false, priority)
+                    local state = BATTLEBEATS.priorityStates[priority] or {}
+                    state.length = 0
+                    BATTLEBEATS.priorityStates[priority] = state
+                else
+                    if not table.IsEmpty(BATTLEBEATS.currentPacks) then
+                        local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
+                        if nextTrack then PlayNextTrack(nextTrack) end
+                    end
                 end
             end)
 
@@ -384,19 +411,40 @@ local function PlayNextTrack(track, time, noFade)
                     debugPrint("[PlayNextTrack] Track stopped unexpectedly. Selecting next track")
                     timer.Remove("BattleBeats_CheckSound")
                     if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
-                    if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-                        local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
-                        if nextTrack then PlayNextTrack(nextTrack) end
+                    if priority then -- looping assigned tracks
+                        PlayNextTrack(track, 0, false, priority)
+                        local state = BATTLEBEATS.priorityStates[priority] or {}
+                        state.length = 0
+                        BATTLEBEATS.priorityStates[priority] = state
+                    else
+                        if not table.IsEmpty(BATTLEBEATS.currentPacks) then
+                            local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
+                            if nextTrack then PlayNextTrack(nextTrack) end
+                        end
                     end
                 end
                 -- update playback length and position
                 if IsValid(station) then
-                    if not isInCombat then
-                        lastAmbiencePosition = station:GetTime()
-                        lastAmbienceLength = lastAmbienceLength + 1
+                    if priority then
+                        local state = BATTLEBEATS.priorityStates[priority] or {}
+                        if state.track == track then
+                            state.length = (state.length or 0) + 1
+                        else
+                            state.length = 0
+                        end
+                        state.track = track
+                        state.position = station:GetTime()
+                        state.totalLength = station:GetLength()
+                        state.time = CurTime()
+                        BATTLEBEATS.priorityStates[priority] = state
                     else
-                        lastCombatPosition = station:GetTime()
-                        lastCombatLength = lastCombatLength + 1
+                        if not isInCombat then
+                            lastAmbiencePosition = station:GetTime()
+                            lastAmbienceLength = lastAmbienceLength + 1
+                        else
+                            lastCombatPosition = station:GetTime()
+                            lastCombatLength = lastCombatLength + 1
+                        end
                     end
                 end
             end)
@@ -410,8 +458,8 @@ local function PlayNextTrack(track, time, noFade)
     end)
 end
 
-function BATTLEBEATS.PlayNextTrack(track, time, noFade)
-    PlayNextTrack(track, time, noFade)
+function BATTLEBEATS.PlayNextTrack(track, time, noFade, priority)
+    PlayNextTrack(track, time, noFade, priority)
 end
 
 hook.Add("PostCleanupMap", "BattleBeats_ResumeMusic", function()
@@ -538,46 +586,104 @@ local function GetOffset(lastTrackPos, oppositeTrackLen, totalLength)
     end
 end
 
-local function TryPlayTrackWithOffset(track, offset, fallbackTrackRef, exclusiveOnly) -- plays track with offset, or falls back to a random track if not possible
+local function TryPlayTrackWithOffset(track, offset, fallbackTrackRef, exclusiveOnly, priority) -- plays track with offset, or falls back to a random track if not possible
     if offset then
-        PlayNextTrack(track, offset)
+        PlayNextTrack(track, offset, false, priority)
     else
         local fallbackTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, fallbackTrackRef, exclusiveOnly)
         if fallbackTrack then PlayNextTrack(fallbackTrack) end
     end
 end
 
-local function SwitchTrack()
+local function GetNPCMatchingTrack()
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return nil end
+    if table.IsEmpty(BATTLEBEATS.npcTrackMappings) then return nil end
+    if not enableAssignedTracks:GetBool() then return nil end
+
+    local trackPriorities = {}
+    local nearbyNPCs = ents.FindInSphere(ply:GetPos(), maxDistance:GetInt())
+
+    for _, ent in ipairs(nearbyNPCs) do
+        if IsValid(ent) and (ent:IsNPC() or ent:IsNextBot()) then
+            local npcClass = ent.GetClass and ent:GetClass()
+            for track, mapping in pairs(BATTLEBEATS.npcTrackMappings or {}) do
+                if mapping.class == npcClass then
+                    trackPriorities[track] = mapping.priority
+                end
+            end
+        end
+    end
+
+    if table.IsEmpty(trackPriorities) then return nil end
+
+    local minPriority = nil
+    for _, priority in pairs(trackPriorities) do
+        if priority > 0 and (not minPriority or priority < minPriority) then
+            minPriority = priority
+        end
+    end
+
+    local topTracks = {}
+    for track, priority in pairs(trackPriorities) do
+        if priority == minPriority then
+            table.insert(topTracks, track)
+        end
+    end
+
+    local selectedTrack = topTracks[math.random(#topTracks)]
+    return selectedTrack
+end
+
+local function SwitchTrack(npcTrack)
     if IsValid(currentPreviewStation) then return end
     if not GetConVar("battlebeats_persistent_notification"):GetBool() then
         BATTLEBEATS.HideNotification()
     end
     if isInCombat then
-        -- decide whether to continue last combat track or pick new one
-        if (CurTime() - ambienceStartTime <= combatWaitTime:GetInt() and lastCombatTrack) or (alwaysContinue:GetBool() and lastCombatTrack) then
-            if exclusivePlay:GetBool() and lastAmbienceTrack then
-                local samePack = AreTracksFromSamePack(lastCombatTrack, lastAmbienceTrack)
-                if not samePack then
-                    -- pick a different track from same pack
-                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
-                    if track then PlayNextTrack(track) end
+        if npcTrack then
+            local priority = BATTLEBEATS.npcTrackMappings[npcTrack].priority
+            local npcState = BATTLEBEATS.priorityStates[priority]
+            local shouldContinue = npcState and ((CurTime() - npcState.time <= combatWaitTime:GetInt()) or alwaysContinue:GetBool()) or false
+
+            if npcState and npcState.track == npcTrack and shouldContinue then
+                local offset = GetOffset(npcState.position, lastAmbienceLength, npcState.totalLength)
+                TryPlayTrackWithOffset(npcState.track, offset, lastAmbienceTrack, false, priority)
+            else
+                PlayNextTrack(npcTrack, nil, false, priority)
+            end
+            lastCombatTrackPriority = priority
+        else
+            local shouldContinue = (CurTime() - ambienceStartTime <= combatWaitTime:GetInt() and lastCombatTrack) or (alwaysContinue:GetBool() and lastCombatTrack)
+            if shouldContinue then
+                if exclusivePlay:GetBool() and lastAmbienceTrack then
+                    local samePack = AreTracksFromSamePack(lastCombatTrack, lastAmbienceTrack)
+                    if not samePack then
+                        -- pick a different track from same pack
+                        local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks,
+                            lastAmbienceTrack, true)
+                        if track then PlayNextTrack(track) end
+                    else
+                        -- continue same combat track from calculated offset
+                        local offset = GetOffset(lastCombatPosition, lastAmbienceLength, lastCombatTotalLength)
+                        TryPlayTrackWithOffset(lastCombatTrack, offset, lastAmbienceTrack, true)
+                    end
                 else
-                    -- continue same combat track from calculated offset
                     local offset = GetOffset(lastCombatPosition, lastAmbienceLength, lastCombatTotalLength)
-                    TryPlayTrackWithOffset(lastCombatTrack, offset, lastAmbienceTrack, true)
+                    TryPlayTrackWithOffset(lastCombatTrack, offset, lastAmbienceTrack)
                 end
             else
-                local offset = GetOffset(lastCombatPosition, lastAmbienceLength, lastCombatTotalLength)
-                TryPlayTrackWithOffset(lastCombatTrack, offset, lastAmbienceTrack)
+                if exclusivePlay:GetBool() then
+                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks,
+                        lastAmbienceTrack, true)
+                    if track then PlayNextTrack(track) end
+                else
+                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks,
+                        lastAmbienceTrack)
+                    if track then PlayNextTrack(track) end
+                end
             end
-        else
-            if exclusivePlay:GetBool() then
-                local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
-                if track then PlayNextTrack(track) end
-            else
-                local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack)
-                if track then PlayNextTrack(track) end
-            end
+            lastCombatTrackPriority = 0
         end
     else
         if not enableAmbient:GetBool() then
@@ -606,21 +712,69 @@ local function SwitchTrack()
     end
 end
 
+local pendingSwitch = nil
+local pendingTrack = nil
+
 timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
     isInCombat = ply:GetNWBool("BattleBeats_InCombat", false)
     BATTLEBEATS.isInCombat = isInCombat
+
     if isInCombat ~= lastCombatState then
         if ambienceStartTime == nil then ambienceStartTime = CurTime() end
         lastCombatState = isInCombat
-        if isInCombat then combatStartTime = CurTime() else ambienceStartTime = CurTime() end
-        if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-            local success, err = pcall(SwitchTrack)
+        if isInCombat then
+            combatStartTime = CurTime()
+            local npcTrack = GetNPCMatchingTrack()
+            local success, err = pcall(SwitchTrack, npcTrack)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
             end
+        else
+            ambienceStartTime = CurTime()
+            local success, err = pcall(SwitchTrack, nil)
+            if not success then
+                print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
+            end
+            lastCombatTrackPriority = 0 
+        end
+    elseif isInCombat then
+        local npcTrack = GetNPCMatchingTrack()
+        if not npcTrack then return end
+        local newPriority = npcTrack and BATTLEBEATS.npcTrackMappings[npcTrack].priority or 0
+
+        if npcTrack ~= lastCombatTrack and npcTrack ~= pendingTrack then
+            local shouldSwitch = false
+
+            if newPriority > 0 then
+                if lastCombatTrackPriority == 0 or newPriority < lastCombatTrackPriority then
+                    shouldSwitch = true
+                    debugPrint("Switching to higher priority NPC track: " .. npcTrack .. " (priority " .. newPriority .. ")")
+                elseif newPriority == lastCombatTrackPriority then
+                    shouldSwitch = false
+                elseif switchOnLower:GetBool() then
+                    shouldSwitch = true
+                    debugPrint("Switching to lower priority NPC track: " .. npcTrack .. " (priority " .. newPriority .. ")")
+                else
+                    debugPrint("Keeping current track (higher priority active)")
+                end
+            end
+
+            if shouldSwitch then
+                pendingSwitch = { track = npcTrack, time = CurTime() + 2 }
+                pendingTrack = npcTrack
+            end
+        end
+
+        if pendingSwitch and CurTime() >= pendingSwitch.time then
+            local success, err = pcall(SwitchTrack, pendingSwitch.track)
+            if not success then
+                print("[BattleBeats Client] NPC track switch error: " .. tostring(err))
+            end
+            pendingSwitch = nil
+            pendingTrack = nil
         end
     end
 end)
