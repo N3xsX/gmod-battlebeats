@@ -186,7 +186,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
         ExpandPanel(panel, finalX, finalY, finalWidth, finalHeight)
     end)
 
-    surface.SetFont("CloseCaption_Bold")
+    surface.SetFont("BattleBeats_Notification_Font")
 
     local textX = 10
     local radius = 16
@@ -211,7 +211,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
         draw.RoundedBoxEx(radius, 0, 0, w, radius, c3, true, true, false, false)
         surface.SetDrawColor(c3)
         surface.DrawRect(0, radius, w, h - radius)
-        draw.SimpleText("NOW PLAYING", "HudHintTextLarge", progressBarX + progressBarWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
+        draw.SimpleText("NOW PLAYING", "BattleBeats_Notification_Font_Misc", finalWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
 
         surface.SetTexture(gradient)
         surface.DrawTexturedRect(0, 0, w, h)
@@ -272,10 +272,10 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
             if textX < -textWidth - 50 then
                 textX = textX + textWidth + 40
             end
-            draw.SimpleText(trackName, "CloseCaption_Bold", textX + 30, 25, textColor, TEXT_ALIGN_LEFT)
-            draw.SimpleText(trackName, "CloseCaption_Bold", textX + textWidth + 70, 25, textColor, TEXT_ALIGN_LEFT)
+            draw.SimpleText(trackName, "BattleBeats_Notification_Font", textX + 30, 25, textColor, TEXT_ALIGN_LEFT)
+            draw.SimpleText(trackName, "BattleBeats_Notification_Font", textX + textWidth + 70, 25, textColor, TEXT_ALIGN_LEFT)
         else
-            draw.SimpleText(trackName, "CloseCaption_Bold", 150, 25, textColor, TEXT_ALIGN_CENTER)
+            draw.SimpleText(trackName, "BattleBeats_Notification_Font", 150, 25, textColor, TEXT_ALIGN_CENTER)
         end
 
         if showBar:GetBool() then
@@ -289,10 +289,8 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
             else
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c1)
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, textColor)
-                draw.SimpleText(BATTLEBEATS.FormatTime(currentTime), "CenterPrintText", progressBarX - 30,
-                    progressBarY - 6, c2, TEXT_ALIGN_LEFT)
-                draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText",
-                    progressBarX + progressBarWidth + 5, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
+                draw.SimpleText(BATTLEBEATS.FormatTime(currentTime), "CenterPrintText", progressBarX - 30, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
+                draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
             end
         elseif showNotificationPackName:GetBool() then
             draw.SimpleText("From: " .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)

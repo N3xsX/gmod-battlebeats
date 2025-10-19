@@ -17,7 +17,7 @@ local function CreateCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
         local enabled = GetConVar(cvarName):GetBool()
         local targetX = enabled and (w - knobSize - 2) or 2
         self.KnobX = Lerp(FrameTime() * 10, self.KnobX, targetX)
-        local bgColor = enabled and Color(50, 200, 50) or Color(90, 90, 90)
+        local bgColor = enabled and Color(255, 210, 0) or Color(90, 90, 90)
         draw.RoundedBox(h / 2, 0, 0, w, h, bgColor)
         draw.RoundedBox(h, self.KnobX, 2, knobSize, knobSize, Color(230, 230, 230))
     end
@@ -46,10 +46,10 @@ local function CreateCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     label:SetPos(width + spacing, (panel:GetTall() - label:GetTall()) / 2)
 
     switch.OnCursorEntered = function(self) self:SetCursor("hand") end
-    switch.OnCursorExited  = function(self) self:SetCursor("arrow") end
-    panel.OnCursorEntered  = switch.OnCursorEntered
-    panel.OnCursorExited   = switch.OnCursorExited
-    panel.OnMousePressed   = switch.OnMousePressed
+    switch.OnCursorExited = function(self) self:SetCursor("arrow") end
+    panel.OnCursorEntered = switch.OnCursorEntered
+    panel.OnCursorExited = switch.OnCursorExited
+    panel.OnMousePressed = switch.OnMousePressed
 
     return panel
 end
@@ -75,7 +75,7 @@ local function CreateCustomNumSlider(parent, x, y, labelText, cvarName, min, max
     sliderBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
         local progress = (GetConVar(cvarName):GetInt() - min) / (max - min)
-        draw.RoundedBox(4, 0, 0, w * progress, h, Color(50, 255, 50))
+        draw.RoundedBox(4, 0, 0, w * progress, h, Color(255, 210, 0))
     end
 
     local function UpdateSlider(bar, x)
@@ -136,7 +136,7 @@ local function CreateArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     sliderBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
         local progress = (GetConVar(cvarName):GetInt() - min) / (max - min)
-        draw.RoundedBox(4, 0, 0, w * progress, h, Color(50, 255, 50))
+        draw.RoundedBox(4, 0, 0, w * progress, h, Color(255, 210, 0))
     end
 
     local leftBtn = vgui.Create("DButton", panel)

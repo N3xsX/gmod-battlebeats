@@ -3,61 +3,154 @@ local assignFrame
 local isLooping = false
 local skipExcluded = false
 
+local wsCache = {}
+
 local volumeSet = GetConVar("battlebeats_volume")
 local persistentNotification = GetConVar("battlebeats_persistent_notification")
 local showPreviewNotification = GetConVar("battlebeats_show_preview_notification")
 
+surface.CreateFont("BattleBeats_Font", {
+    font = "Roboto Bold",
+    size = 30,
+    weight = 800,
+    antialias = true,
+    shadow = true
+})
+
+surface.CreateFont("BattleBeats_Player_Font", {
+    font = "Roboto Bold",
+    size = 46,
+    weight = 800,
+    antialias = true,
+    shadow = true
+})
+
+surface.CreateFont("BattleBeats_Checkbox_Font", {
+    font = "Roboto Regular",
+    size = 18,
+    weight = 200,
+    antialias = true,
+})
+
+surface.CreateFont("BattleBeats_Notification_Font", {
+    font = "Roboto Medium",
+    size = 28,
+    weight = 800,
+    antialias = true,
+})
+
+surface.CreateFont("BattleBeats_Notification_Font_Misc", {
+    font = "Roboto Light",
+    size = 16,
+    weight = 500,
+    antialias = true,
+})
+
 --MARK:Steamworks info
+local function CreateInfoBoxes(panel, size, date, ownerName)
+    if not IsValid(panel) then return end
+    local buttonWidth, buttonHeight, spacing = 200, 30, 40
+    local panelWidth = panel:GetWide()
+    local totalWidth = buttonWidth * 3 + spacing * 2
+    local startX = (panelWidth - totalWidth) / 2
+    local y = 120
+
+    local function AddInfoBox(text, x)
+        local box = vgui.Create("DPanel", panel)
+        box:SetSize(buttonWidth, buttonHeight)
+        box:SetPos(x, y)
+        box.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, Color(60, 60, 60))
+        end
+
+        local label = vgui.Create("DLabel", box)
+        label:SetText(text)
+        label:SetFont("DermaDefault")
+        label:SetTextColor(Color(200, 200, 200))
+        label:SizeToContents()
+        label:Center()
+
+        table.insert(panel.infoPanels, box)
+    end
+
+    AddInfoBox("Size: " .. size, startX)
+    AddInfoBox("Created: " .. date, startX + buttonWidth + spacing)
+    AddInfoBox("Author: " .. ownerName, startX + (buttonWidth + spacing) * 2)
+end
+
 local function CreateInfoPanel(panel, packData)
     if not IsValid(panel) then return end
     panel.infoPanels = {}
-    local function CreateInfoBoxes(panel, size, date, ownerName)
-        if not IsValid(panel) then return end
-        local buttonWidth, buttonHeight, spacing = 200, 30, 40
-        local panelWidth = panel:GetWide()
-        local totalWidth = buttonWidth * 3 + spacing * 2
-        local startX = (panelWidth - totalWidth) / 2
-        local y = 120
 
-        local function AddInfoBox(text, x)
-            local box = vgui.Create("DPanel", panel)
-            box:SetSize(buttonWidth, buttonHeight)
-            box:SetPos(x, y)
-            box.Paint = function(self, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, Color(60, 60, 60))
-            end
-
-            local label = vgui.Create("DLabel", box)
-            label:SetText(text)
-            label:SetFont("DermaDefault")
-            label:SetTextColor(Color(200, 200, 200))
-            label:SizeToContents()
-            label:Center()
-
-            table.insert(panel.infoPanels, box)
-        end
-
-        AddInfoBox("Size: " .. size, startX)
-        AddInfoBox("Created: " .. date, startX + buttonWidth + spacing)
-        AddInfoBox("Author: " .. ownerName, startX + (buttonWidth + spacing) * 2)
+    local wsid = packData.wsid
+    local function ApplyInfo(result)
+        local size = result.size and string.NiceSize(result.size) or "N/A"
+        local date = result.created and os.date("%Y-%m-%d", result.created) or "N/A"
+        local ownerName = result.ownername or "N/A"
+        CreateInfoBoxes(panel, size, date, ownerName)
     end
+
     CreateInfoBoxes(panel, "Loading...", "Loading...", "Loading...")
-    if packData.wsid then
-        steamworks.FileInfo(packData.wsid, function(result)
-            if not result then
-                CreateInfoBoxes(panel, "N/A", "N/A", "N/A")
-                return
-            end
 
-            local size = result.size and string.NiceSize(result.size) or "N/A"
-            local date = result.created and os.date("%Y-%m-%d", result.created) or "N/A"
-            local ownerName = result.ownername or "N/A"
-
-            CreateInfoBoxes(panel, size, date, ownerName)
-        end)
-    else
+    if not wsid then
         CreateInfoBoxes(panel, "N/A", "N/A", "N/A")
+        return
     end
+
+    if wsCache[wsid] then
+        ApplyInfo(wsCache[wsid])
+        return
+    end
+
+    steamworks.FileInfo(wsid, function(result)
+        if not result then
+            result = { size = nil, created = nil, ownername = nil }
+        end
+        wsCache[wsid] = result
+        ApplyInfo(result)
+    end)
+end
+
+local function GetPackInfo(packName)
+    local formattedName = packName
+    local packType = "na"
+
+    if packName:match("^[Bb][Aa][Tt][Tt][Ll][Ee][Bb][Ee][Aa][Tt][Ss] %- ") then
+        formattedName = packName:gsub("^[Bb][Aa][Tt][Tt][Ll][Ee][Bb][Ee][Aa][Tt][Ss] %- ", "", 1)
+        packType = "battlebeats"
+    elseif packName:match("^[Nn][Oo][Mm][Bb][Aa][Tt] %- ") then
+        formattedName = packName:gsub("^[Nn][Oo][Mm][Bb][Aa][Tt] %- ", "", 1)
+        packType = "nombat"
+    elseif packName:match("^[Ss][Bb][Mm]") then
+        formattedName = packName
+        formattedName = formattedName:gsub("^[Ss][Bb][Mm] [Dd][Ll][Cc]: ", "", 1)
+        formattedName = formattedName:gsub("^[Ss][Bb][Mm]: ", "", 1)
+        packType = "sbm"
+    elseif packName:match("^%[16[Tt][Hh][Nn][Oo][Tt][Ee]%]") then
+        formattedName = packName:gsub("^%[16[Tt][Hh][Nn][Oo][Tt][Ee]%]", "", 1)
+        packType = "16th"
+    else
+        packType = "na"
+    end
+
+    return formattedName:Trim(), packType
+end
+
+local packIcons = {
+    ["battlebeats"] = Material("btb.png"),
+    ["nombat"] = Material("nombat.jpg"),
+    ["sbm"] = Material("sbm.jpg"),
+    ["16th"] = Material("16th.jpg"),
+    ["na"] = Material("na.jpg")
+}
+
+local function LerpColor(t, from, to)
+    return Color(
+        Lerp(t, from.r, to.r),
+        Lerp(t, from.g, to.g),
+        Lerp(t, from.b, to.b),
+        Lerp(t, from.a or 255, to.a or 255)
+    )
 end
 
 --MARK:Main UI
@@ -94,6 +187,17 @@ local function OpenMusicMenu()
                     frame.isMinimalized = true
                 end
             end
+        end
+    end
+
+    for _, packData in pairs(BATTLEBEATS.musicPacks) do
+        local wsid = packData.wsid
+        if wsid and not wsCache[wsid] then
+            steamworks.FileInfo(wsid, function(result)
+                if result then
+                    wsCache[wsid] = result
+                end
+            end)
         end
     end
 
@@ -154,7 +258,7 @@ local function OpenMusicMenu()
         draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
         local cvar = volumeSet
         local progress = cvar:GetInt() / 200
-        draw.RoundedBox(4, 0, 0, w * progress, h, Color(50, 255, 50))
+        draw.RoundedBox(4, 0, 0, w * progress, h, Color(255, 210, 0))
     end
 
     local dotPanel = vgui.Create("DPanel", volumePanel)
@@ -264,10 +368,10 @@ local function OpenMusicMenu()
     totalTimeLabel:SetContentAlignment(6)
 
     local trackNameLabel = vgui.Create("DLabel", playerPanel)
-    trackNameLabel:SetPos(45, 20)
-    trackNameLabel:SetSize(880, 30)
+    trackNameLabel:SetPos(45, 15)
+    trackNameLabel:SetSize(880, 50)
     trackNameLabel:SetText("No Track Selected")
-    trackNameLabel:SetFont("DermaLarge")
+    trackNameLabel:SetFont("BattleBeats_Player_Font")
     trackNameLabel:SetTextColor(Color(255, 255, 255))
     trackNameLabel:SetContentAlignment(5)
 
@@ -462,7 +566,7 @@ local function OpenMusicMenu()
         local trackDuration = IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetLength() or 0
         local progress = trackDuration > 0 and math.Clamp(currentTime / trackDuration, 0, 1) or 0
 
-        draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, Color(50, 255, 50))
+        draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, Color(255, 210, 0))
 
         if self:IsHovered() and trackDuration > 0 then
             local mx, _ = self:CursorPos()
@@ -568,7 +672,7 @@ local function OpenMusicMenu()
             row.isScrolling = false
             row.scrollResetTime = 0
 
-            surface.SetFont("DermaLarge")
+            surface.SetFont("BattleBeats_Font")
             local textWidth = surface.GetTextSize(isFavorite and "★ " .. trackName or trackName)
             local panelWidth = 820
             local scrollSpeed = 60
@@ -604,40 +708,36 @@ local function OpenMusicMenu()
                 offsetIcon:SetImage("icon16/time.png")
             end
 
+            local colorLerp = excluded and Color(255, 0, 0) or Color(255, 210, 0)
+            local targetColor = colorLerp
             local customCheckbox = vgui.Create("DPanel", row)
-            customCheckbox:SetSize(80, 20)
-            customCheckbox:SetPos(860, 15)
-
-            local targetColor = excluded and Color(255, 0, 0) or Color(0, 255, 0)
+            customCheckbox:SetSize(85, 25)
+            customCheckbox:SetPos(860, 12.5)
             customCheckbox.OnCursorEntered = function(self)
                 self:SetCursor("hand")
+                targetColor = excluded and Color(255, 80, 80) or Color(255, 230, 50)
             end
             customCheckbox.OnCursorExited = function(self)
                 self:SetCursor("arrow")
+                targetColor = excluded and Color(255, 0, 0) or Color(255, 210, 0)
             end
+            customCheckbox:SetTooltip(excluded and "Excluded tracks won't be selected by the music player" or "Included packs play normally")
 
-            local checkboxText = vgui.Create("DLabel", customCheckbox)
-            checkboxText:SetFont("DermaDefaultBold")
-            checkboxText:SetText(excluded and "✖ Excluded" or "✔ Included")
-            checkboxText:SetTextColor(Color(255, 255, 255))
-            checkboxText:Dock(FILL)
-            checkboxText:SetContentAlignment(5)
-            customCheckbox:SetTooltip(excluded and "Excluded tracks won’t be selected by the music player" or "Included packs play normally")
-            customCheckbox:SetBackgroundColor(targetColor)
-
-            local function updateCheckboxVisual()
-                checkboxText:SetText(excluded and "✖ Excluded" or "✔ Included")
-                customCheckbox:SetTooltip(excluded and "Excluded tracks won’t be selected by the music player" or "Included packs play normally")
-                customCheckbox:SetBackgroundColor(excluded and Color(255, 0, 0) or Color(0, 255, 0))
-                surface.PlaySound(excluded and "btb_button_disable.mp3" or "btb_button_enable.mp3")
-            end
-
-            customCheckbox.OnMousePressed = function(self, mousecode)
+            customCheckbox.OnMousePressed = function(self)
                 excluded = not excluded
                 BATTLEBEATS.excludedTracks[track] = excluded
                 changesMade = true
                 BATTLEBEATS.SaveExcludedTracks()
-                updateCheckboxVisual()
+                targetColor = excluded and Color(255, 0, 0) or Color(255, 210, 0)
+                customCheckbox:SetTooltip(excluded and "Excluded tracks won't be selected by the music player" or "Included packs play normally")
+                surface.PlaySound(excluded and "btb_button_disable.mp3" or "btb_button_enable.mp3")
+            end
+
+            customCheckbox.Paint = function(self, w, h)
+                colorLerp = LerpColor(FrameTime() * 10, colorLerp, targetColor)
+                draw.RoundedBox(6, 0, 0, w, h, colorLerp)
+                local text = excluded and "✖ Excluded" or "✔ Included"
+                draw.SimpleTextOutlined(text, "BattleBeats_Checkbox_Font", w / 2, 3, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 0.9, Color(0, 0, 0, 200))
             end
 
             row.OnMousePressed = function(self, keyCode)
@@ -682,8 +782,7 @@ local function OpenMusicMenu()
 
                 local screenX, screenY = self:LocalToScreen(0, 0)
                 render.SetScissorRect(screenX, screenY, screenX + panelWidth, screenY + h, true)
-                draw.SimpleText(displayName, "DermaLarge", self.textX, h / 2, Color(255, 255, 255), TEXT_ALIGN_LEFT,
-                    TEXT_ALIGN_CENTER)
+                draw.SimpleTextOutlined(displayName, "BattleBeats_Font", self.textX, h / 2, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 200))
                 render.SetScissorRect(0, 0, 0, 0, false)
             end
 
@@ -862,7 +961,7 @@ local function OpenMusicMenu()
                             priorityCombo:SetPos(290, 45)
                             priorityCombo:SetSize(100, 20)
                             for i = 1, 5 do
-                                priorityCombo:AddChoice(priorityNames[i])
+                                priorityCombo:AddChoice(priorityNames[i], i)
                             end
                             priorityCombo:SetValue(currentNPC and tostring(currentNPC.priority) or "1 (Highest)")
 
@@ -874,8 +973,8 @@ local function OpenMusicMenu()
                             saveButton:SetTextColor(Color(255, 255, 255))
                             saveButton.DoClick = function()
                                 local class = textEntry:GetText()
-                                local _, priorityStr = priorityCombo:GetSelected()
-                                local priority = tonumber(priorityStr) or 1
+                                local _, priority = priorityCombo:GetSelected()
+                                priority = priority or 1
 
                                 if not class or class == "" then
                                     if currentNPC then
@@ -1083,9 +1182,9 @@ local function OpenMusicMenu()
                 local bg = Color(40, 40, 40, 255)
                 draw.RoundedBox(4, 0, 0, w, h, bg)
                 if BATTLEBEATS.musicPacks[selectedPack].packType == "sbm" then
-                    draw.SimpleText("Track names may appear unusual due to the naming conventions used in SBM", "Trebuchet24", w / 2, h / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                    draw.SimpleText("Track names may appear unusual due to the naming conventions used in SBM", "BattleBeats_Font", w / 2, h / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 else
-                    draw.SimpleText("Track names appear unusual due to the naming conventions used in Nombat", "Trebuchet24", w / 2, h / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                    draw.SimpleText("Track names appear unusual due to the naming conventions used in Nombat", "BattleBeats_Font", w / 2, h / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 end
             end
         end
@@ -1240,12 +1339,22 @@ local function OpenMusicMenu()
                 self:SetCursor("arrow")
             end
 
-            local packLabel = vgui.Create("DLabel", panel)
-            packLabel:SetText(packName)
-            packLabel:SetFont("CloseCaption_Bold")
-            packLabel:SetPos(10, 25)
-            packLabel:SetSize(800, 30)
-            packLabel:SetTextColor(Color(255, 255, 255))
+            local packLabel = vgui.Create("DPanel", panel)
+            packLabel:SetPos(10, 5)
+            packLabel:SetSize(800, 80)
+            packLabel:SetPaintBackground(false)
+            packLabel:SetMouseInputEnabled(false)
+            packLabel:SetKeyboardInputEnabled(false)
+
+            local formattedName, packType = GetPackInfo(packName)
+            local iconMat = packIcons[packType] or packIcons["Unknown"]
+
+            packLabel.Paint = function(self, w, h)
+                surface.SetMaterial(iconMat)
+                surface.SetDrawColor(255, 255, 255, 255)
+                surface.DrawTexturedRect(0, 2, 65, 65)
+                draw.SimpleTextOutlined(formattedName, "BattleBeats_Font", 80, 35, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 200))
+            end
 
             if isErrored then
                 local errorIcon = vgui.Create("DImage", panel)
@@ -1265,6 +1374,11 @@ local function OpenMusicMenu()
             customCheckbox:SetSize(80, 30)
             customCheckbox:SetPos(870, 25)
 
+            local currentColor = BATTLEBEATS.currentPacks[packName] and Color(255, 210, 0) or Color(80, 0, 0)
+            local text = BATTLEBEATS.currentPacks[packName] and "Enabled" or "Disabled"
+            local targetColor = currentColor
+            local hoverStrength = 0
+
             customCheckbox.OnCursorEntered = function(self)
                 if not isErrored then
                     self:SetCursor("hand")
@@ -1272,45 +1386,50 @@ local function OpenMusicMenu()
                     self:SetCursor("no")
                 end
             end
+
             customCheckbox.OnCursorExited = function(self)
                 self:SetCursor("arrow")
             end
-
-            local checkboxText = vgui.Create("DLabel", customCheckbox)
-            checkboxText:SetFont("DermaDefaultBold")
-            checkboxText:SetText(BATTLEBEATS.currentPacks[packName] and "Enabled" or "Disabled")
-            checkboxText:SetTextColor(Color(255, 255, 255))
-            checkboxText:Dock(FILL)
-            checkboxText:SetContentAlignment(5)
 
             if not isErrored then
                 customCheckbox.OnMousePressed = function()
                     changesMade = true
                     if BATTLEBEATS.currentPacks[packName] then
                         BATTLEBEATS.currentPacks[packName] = nil
+                        surface.PlaySound("btb_button_disable.mp3")
+                        targetColor = Color(80, 0, 0)
+                        text = "Disabled"
                     else
                         BATTLEBEATS.currentPacks[packName] = true
-                    end
-                    checkboxText:SetText(BATTLEBEATS.currentPacks[packName] and "Enabled" or "Disabled")
-                    if not BATTLEBEATS.currentPacks[packName] then
-                        customCheckbox:SetBackgroundColor(Color(255, 0, 0))
-                        surface.PlaySound("btb_button_disable.mp3")
-                    else
-                        customCheckbox:SetBackgroundColor(Color(0, 255, 0))
                         surface.PlaySound("btb_button_enable.mp3")
+                        targetColor = Color(255, 210, 0)
+                        text = "Enabled"
                     end
                 end
             else
-                customCheckbox:SetBackgroundColor(Color(100, 0, 0))
-                checkboxText:SetText("Unavailable")
+                currentColor = Color(100, 0, 0)
+                targetColor = currentColor
+                text = "Unavailable"
             end
 
-            if not isErrored then
-                if not BATTLEBEATS.currentPacks[packName] then
-                    customCheckbox:SetBackgroundColor(Color(255, 0, 0))
+            customCheckbox.Think = function(self)
+                currentColor = LerpColor(FrameTime() * 10, currentColor, targetColor)
+                if self:IsHovered() and not isErrored then
+                    hoverStrength = Lerp(FrameTime() * 10, hoverStrength, 0.15)
                 else
-                    customCheckbox:SetBackgroundColor(Color(0, 255, 0))
+                    hoverStrength = Lerp(FrameTime() * 10, hoverStrength, 0)
                 end
+            end
+
+            customCheckbox.Paint = function(self, w, h)
+                local drawColor = Color(
+                    math.min(255, currentColor.r + 255 * hoverStrength),
+                    math.min(255, currentColor.g + 255 * hoverStrength),
+                    math.min(255, currentColor.b + 255 * hoverStrength),
+                    255
+                )
+                draw.RoundedBox(6, 0, 0, w, h, drawColor)
+                draw.SimpleTextOutlined(text, "BattleBeats_Checkbox_Font", w / 2, h / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 100))
             end
 
             --MARK:Packs dropdown functions

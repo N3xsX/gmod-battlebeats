@@ -39,7 +39,7 @@ BATTLEBEATS.npcTrackMappings = {}
 BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 
-BATTLEBEATS.currentVersion = "v2.0.1"
+BATTLEBEATS.currentVersion = "v2.1.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -123,17 +123,17 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
     fadeTime = fadeTime or 2
     local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
     local masterVolume = volumeSet:GetInt() / 100
-    local targetVolume = muteVolume or ((volumeType / 100) * masterVolume)
-    if isPreview then targetVolume = muteVolume or masterVolume end
+    local tgVolume = muteVolume or ((volumeType / 100) * masterVolume)
+    if isPreview then tgVolume = muteVolume or masterVolume end
 
     local startVolume = fadeIn and 0 or station:GetVolume()
-    local endVolume = fadeIn and targetVolume or 0
+    local endVolume = fadeIn and tgVolume or 0
     local startTime = CurTime()
     local timerName = "BattleBeats_Fade_" .. tostring(station)
 
-    debugPrint("[FadeMusic] Start " .. (fadeIn and "IN " or "OUT ") .. tostring(station) .. " targetVolume: " .. tostring(targetVolume))
+    debugPrint("[FadeMusic] Start " .. (fadeIn and "IN " or "OUT ") .. tostring(station) .. " targetVolume: " .. tostring(tgVolume))
 
-    timer.Simple(fadeTime + 0.1, function() -- plz god no more ghost tracks
+    timer.Create(timerName .. CurTime(), fadeTime, 3, function()
         if not fadeIn and IsValid(station) then
             debugPrint("[FadeMusic][Failsafe] Stopping station " .. tostring(station))
             station:SetVolume(0)
@@ -141,7 +141,7 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
             station = nil
         end
     end)
-    
+
     timer.Create(timerName, 0.03, fadeTime / 0.03, function()
         if not IsValid(station) then
             debugPrint("[FadeMusic] Station invalid, removing timer " .. tostring(station))
