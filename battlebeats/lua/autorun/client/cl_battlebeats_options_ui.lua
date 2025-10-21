@@ -1,25 +1,22 @@
-local function CreateCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
-    local width, height = 40, 20
-    local knobSize = 16
-
+local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     local panel = vgui.Create("DPanel", parent)
-    panel:SetTall(height)
+    panel:SetTall(20)
     panel:SetPos(0, y)
     panel.Paint = function() end
 
     local switch = vgui.Create("DPanel", panel)
-    switch:SetSize(width, height)
+    switch:SetSize(40, 20)
 
     local enabled = GetConVar(cvarName):GetBool()
-    switch.KnobX = enabled and (width - knobSize - 2) or 2
+    switch.KnobX = enabled and (40 - 16 - 2) or 2
 
     switch.Paint = function(self, w, h)
         local enabled = GetConVar(cvarName):GetBool()
-        local targetX = enabled and (w - knobSize - 2) or 2
+        local targetX = enabled and (w - 16 - 2) or 2
         self.KnobX = Lerp(FrameTime() * 10, self.KnobX, targetX)
         local bgColor = enabled and Color(255, 210, 0) or Color(90, 90, 90)
         draw.RoundedBox(h / 2, 0, 0, w, h, bgColor)
-        draw.RoundedBox(h, self.KnobX, 2, knobSize, knobSize, Color(230, 230, 230))
+        draw.RoundedBox(h, self.KnobX, 2, 16, 16, Color(230, 230, 230))
     end
 
     switch.OnMousePressed = function()
@@ -37,13 +34,12 @@ local function CreateCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     label:SetTextColor(Color(255, 255, 255))
     label:SizeToContents()
 
-    local spacing = 8
-    local totalWidth = width + spacing + label:GetWide()
+    local totalWidth = 40 + 8 + label:GetWide()
     panel:SetWide(totalWidth)
     panel:SetPos(x - totalWidth / 2, y)
 
-    switch:SetPos(0, (panel:GetTall() - height) / 2)
-    label:SetPos(width + spacing, (panel:GetTall() - label:GetTall()) / 2)
+    switch:SetPos(0, (panel:GetTall() - 20) / 2)
+    label:SetPos(40 + 8, (panel:GetTall() - label:GetTall()) / 2)
 
     switch.OnCursorEntered = function(self) self:SetCursor("hand") end
     switch.OnCursorExited = function(self) self:SetCursor("arrow") end
@@ -54,7 +50,7 @@ local function CreateCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     return panel
 end
 
-local function CreateCustomNumSlider(parent, x, y, labelText, cvarName, min, max)
+local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 40)
     panel:SetPos(x, y)
@@ -78,7 +74,7 @@ local function CreateCustomNumSlider(parent, x, y, labelText, cvarName, min, max
         draw.RoundedBox(4, 0, 0, w * progress, h, Color(255, 210, 0))
     end
 
-    local function UpdateSlider(bar, x)
+    local function updateSlider(bar, x)
         local progress = math.Clamp(x / bar:GetWide(), 0, 1)
         local newValue = math.floor(min + progress * (max - min))
         RunConsoleCommand(cvarName, math.Round(newValue, 0))
@@ -87,7 +83,7 @@ local function CreateCustomNumSlider(parent, x, y, labelText, cvarName, min, max
     sliderBar.OnMousePressed = function(self, code)
         if code == MOUSE_LEFT then
             local x, _ = self:CursorPos()
-            UpdateSlider(self, x)
+            updateSlider(self, x)
             self.IsDragging = true
         end
     end
@@ -95,7 +91,7 @@ local function CreateCustomNumSlider(parent, x, y, labelText, cvarName, min, max
     sliderBar.Think = function(self)
         if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
             local x, _ = self:CursorPos()
-            UpdateSlider(self, x)
+            updateSlider(self, x)
         elseif self.IsDragging and not input.IsMouseDown(MOUSE_LEFT) then
             self.IsDragging = false
         end
@@ -111,7 +107,7 @@ local function CreateCustomNumSlider(parent, x, y, labelText, cvarName, min, max
     return panel
 end
 
-local function CreateArrowStepper(parent, x, y, labelText, cvarName, min, max, helpText)
+local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 50)
     panel:SetPos(x, y)
@@ -167,13 +163,13 @@ local function CreateArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     valueLabel:SetTextColor(Color(255, 255, 255))
     valueLabel:SetContentAlignment(5)
 
-    local function UpdateSlider(bar, x)
+    local function updateSlider(bar, x)
         local progress = math.Clamp(x / bar:GetWide(), 0, 1)
         local newValue = math.floor(min + progress * (max - min))
         RunConsoleCommand(cvarName, math.Round(newValue, 0))
     end
 
-    local function UpdateValue(delta)
+    local function updateValue(delta)
         local current = GetConVar(cvarName):GetInt()
         local newVal = math.Clamp(current + delta, min, max)
         RunConsoleCommand(cvarName, newVal)
@@ -182,17 +178,17 @@ local function CreateArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     sliderBar.OnMousePressed = function(self, code)
         if code == MOUSE_LEFT then
             local x, _ = self:CursorPos()
-            UpdateSlider(self, x)
+            updateSlider(self, x)
             self.IsDragging = true
         end
     end
 
     leftBtn.DoClick = function()
-        UpdateValue(-1)
+        updateValue(-1)
     end
 
     rightBtn.DoClick = function()
-        UpdateValue(1)
+        updateValue(1)
     end
 
     sliderBar.Think = function(self)
@@ -200,7 +196,7 @@ local function CreateArrowStepper(parent, x, y, labelText, cvarName, min, max, h
         valueLabel:SetText(val)
         if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
             local x, _ = self:CursorPos()
-            UpdateSlider(self, x)
+            updateSlider(self, x)
         elseif self.IsDragging and not input.IsMouseDown(MOUSE_LEFT) then
             self.IsDragging = false
         end
@@ -216,7 +212,7 @@ local function CreateArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     return panel
 end
 
-local function CreateCustomComboBox(parent, x, y, labelText, cvarName, options, helpText)
+local function createCustomComboBox(parent, x, y, labelText, cvarName, options, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(200, 200)
     panel:SetPos(x, y)
@@ -292,6 +288,29 @@ local function CreateCustomComboBox(parent, x, y, labelText, cvarName, options, 
     return panel
 end
 
+local function createCustomButton(parent, x, y, labelText, cvarName, helpText)
+    local button = vgui.Create("DButton", parent)
+    button:SetSize(200, 30)
+    button:SetPos(x - 100, y)
+    button:SetText(labelText)
+    button:SetTextColor(Color(255, 255, 255))
+
+    button.Paint = function(self, w, h)
+        local bgColor = self:IsHovered() and Color(100, 100, 100) or Color(90, 90, 90)
+        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+    end
+
+    if helpText then
+        button:SetTooltip(helpText)
+    end
+
+    button.DoClick = function()
+        RunConsoleCommand(cvarName)
+    end
+
+    return button
+end
+
 concommand.Add("battlebeats_options", function(ply, cmd, args)
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
@@ -353,42 +372,46 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
         panel:SetVisible(false)
         category.panel = panel
 
+        local contentPanel_2 = contentPanel:GetWide() / 2
+        local contentPanel_NumSlider = (panel:GetWide() - 300) / 2
+
         if category.name == "Sound" then
-            CreateCustomNumSlider(panel, (panel:GetWide() - 300) / 2, 10, "Master Volume", "battlebeats_volume", 0, 200)
-            CreateCustomNumSlider(panel, (panel:GetWide() - 300) / 2, 50, "Ambient Volume", "battlebeats_volume_ambient", 0, 100)
-            CreateCustomNumSlider(panel, (panel:GetWide() - 300) / 2, 90, "Combat Volume", "battlebeats_volume_combat", 0, 100)
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 150, "Enable Ambient", "battlebeats_enable_ambient")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 180, "Enable Combat", "battlebeats_enable_combat")
-            CreateCustomComboBox(panel, (contentPanel:GetWide() / 2 - 100), 220, "On death behavior", "battlebeats_disable_mode", { "Nothing", "Mute completely", "Lower volume" })
+            createCustomNumSlider(panel, contentPanel_NumSlider, 10, "Master Volume", "battlebeats_volume", 0, 200)
+            createCustomNumSlider(panel, contentPanel_NumSlider, 50, "Ambient Volume", "battlebeats_volume_ambient", 0, 100)
+            createCustomNumSlider(panel, contentPanel_NumSlider, 90, "Combat Volume", "battlebeats_volume_combat", 0, 100)
+            createCustomCheckbox(panel, contentPanel_2, 150, "Enable Ambient", "battlebeats_enable_ambient")
+            createCustomCheckbox(panel, contentPanel_2, 180, "Enable Combat", "battlebeats_enable_combat")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 220, "On death behavior", "battlebeats_disable_mode", { "Nothing", "Mute completely", "Lower volume" })
         elseif category.name == "Notifications" then
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "Enable notification", "battlebeats_show_notification")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "Notification always visible", "battlebeats_persistent_notification", "The notification will remain visible for the entire duration of the music, instead of disappearing after a few seconds")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 4, 50, "Show progress bar", "battlebeats_show_status_bar", "Displays a progress bar for the current track (showing total time and current time) at the bottom of the notification")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 50, "Show replay notification", "battlebeats_show_notification_after_continue", "Displays a notification even if the same track is replayed (e.g. after leaving combat before the wait time ends). \n(This is enabled by default if 'Notification always visible' is active)")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 4, 90, "Skip Nombat track names", "battlebeats_skip_nombat_names", "Hides track names like C7 or A2 when playing tracks from Nombat packs")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 90, "Show pack name in notification", "battlebeats_show_notification_pack_name", "Shows the pack name of the currently played track in the notification")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 130, "Enable preview notification", "battlebeats_show_preview_notification", "Shows notification when you are previewing tracks")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 170, "Show notification visualizer", "battlebeats_show_notification_visualizer", "Show FFT bars in the track notification")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 210, "Visualizer amplitude smoothing", "battlebeats_visualizer_smooth", "Enable amplitude smoothing for the visualizer")
-            CreateArrowStepper(panel, (panel:GetWide() - 300) / 2, 250, "Visualizer Boost", "battlebeats_visualizer_boost", 1, 20, "Multiplier for visualizer amplitude boost (used in log scale)")
-            CreateArrowStepper(panel, (panel:GetWide() - 300) / 2, 300, "Notification X position", "battlebeats_notif_x", 0, ScrW(), "Default: " .. tostring(ScrW() - 310))
-            CreateArrowStepper(panel, (panel:GetWide() - 300) / 2, 350, "Notification Y position", "battlebeats_notif_y", 0, ScrH(), "Default: " .. tostring(ScrH() / 6))
+            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "Enable notification", "battlebeats_show_notification")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "Notification always visible", "battlebeats_persistent_notification", "The notification will remain visible for the entire duration of the music, instead of disappearing after a few seconds")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 50, "Show progress bar", "battlebeats_show_status_bar", "Displays a progress bar for the current track (showing total time and current time) at the bottom of the notification")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 50, "Show replay notification", "battlebeats_show_notification_after_continue", "Displays a notification even if the same track is replayed (e.g. after leaving combat before the wait time ends). \n(This is enabled by default if 'Notification always visible' is active)")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 90, "Skip Nombat track names", "battlebeats_skip_nombat_names", "Hides track names like C7 or A2 when playing tracks from Nombat packs")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 90, "Show pack name in notification", "battlebeats_show_notification_pack_name", "Shows the pack name of the currently played track in the notification")
+            createCustomCheckbox(panel, contentPanel_2, 130, "Enable preview notification", "battlebeats_show_preview_notification", "Shows notification when you are previewing tracks")
+            createCustomCheckbox(panel, contentPanel_2, 170, "Show notification visualizer", "battlebeats_show_notification_visualizer", "Show FFT bars in the track notification")
+            createCustomCheckbox(panel, contentPanel_2, 210, "Visualizer amplitude smoothing", "battlebeats_visualizer_smooth", "Enable amplitude smoothing for the visualizer")
+            createArrowStepper(panel, contentPanel_NumSlider, 250, "Visualizer Boost", "battlebeats_visualizer_boost", 1, 20, "Multiplier for visualizer amplitude boost (used in log scale)")
+            createArrowStepper(panel, contentPanel_NumSlider, 300, "Notification X position", "battlebeats_notif_x", 0, ScrW(), "Default: " .. tostring(ScrW() - 310))
+            createArrowStepper(panel, contentPanel_NumSlider, 350, "Notification Y position", "battlebeats_notif_y", 0, ScrH(), "Default: " .. tostring(ScrH() / 6))
         elseif category.name == "M. Player" then
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 10, "Switch to current pack only", "battlebeats_exclusive_play", "When switching between ambient and combat, only tracks from the same pack will be used. When a track ends naturally, the next one will still be chosen randomly from all enabled packs")
-            CreateArrowStepper(panel, (panel:GetWide() - 300) / 2, 50, "Ambient wait time (in seconds)", "battlebeats_ambient_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")
-            CreateArrowStepper(panel, (panel:GetWide() - 300) / 2, 100, "Combat wait time (in seconds)", "battlebeats_combat_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 160, "Always continue previous track", "battlebeats_always_continue", "Skips the wait time and always resumes the previous track until it finishes playing")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 190, "NPC's fight triggers combat", "battlebeats_npc_combat", "Triggers combat when an NPC is targeting other NPCs or players")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 220, "Enable assigned tracks", "battlebeats_enable_assigned_tracks", "Plays assigned tracks when their NPCs are present")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 250, "Exclude assigned tracks", "battlebeats_exclude_mapped_tracks", "Tracks assigned to NPCs will not play when selecting random combat tracks")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 280, "Switch to lower priority", "battlebeats_switch_on_lower_priority", "A track with higher priority will switch to a lower priority (if available) when the NPC with that priority dies")
-            CreateCustomComboBox(panel, (contentPanel:GetWide() / 2 - 100), 310, "Continue Mode", "battlebeats_continue_mode", { "Resume from last position", "Play simultaneously" }, "Resume from last position: the track will continue from where it left off before switching.\nPlay simultaneously: tracks continue playing in the background during switches (not actually audible - they just remain active in the background)")
+            createCustomCheckbox(panel, contentPanel_2, 10, "Switch to current pack only", "battlebeats_exclusive_play", "When switching between ambient and combat, only tracks from the same pack will be used. When a track ends naturally, the next one will still be chosen randomly from all enabled packs")
+            createArrowStepper(panel, contentPanel_NumSlider, 50, "Ambient wait time (in seconds)", "battlebeats_ambient_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")
+            createArrowStepper(panel, contentPanel_NumSlider, 100, "Combat wait time (in seconds)", "battlebeats_combat_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")
+            createCustomCheckbox(panel, contentPanel_2, 160, "Always continue previous track", "battlebeats_always_continue", "Skips the wait time and always resumes the previous track until it finishes playing")
+            createCustomCheckbox(panel, contentPanel_2, 190, "NPC's fight triggers combat", "battlebeats_npc_combat", "Triggers combat when an NPC is targeting other NPCs or players")
+            createCustomCheckbox(panel, contentPanel_2, 220, "Enable assigned tracks", "battlebeats_enable_assigned_tracks", "Plays assigned tracks when their NPCs are present")
+            createCustomCheckbox(panel, contentPanel_2, 250, "Exclude assigned tracks", "battlebeats_exclude_mapped_tracks", "Tracks assigned to NPCs will not play when selecting random combat tracks")
+            createCustomCheckbox(panel, contentPanel_2, 280, "Switch to lower priority", "battlebeats_switch_on_lower_priority", "A track with higher priority will switch to a lower priority (if available) when the NPC with that priority dies")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 310, "Continue Mode", "battlebeats_continue_mode", { "Resume from last position", "Play simultaneously" }, "Resume from last position: the track will continue from where it left off before switching.\nPlay simultaneously: tracks continue playing in the background during switches (not actually audible - they just remain active in the background)")
         elseif category.name == "Misc" then
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 10, "NPC Combat requires LoS", "battlebeats_detection_mode", "LoS - Line of Sight. If enabled, combat will only trigger when you have visual contact with an enemy")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 40, "Auto Popup", "battlebeats_autopopup", "Automatically open the BattleBeats pack selector on startup if no packs are selected")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 70, "Load local packs", "battlebeats_load_local_packs", "Enables loading music packs directly from the addons/ folder without needing to upload them to Workshop. This will not work if Debug Mode is enabled\n(Not intended for testing sound packs - use debug mode for that instead)\n(Requires restart or packs reload)")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 100, "Debug Mode", "battlebeats_debug_mode", "Used for testing sound packs and debugging functions. Some features may be disabled while debug mode is active\n(Requires restart or packs reload)")
-            CreateCustomCheckbox(panel, contentPanel:GetWide() / 2, 130, "Lower volume in menu", "battlebeats_lower_volume_in_menu", "Lowers volume in game/spawn menu ('escape' menu won't work in singleplayer - timers pause when menu is open)")
+            createCustomCheckbox(panel, contentPanel_2, 10, "NPC Combat requires LoS", "battlebeats_detection_mode", "LoS - Line of Sight. If enabled, combat will only trigger when you have visual contact with an enemy")
+            createCustomCheckbox(panel, contentPanel_2, 40, "Auto Popup", "battlebeats_autopopup", "Automatically open the BattleBeats pack selector on startup if no packs are selected")
+            createCustomCheckbox(panel, contentPanel_2, 70, "Load local packs", "battlebeats_load_local_packs", "Enables loading music packs directly from the addons/ folder without needing to upload them to Workshop. This will not work if Debug Mode is enabled\n(Not intended for testing sound packs - use debug mode for that instead)\n(Requires restart or packs reload)")
+            createCustomCheckbox(panel, contentPanel_2, 100, "Debug Mode", "battlebeats_debug_mode", "Used for testing sound packs and debugging functions. Some features may be disabled while debug mode is active\n(Requires restart or packs reload)")
+            createCustomCheckbox(panel, contentPanel_2, 130, "Lower volume in menu", "battlebeats_lower_volume_in_menu", "Lowers volume in game/spawn menu ('escape' menu won't work in singleplayer - timers pause when menu is open)")
+            createCustomButton(panel, contentPanel_2, 160, "Reload Packs", "battlebeats_reload_packs")
         end
 
         button.DoClick = function()

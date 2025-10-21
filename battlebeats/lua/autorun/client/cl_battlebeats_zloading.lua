@@ -60,7 +60,7 @@ end
 
 local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote" }
 
-local function LoadGenericMusicPacks()
+local function loadGenericMusicPacks()
     local startTime = SysTime()
     local addons = engine.GetAddons()
 
@@ -125,7 +125,7 @@ local function LoadGenericMusicPacks()
     debugPrint("[LoadGenericMusicPacks] Finished loading in " .. elapsed .. " seconds")
 end
 
-local function LoadBattleBeatsMusicPacks(isDebug)
+local function loadBattleBeatsMusicPacks(isDebug)
     if isDebug then
         if not debugMode:GetBool() then return end
     else
@@ -213,7 +213,7 @@ local function LoadBattleBeatsMusicPacks(isDebug)
     end
 end
 
-local function CleanupInvalidTracks(tbl)
+local function cleanupInvalidTracks(tbl)
     local toRemove = {}
     for trackPath, _ in pairs(tbl) do
         if not file.Exists(trackPath, "GAME") then
@@ -241,7 +241,7 @@ function BATTLEBEATS.SaveExcludedTracks()
     end
 end
 
-local function LoadExcludedTracks()
+local function loadExcludedTracks()
     BATTLEBEATS.excludedTracks = {}
 
     local paths = { "battlebeats/battlebeats_excluded_tracks.txt", "battlebeats_excluded_tracks.txt" }
@@ -263,7 +263,7 @@ local function LoadExcludedTracks()
             end
         end
     end
-    CleanupInvalidTracks(BATTLEBEATS.excludedTracks)
+    cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
     BATTLEBEATS.SaveExcludedTracks()
 end
 
@@ -277,7 +277,7 @@ function BATTLEBEATS.SaveFavoriteTracks()
     end
 end
 
-local function LoadFavoriteTracks()
+local function loadFavoriteTracks()
     BATTLEBEATS.favoriteTracks = {}
 
     local paths = { "battlebeats/battlebeats_favorite_tracks.txt", "battlebeats_favorite_tracks.txt" }
@@ -299,7 +299,7 @@ local function LoadFavoriteTracks()
             end
         end
     end
-    CleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+    cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
     BATTLEBEATS.SaveFavoriteTracks()
 end
 
@@ -311,14 +311,14 @@ function BATTLEBEATS.SaveNPCMappings()
     file.Write("battlebeats/battlebeats_npc_mappings.txt", util.TableToJSON(data, true))
 end
 
-local function LoadMappedTracks()
+local function loadMappedTracks()
     BATTLEBEATS.npcTrackMappings = {}
 
     if file.Exists("battlebeats/battlebeats_npc_mappings.txt", "DATA") then
         local jsonData = file.Read("battlebeats/battlebeats_npc_mappings.txt", "DATA")
         BATTLEBEATS.npcTrackMappings = util.JSONToTable(jsonData) or {}
 
-        CleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
+        cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
         BATTLEBEATS.SaveNPCMappings()
     end
 end
@@ -328,19 +328,19 @@ function BATTLEBEATS.SaveTrackOffsets()
     file.Write("battlebeats/battlebeats_track_offsets.txt", jsonFavorites)
 end
 
-local function LoadTrackOffsets()
+local function loadTrackOffsets()
     BATTLEBEATS.trackOffsets = {}
 
     if file.Exists("battlebeats/battlebeats_track_offsets.txt", "DATA") then
         local jsonData = file.Read("battlebeats/battlebeats_track_offsets.txt", "DATA")
         BATTLEBEATS.trackOffsets = util.JSONToTable(jsonData) or {}
 
-        CleanupInvalidTracks(BATTLEBEATS.trackOffsets)
+        cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
         BATTLEBEATS.SaveTrackOffsets()
     end
 end
 
-local function LoadSavedPacks()
+local function loadSavedPacks()
     local savedPacks = cookie.GetString("battlebeats_selected_packs", "")
     if savedPacks ~= "" then
         BATTLEBEATS.currentPacks = util.JSONToTable(savedPacks) or {}
@@ -358,7 +358,7 @@ local function LoadSavedPacks()
     else
         print("[BattleBeats Client] No saved packs found")
     end
-    if not table.IsEmpty(BATTLEBEATS.musicPacks) and table.IsEmpty(BATTLEBEATS.currentPacks) /*and autoPopup:GetBool()*/ then
+    if not table.IsEmpty(BATTLEBEATS.musicPacks) and table.IsEmpty(BATTLEBEATS.currentPacks) and autoPopup:GetBool() then
         RunConsoleCommand("battlebeats_menu")
         /*chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
@@ -370,14 +370,14 @@ end
 local versionConVar = GetConVar("battlebeats_seen_version")
 
 hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
-    LoadGenericMusicPacks()
-    LoadBattleBeatsMusicPacks(true)
-    LoadBattleBeatsMusicPacks(false)
-    LoadExcludedTracks()
-    LoadFavoriteTracks()
-    LoadMappedTracks()
-    LoadSavedPacks()
-    LoadTrackOffsets()
+    loadGenericMusicPacks()
+    loadBattleBeatsMusicPacks(true)
+    loadBattleBeatsMusicPacks(false)
+    loadExcludedTracks()
+    loadFavoriteTracks()
+    loadMappedTracks()
+    loadSavedPacks()
+    loadTrackOffsets()
     BATTLEBEATS.ValidatePacks()
     timer.Simple(2, function()
         local conflicts = {
@@ -425,9 +425,10 @@ end)
 concommand.Add("battlebeats_reload_packs", function()
     if IsValid(BATTLEBEATS.frame) then BATTLEBEATS.frame:Close() end
     BATTLEBEATS.musicPacks = {}
-    LoadGenericMusicPacks()
-    LoadBattleBeatsMusicPacks(true)
-    LoadBattleBeatsMusicPacks(false)
+    BATTLEBEATS.checking = false
+    loadGenericMusicPacks()
+    loadBattleBeatsMusicPacks(true)
+    loadBattleBeatsMusicPacks(false)
     BATTLEBEATS.ValidatePacks()
 end)
 

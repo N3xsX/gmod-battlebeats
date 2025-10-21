@@ -17,7 +17,7 @@ function BATTLEBEATS.FormatTime(seconds) -- formats seconds into m:ss
     return string.format("%d:%02d", minutes, secs)
 end
 
-local function CapitalizeLetters(str) -- capitalizes words and fixes punctuation
+local function capitalizeLetters(str) -- capitalizes words and fixes punctuation
     local result = {}
     for part in str:gmatch("[^%.]+") do
         part = part:gsub("^%s+", ""):gsub("%s+$", "")
@@ -43,7 +43,7 @@ function BATTLEBEATS.FormatTrackName(trackName) -- cleans file path, extensions,
     trackName = string.gsub(trackName, "%.mp3$", "") -- remove mp3 suffix
     trackName = string.gsub(trackName, "%.ogg$", "") -- remove ogg suffix
     trackName = string.gsub(trackName, "(_%d%d%d)$", "") -- remove numbers from the end of the track name (for SBM packs)
-    trackName = CapitalizeLetters(trackName)
+    trackName = capitalizeLetters(trackName)
     return trackName
 end
 
@@ -94,7 +94,7 @@ function BATTLEBEATS.HideNotification()
     end
 end
 
-local function ExpandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDone)
+local function expandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDone)
     if not IsValid(panel) then return end
     local startW, startH = 10, 10
     local startX = finalX + (finalWidth - startW) / 2
@@ -134,7 +134,7 @@ local function ExpandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDon
     end
 end
 
-local function GetPackName(trackName)
+local function getPackName(trackName)
     for packName, pack in pairs(BATTLEBEATS.musicPacks) do
         for _, f in ipairs(pack.ambient or {}) do
             if f == trackName then
@@ -162,7 +162,7 @@ local finalWidth, finalHeight = 300, 80
 
 function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
     if not trackName then return end
-    local packName = GetPackName(trackName)
+    local packName = getPackName(trackName)
     trackName = BATTLEBEATS.FormatTrackName(trackName)
 
     if string.match(trackName:lower(), "^[ca]%d+$") and skipNombat:GetBool() then -- if the name of the track is letter A or C then skip it
@@ -183,7 +183,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     panel:SetAlpha(0)
 
     timer.Simple(0.1, function() -- workaround: delay to prevent animation breaking when called during Initialization
-        ExpandPanel(panel, finalX, finalY, finalWidth, finalHeight)
+        expandPanel(panel, finalX, finalY, finalWidth, finalHeight)
     end)
 
     surface.SetFont("BattleBeats_Notification_Font")
@@ -304,7 +304,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     end
 end
 
-local function AddNotificationPreview() -- shows outline box when adjusting notif X/Y
+local function addNotificationPreview() -- shows outline box when adjusting notif X/Y
     local startTime = CurTime()
     local finalX = notifX:GetInt()
     local finalY = notifY:GetInt()
@@ -325,5 +325,5 @@ local function AddNotificationPreview() -- shows outline box when adjusting noti
     end)
 end
 
-cvars.AddChangeCallback("battlebeats_notif_x", function() AddNotificationPreview() end, "BattleBeatsNotifX")
-cvars.AddChangeCallback("battlebeats_notif_y", function() AddNotificationPreview() end, "BattleBeatsNotifY")
+cvars.AddChangeCallback("battlebeats_notif_x", function() addNotificationPreview() end, "BattleBeatsNotifX")
+cvars.AddChangeCallback("battlebeats_notif_y", function() addNotificationPreview() end, "BattleBeatsNotifY")
