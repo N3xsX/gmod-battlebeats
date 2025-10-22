@@ -233,4 +233,10 @@ BATTLEBEATS.FadeMusic(BATTLEBEATS.currentStation, false, 3)
 -- Show a track notification in orange color
 BATTLEBEATS.ShowTrackNotification("sound/mymusic/combat/action.ogg", true, false)
 -- This will show as: "Action"
+
+-- Play a random track from the player's enabled music packs,
+-- taking into account any tracks the player has excluded
+-- Used in the "Force Next Track" command
+local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+if track then BATTLEBEATS.PlayNextTrack(track) end
 ```
