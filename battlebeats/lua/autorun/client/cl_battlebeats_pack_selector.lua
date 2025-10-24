@@ -178,6 +178,12 @@ local function validateTracksInPack(packName)
         end
     end
 
+    MsgC(
+        Color(255, 255, 0), "[BattleBeats Debug] ",
+        color_white, "Verifying pack: ",
+        Color(0, 255, 255), packName .. "\n"
+    )
+
     local trackIndex = 1
     packData.verifying = true
 
@@ -191,7 +197,6 @@ local function validateTracksInPack(packName)
                 packNames = {}
                 currentPackIndex = 1
                 if errorCount > 0 then
-                    packData.error = "Verification failed - found " .. errorCount .. " error(s)"
                     MsgC(
                         Color(255, 255, 0), "[BattleBeats Debug] ",
                         color_white, "Pack verification",
@@ -200,7 +205,7 @@ local function validateTracksInPack(packName)
                         Color(255, 0, 0), tostring(errorCount),
                         color_white, " error(s)\n"
                     )
-                    notification.AddLegacy("[BattleBeats] Pack verification FAILED! Found " .. tostring(errorCount) .. " error(s)", NOTIFY_GENERIC, 4)
+                    notification.AddLegacy("[BattleBeats] Pack verification FAILED! Found " .. tostring(errorCount) .. " error(s)", NOTIFY_ERROR, 4)
                     surface.PlaySound("buttons/button8.wav")
                 else
                     MsgC(
@@ -209,7 +214,7 @@ local function validateTracksInPack(packName)
                         Color(0, 255, 0), " PASSED! ",
                         color_white, "No errors found\n"
                     )
-                    notification.AddLegacy("[BattleBeats] Pack verification PASSED!", NOTIFY_GENERIC, 4)
+                    notification.AddLegacy("[BattleBeats] Pack verification PASSED!", NOTIFY_HINT, 4)
                     surface.PlaySound("buttons/button14.wav")
                 end
                 errorCount = 0
@@ -1458,6 +1463,7 @@ local function openBTBmenu()
 
         --MARK:Packs found
         for packName, _ in pairs(BATTLEBEATS.musicPacks) do
+            local debugMode = GetConVar("battlebeats_debug_mode"):GetBool()
             local packData = BATTLEBEATS.musicPacks[packName]
             if not BATTLEBEATS.checking then
                 if packData.debug == true then
@@ -1524,6 +1530,9 @@ local function openBTBmenu()
                         createError()
                     end
                     return
+                elseif debugMode and not packData.debug then
+                    draw.RoundedBox(4, 0, 0, w, h, Color(10, 10, 10, 200))
+                    return
                 end
                 local bgColor = self:IsHovered() and cHover2 or cHover
                 if packData.packType == "local" then bgColor = self:IsHovered() and c50140140200 or c50120120200 end
@@ -1544,11 +1553,11 @@ local function openBTBmenu()
             end
 
             panel.OnCursorEntered = function(self)
-                if not isErrored and not packData.verifying then
+                if not isErrored and not packData.verifying and not (debugMode and not packData.debug) then
                     self:SetCursor("hand")
                 elseif packData.verifying then
                     self:SetCursor("hourglass")
-                elseif isErrored then
+                elseif isErrored or (debugMode and not packData.debug) then
                     self:SetCursor("no")
                 end
             end
@@ -1573,6 +1582,12 @@ local function openBTBmenu()
                     surface.DrawTexturedRect(0, 2, 65, 65)
                     draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, c255255255100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
+                elseif debugMode and not packData.debug then
+                    surface.SetMaterial(Material("block.png"))
+                    surface.SetDrawColor(255, 255, 255, 150)
+                    surface.DrawTexturedRect(0, 2, 65, 65)
+                    draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, c255255255100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                    return
                 end
                 surface.SetMaterial(iconMat)
                 surface.SetDrawColor(color_white)
@@ -1585,9 +1600,9 @@ local function openBTBmenu()
 
             local hoverStrength = 0
             customCheckbox.OnCursorEntered = function(self)
-                if not isErrored and not packData.verifying then
+                if not isErrored and not packData.verifying and not debugMode then
                     self:SetCursor("hand")
-                elseif isErrored or packData.verifying then
+                elseif isErrored or packData.verifying or debugMode then
                     self:SetCursor("no")
                 end
             end
@@ -1598,8 +1613,8 @@ local function openBTBmenu()
 
             if not isErrored then
                 customCheckbox.OnMousePressed = function()
-                    if checking then
-                        notification.AddLegacy("Cannot edit pack during verification", NOTIFY_ERROR, 3)
+                    if debugMode then
+                        notification.AddLegacy("Cannot toggle packs while debug mode is active!", NOTIFY_ERROR, 3)
                         surface.PlaySound("buttons/button10.wav")
                         return
                     end
@@ -1632,11 +1647,17 @@ local function openBTBmenu()
             end
 
             local c255255255200 = Color(255, 255, 255, 200)
+            local c2001300200 = Color(200, 130, 0, 200)
             local c000100 = Color(0, 0, 0, 100)
+            local c303030 = Color(30, 30, 30)
             customCheckbox.Paint = function(self, w, h)
                 if packData.verifying then
-                    draw.RoundedBox(6, 0, 0, w, h, c707070255)
+                    draw.RoundedBox(6, 0, 0, w, h, c2001300200)
                     draw.SimpleText("Verifying", "BattleBeats_Checkbox_Font", w / 2, h / 2, c255255255200, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                    return
+                elseif debugMode and not isErrored then
+                    draw.RoundedBox(6, 0, 0, w, h, c303030)
+                    draw.SimpleText("N/A", "BattleBeats_Checkbox_Font", w / 2, h / 2, c255255255200, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                     return
                 end
                 local drawColor = Color(
@@ -1726,13 +1747,16 @@ local function openBTBmenu()
 
             --MARK:Packs dropdown
             panel.OnMousePressed = function()
-                if checking then
+                if checking and not (debugMode and not packData.debug) then
                     notification.AddLegacy("Cannot edit packs during verification", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button10.wav")
                     return
-                end
-                if isErrored then
+                elseif isErrored then
                     notification.AddLegacy("This pack has an error and cannot be edited!", NOTIFY_ERROR, 3)
+                    surface.PlaySound("buttons/button10.wav")
+                    return
+                elseif debugMode and not packData.debug then
+                    notification.AddLegacy("Cannot edit workshop packs while debug mode is active!", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button10.wav")
                     return
                 end

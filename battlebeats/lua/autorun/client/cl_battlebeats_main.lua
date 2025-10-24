@@ -39,7 +39,7 @@ BATTLEBEATS.npcTrackMappings = {}
 BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 
-BATTLEBEATS.currentVersion = "v2.1.1"
+BATTLEBEATS.currentVersion = "v2.1.3"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -411,6 +411,10 @@ local function PlayNextTrack(track, time, noFade, priority)
                     debugPrint("[PlayNextTrack] Track stopped unexpectedly. Selecting next track")
                     timer.Remove("BattleBeats_CheckSound")
                     if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
+                    if (isInCombat and not enableCombat:GetBool()) or
+                        (not isInCombat and not enableAmbient:GetBool()) then
+                        return
+                    end
                     if priority then -- looping assigned tracks
                         PlayNextTrack(track, 0, false, priority)
                         local state = BATTLEBEATS.priorityStates[priority] or {}
@@ -580,11 +584,13 @@ timer.Create("BattleBeats_ClientAliveCheck", 1, 0, function()
     end
 end)
 
+local volumeFrameOn = false
 timer.Create("BattleBeats_ClientAliveSoundCheck", 5, 0, function() -- sanity check
     if isAlive and not lastMuteState and (IsValid(currentStation) or IsValid(currentPreviewStation))
         and not timer.Exists("BattleBeats_SmoothFade")
         and not (IsValid(currentStation) and timer.Exists("BattleBeats_Fade_" .. tostring(currentStation)))
         and not (IsValid(currentPreviewStation) and timer.Exists("BattleBeats_Fade_" .. tostring(currentPreviewStation))) then
+        if volumeFrameOn then return end
         local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
         local masterVolume = volumeSet:GetInt() / 100
         if IsValid(currentStation) then currentStation:SetVolume((volumeType / 100) * masterVolume) end
@@ -803,8 +809,8 @@ end)
 --MARK:Misc
 --------------------------------------------------------------------------------------
 
-cvars.AddChangeCallback("battlebeats_enable_ambient", function(_, old_value, new_value)
-    if tonumber(new_value) == 0 and not isInCombat then
+cvars.AddChangeCallback("battlebeats_enable_ambient", function(_, _, newValue)
+    if tonumber(newValue) == 0 and not isInCombat then
         if currentStation and IsValid(currentStation) then FadeMusic(currentStation, false) end
         removeSoundTimers()
         BATTLEBEATS.HideNotification()
@@ -816,16 +822,16 @@ cvars.AddChangeCallback("battlebeats_enable_ambient", function(_, old_value, new
     end
 end)
 
-cvars.AddChangeCallback("battlebeats_show_preview_notification", function(_, old_value, new_value)
-    if tonumber(new_value) == 0 then
+cvars.AddChangeCallback("battlebeats_show_preview_notification", function(_, _, newValue)
+    if tonumber(newValue) == 0 then
         if IsValid(currentPreviewStation) then BATTLEBEATS.HideNotification() end
     else
         if IsValid(currentPreviewStation) then BATTLEBEATS.ShowTrackNotification(BATTLEBEATS.currentPreviewTrack, false, true) end
     end
 end)
 
-cvars.AddChangeCallback("battlebeats_persistent_notification", function(_, old_value, new_value)
-    if tonumber(new_value) == 0 then
+cvars.AddChangeCallback("battlebeats_persistent_notification", function(_, _, newValue)
+    if tonumber(newValue) == 0 then
         BATTLEBEATS.HideNotification()
     else
         if currentStation and IsValid(currentStation) then
@@ -834,8 +840,8 @@ cvars.AddChangeCallback("battlebeats_persistent_notification", function(_, old_v
     end
 end)
 
-cvars.AddChangeCallback("battlebeats_show_notification", function(_, old_value, new_value)
-    if tonumber(new_value) == 0 then
+cvars.AddChangeCallback("battlebeats_show_notification", function(_, _, newValue)
+    if tonumber(newValue) == 0 then
         BATTLEBEATS.HideNotification()
     else
         if currentStation and IsValid(currentStation) and persistentNotification:GetBool() then
@@ -858,21 +864,21 @@ local function applyVolume(vol)
     end
 end
 
-cvars.AddChangeCallback("battlebeats_volume_ambient", function(_, old_value, new_value)
-    local newVolume = tonumber(new_value)
+cvars.AddChangeCallback("battlebeats_volume_ambient", function(_, _, newValue)
+    local newVolume = tonumber(newValue)
     if not newVolume then return end
     applyVolume(volumeSet:GetInt())
 end)
 
 
-cvars.AddChangeCallback("battlebeats_volume_combat", function(_, old_value, new_value)
-    local newVolume = tonumber(new_value)
+cvars.AddChangeCallback("battlebeats_volume_combat", function(_, _, newValue)
+    local newVolume = tonumber(newValue)
     if not newVolume then return end
     applyVolume(volumeSet:GetInt())
 end)
 
-cvars.AddChangeCallback("battlebeats_lower_volume_in_menu", function(_, old_value, new_value)
-    if tonumber(new_value) == 0 then
+cvars.AddChangeCallback("battlebeats_lower_volume_in_menu", function(_, _, newValue)
+    if tonumber(newValue) == 0 then
         lastMuteState = false
     end
 end)
@@ -896,15 +902,13 @@ local function createButton(text, x, y, callback, cancel)
     return btn
 end
 
-cvars.AddChangeCallback("battlebeats_volume", function(_, old_value, new_value)
-    local newVolume = tonumber(new_value)
+cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
+    local newVolume = tonumber(newValue)
     if not newVolume then return end
     if IsValid(warningBox) then return end
-    if IsValid(currentPreviewStation) then currentPreviewStation:SetVolume(new_value / 100) end
 
     if newVolume > 200 then
-        if IsValid(warningBox) then return end
-
+        volumeFrameOn = true
         warningBox = vgui.Create("DFrame")
         warningBox:SetSize(420, 180)
         warningBox:Center()
@@ -923,6 +927,9 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, old_value, new_value)
             draw.SimpleText("Proceed only if you understand the risk", "DermaDefault", w / 2, 90, Color(200, 200, 255),
                 TEXT_ALIGN_CENTER)
         end
+        warningBox.OnClose = function ()
+            volumeFrameOn = false
+        end
 
         createButton("I understand the risk", 20, 120, function()
             applyVolume(newVolume)
@@ -930,7 +937,7 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, old_value, new_value)
         end)
 
         createButton("Cancel", 220, 120, function()
-            RunConsoleCommand("battlebeats_volume", tostring(math.min(old_value or 100, 200)))
+            RunConsoleCommand("battlebeats_volume", tostring(math.min(oldValue or 100, 200)))
             warningBox:Close()
         end, true)
     else
