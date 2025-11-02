@@ -30,6 +30,10 @@ local function CheckCombatState(ply)
     if not IsValid(ply) then return end
 
     local combatEnabled = ply:GetInfoNum("battlebeats_enable_combat", 1)
+    local forceCombat = ply:GetInfoNum("battlebeats_force_combat", 0)
+    if forceCombat == 1 then
+        return
+    end
     if combatEnabled == 0 then
         ply:SetNWBool("BattleBeats_InCombat", false)
         return

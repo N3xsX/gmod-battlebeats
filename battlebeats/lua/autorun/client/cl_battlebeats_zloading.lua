@@ -379,6 +379,9 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadSavedPacks()
     loadTrackOffsets()
     BATTLEBEATS.ValidatePacks()
+    for songName, _ in pairs(BATTLEBEATS.subtitles) do
+        BATTLEBEATS.parseSRT(songName)
+    end
     timer.Simple(2, function()
         local conflicts = {
             ["270169947"]  = "Nombat",
@@ -403,7 +406,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -411,15 +414,15 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- You can now assign NPCs to combat tracks\n",
-            Color(150, 255, 150), "- You can now add offsets to tracks"
+            Color(150, 255, 150), "- You can now force combat music to play all the time\n",
+            Color(150, 255, 150), "- You can now add subtitles to your tracks"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

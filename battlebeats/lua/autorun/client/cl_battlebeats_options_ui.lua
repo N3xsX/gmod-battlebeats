@@ -334,10 +334,11 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
     end
 
     local categories = {
-        { name = "Sound", panel = nil },
-        { name = "Notifications", panel = nil },
-        { name = "M. Player", panel = nil },
-        { name = "Misc", panel = nil }
+        {name = "Sound", panel = nil},
+        {name = "Notifications", panel = nil},
+        {name = "Subtitles", panel = nil},
+        {name = "M. Player", panel = nil},
+        {name = "Misc", panel = nil}
     }
 
     local contentPanel = vgui.Create("DPanel", frame)
@@ -352,6 +353,7 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
     for i, category in ipairs(categories) do
         local button = vgui.Create("DButton", tabPanel)
         button:SetText(category.name)
+        button:SetFont("CreditsText")
         button:SetPos((i - 1) * tabWidth, 0)
         button:SetSize(tabWidth, 40)
         button:SetTextColor(Color(255, 255, 255))
@@ -372,6 +374,13 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
         panel:SetVisible(false)
         category.panel = panel
 
+        local versionlabel = vgui.Create("DLabel", panel)
+        versionlabel:SetText("BattleBeats version: " .. BATTLEBEATS.currentVersion)
+        versionlabel:SetPos((contentPanel:GetWide() - 150) / 2, 440)
+        versionlabel:SetSize(150, 20)
+        versionlabel:SetTextColor(Color(80, 80, 80, 200))
+        versionlabel:SetContentAlignment(5)
+
         local contentPanel_2 = contentPanel:GetWide() / 2
         local contentPanel_NumSlider = (panel:GetWide() - 300) / 2
 
@@ -381,7 +390,8 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
             createCustomNumSlider(panel, contentPanel_NumSlider, 90, "Combat Volume", "battlebeats_volume_combat", 0, 100)
             createCustomCheckbox(panel, contentPanel_2, 150, "Enable Ambient", "battlebeats_enable_ambient")
             createCustomCheckbox(panel, contentPanel_2, 180, "Enable Combat", "battlebeats_enable_combat")
-            createCustomComboBox(panel, (contentPanel_2 - 100), 220, "On death behavior", "battlebeats_disable_mode", { "Nothing", "Mute completely", "Lower volume" })
+            createCustomCheckbox(panel, contentPanel_2, 210, "Force Combat", "battlebeats_force_combat", "Forces combat music to play regardless of nearby hostile NPCs. This won't work if combat music is disabled")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 250, "On death behavior", "battlebeats_disable_mode", { "Nothing", "Mute completely", "Lower volume" })
         elseif category.name == "Notifications" then
             createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "Enable notification", "battlebeats_show_notification")
             createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "Notification always visible", "battlebeats_persistent_notification", "The notification will remain visible for the entire duration of the music, instead of disappearing after a few seconds")
@@ -395,6 +405,8 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
             createArrowStepper(panel, contentPanel_NumSlider, 250, "Visualizer Boost", "battlebeats_visualizer_boost", 1, 20, "Multiplier for visualizer amplitude boost (used in log scale)")
             createArrowStepper(panel, contentPanel_NumSlider, 300, "Notification X position", "battlebeats_notif_x", 0, ScrW(), "Default: " .. tostring(ScrW() - 310))
             createArrowStepper(panel, contentPanel_NumSlider, 350, "Notification Y position", "battlebeats_notif_y", 0, ScrH(), "Default: " .. tostring(ScrH() / 6))
+        elseif category.name == "Subtitles" then
+            createCustomCheckbox(panel, contentPanel_2, 10, "Enable Subtitles", "battlebeats_subtitles_enabled")
         elseif category.name == "M. Player" then
             createCustomCheckbox(panel, contentPanel_2, 10, "Switch to current pack only", "battlebeats_exclusive_play", "When switching between ambient and combat, only tracks from the same pack will be used. When a track ends naturally, the next one will still be chosen randomly from all enabled packs")
             createArrowStepper(panel, contentPanel_NumSlider, 50, "Ambient wait time (in seconds)", "battlebeats_ambient_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")

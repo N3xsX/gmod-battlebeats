@@ -1,5 +1,6 @@
 local frame
 local assignFrame
+local lframe
 local isLooping = false
 local skipExcluded = false
 
@@ -44,6 +45,12 @@ surface.CreateFont("BattleBeats_Notification_Font_Misc", {
     size = 16,
     weight = 500,
     antialias = true,
+})
+
+surface.CreateFont("BattleBeats_Subtitles", {
+    font = "CloseCaption_Bold",
+    size = 36,
+    weight = 600
 })
 
 local c606060 = Color(60, 60, 60)
@@ -107,7 +114,7 @@ local function createInfoPanel(panel, packData)
 
     steamworks.FileInfo(wsid, function(result)
         if not result then
-            result = { size = nil, created = nil, ownername = nil }
+            result = {size = nil, created = nil, ownername = nil}
         end
         wsCache[wsid] = result
         applyInfo(result)
@@ -282,12 +289,6 @@ local function openBTBmenu()
         draw.RoundedBox(4, 0, 0, w, h, c000200)
     end
     frame.isMinimalized = false
-
-    local versionLabel = vgui.Create("DLabel", frame)
-    versionLabel:SetFont("DermaDefault")
-    versionLabel:SetText(BATTLEBEATS.currentVersion)
-    versionLabel:SetTextColor(c200200200)
-    versionLabel:SetPos(870, 3)
 
     for _, child in ipairs(frame:GetChildren()) do -- cheesy way to enable minimalize button
         if child:GetClassName() == "Label" then
@@ -783,38 +784,31 @@ local function openBTBmenu()
 
             surface.SetFont("BattleBeats_Font")
             local textWidth = surface.GetTextSize(isFavorite and "★ " .. trackName or trackName)
-            local panelWidth = 820
+            local panelWidth = 800
             local scrollSpeed = 60
 
-            local npcAssigned = BATTLEBEATS.npcTrackMappings[track] ~= nil
-            local offsetAssigned = BATTLEBEATS.trackOffsets[track] ~= nil
-            if npcAssigned then
-                local tooltipFrame = vgui.Create("DPanel", row)
-                tooltipFrame:SetSize(16, 16)
-                tooltipFrame:SetPos(840, 17)
-                tooltipFrame:SetPaintBackground(false)
-                tooltipFrame:SetTooltip("This track has an assigned NPC")
+            local iconData = {
+                {check = BATTLEBEATS.npcTrackMappings[track] ~= nil, tooltip = "This track has an assigned NPC", image = "icon16/user.png"},
+                {check = BATTLEBEATS.trackOffsets[track] ~= nil, tooltip = "This track has an assigned offset", image = "icon16/time.png"},
+                {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "This track has subtitles", image = "icon16/comments.png"}
+            }
 
-                local npcIcon = vgui.Create("DImage", tooltipFrame)
-                npcIcon:SetSize(16, 16)
-                npcIcon:SetPos(0, 0)
-                npcIcon:SetImage("icon16/user.png")
-            end
-            if offsetAssigned then
-                local tooltipFrame = vgui.Create("DPanel", row)
-                tooltipFrame:SetSize(16, 16)
-                if not npcAssigned then
-                    tooltipFrame:SetPos(840, 17)
-                else
-                    tooltipFrame:SetPos(820, 17)
+            local xOffset = 840
+            for _, data in ipairs(iconData) do
+                if data.check then
+                    local tooltipFrame = vgui.Create("DPanel", row)
+                    tooltipFrame:SetSize(16, 16)
+                    tooltipFrame:SetPos(xOffset, 17)
+                    tooltipFrame:SetPaintBackground(false)
+                    tooltipFrame:SetTooltip(data.tooltip)
+
+                    local icon = vgui.Create("DImage", tooltipFrame)
+                    icon:SetSize(16, 16)
+                    icon:SetPos(0, 0)
+                    icon:SetImage(data.image)
+
+                    xOffset = xOffset - 20
                 end
-                tooltipFrame:SetPaintBackground(false)
-                tooltipFrame:SetTooltip("This track has an assigned offset")
-
-                local offsetIcon = vgui.Create("DImage", tooltipFrame)
-                offsetIcon:SetSize(16, 16)
-                offsetIcon:SetPos(0, 0)
-                offsetIcon:SetImage("icon16/time.png")
             end
 
             local colorLerp = excluded and c25500 or c2552100
@@ -947,6 +941,8 @@ local function openBTBmenu()
                         SetClipboardText(track)
                     end)
                     copy:SetImage("icon16/tag.png")
+
+                    --favorites
                     if isFavorite then
                         local unfavorite = menu:AddOption("Remove from Favorites", function()
                             BATTLEBEATS.favoriteTracks[track] = nil
@@ -968,6 +964,8 @@ local function openBTBmenu()
                         nofavorite:SetEnabled(false)
                         nofavorite:SetImage("icon16/error_delete.png")
                     end
+
+                    --offset
                     local offsetValue = BATTLEBEATS.trackOffsets[track] or 0
                     local offsetOption = menu:AddOption(offsetValue > 0 and "Edit Offset (" .. offsetValue .. "s)" or "Set Offset", function()
                         local offsetFrame = vgui.Create("DFrame")
@@ -1023,6 +1021,8 @@ local function openBTBmenu()
                     end)
                     offsetOption:SetImage("icon16/time.png")
                     offsetOption:SetTooltip("Adds an offset to the track\nOn first play, it will start from this offset")
+
+                    --npc assign
                     if trackType == "combat" then
                         local currentNPC = BATTLEBEATS.npcTrackMappings[track]
                         local npcOptionText = currentNPC and "Edit assigned NPC" or "Assign NPC Class"
@@ -1152,6 +1152,50 @@ local function openBTBmenu()
 
                         assignNPC:SetImage(currentNPC and "icon16/user_edit.png" or "icon16/user_add.png")
                         assignNPC:SetTooltip("Assign an NPC class to this combat track with a priority (1-5)\nThe track with the highest priority will play when fighting multiple NPCs")
+                    end
+
+                    --subtitles
+                    local subs = BATTLEBEATS.parsedSubtitles[string.lower(trackName)]
+                    if subs and #subs > 0 then
+                        local lyricsOption = menu:AddOption("Show Lyrics", function()
+                            lframe = vgui.Create("DFrame")
+                            lframe:SetTitle("Lyrics for: " .. trackName)
+                            lframe:SetSize(500, 400)
+                            lframe:Center()
+                            lframe:MakePopup()
+                            lframe.Paint = function(self, w, h)
+                                draw.RoundedBox(4, 0, 0, w, h, c000200)
+                            end
+
+                            local scroll = vgui.Create("DScrollPanel", lframe)
+                            scroll:SetSize(480, 360)
+                            scroll:SetPos(10, 30)
+
+                            local rich = vgui.Create("RichText", scroll)
+                            rich:SetSize(480, 360)
+                            rich:SetVerticalScrollbarEnabled(true)
+                            rich:SetWrap(true)
+                            rich.PerformLayout = function(self)
+                                if self:GetFont() ~= "ChatFont" then self:SetFontInternal("ChatFont") end
+                                self:SetFGColor(color_white)
+                            end
+
+                            local lastEnd = 0
+                            for _, sub in ipairs(subs) do
+                                if lastEnd > 0 and (sub.start - lastEnd) > 5 then
+                                    rich:AppendText("\n")
+                                end
+                                local m = math.floor(sub.start / 60)
+                                local s = math.floor(sub.start % 60)
+                                local ts = string.format("[%02d:%02d]", m, s)
+                                rich:InsertColorChange(255, 210, 0, 255)
+                                rich:AppendText(ts .. " ")
+                                rich:InsertColorChange(255, 255, 255, 255)
+                                rich:AppendText(sub.text .. "\n")
+                                lastEnd = sub['end']
+                            end
+                        end)
+                        lyricsOption:SetImage("icon16/text_align_left.png")
                     end
                     menu:Open()
                 end
@@ -1851,6 +1895,7 @@ local function openBTBmenu()
         BATTLEBEATS.ValidatePacks()
         if IsValid(BATTLEBEATS.optionsFrame) then BATTLEBEATS.optionsFrame:Close() end
         if IsValid(assignFrame) then assignFrame:Close() end
+        if IsValid(lframe) then lframe:Close() end
         if timer.Exists("BattleBeats_NextPreviewTrack") then
             timer.Remove("BattleBeats_NextPreviewTrack")
         end

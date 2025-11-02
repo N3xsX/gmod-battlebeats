@@ -39,7 +39,7 @@ BATTLEBEATS.npcTrackMappings = {}
 BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 
-BATTLEBEATS.currentVersion = "v2.1.3"
+BATTLEBEATS.currentVersion = "2.1.7"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -62,6 +62,9 @@ local alwaysContinue = CreateClientConVar("battlebeats_always_continue", "0", tr
 local continueMode = CreateClientConVar("battlebeats_continue_mode", "0", true, false, "", 0, 1)
 local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_notification", "1", true, false, "", 0, 1)
 local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "0", true, false, "", 0, 1)
+local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, true, "", 0, 1)
+
+local enableSubtitles = CreateClientConVar("battlebeats_subtitles_enabled", "1", true, false, "", 0, 1)
 
 local ambientVolume = CreateClientConVar("battlebeats_volume_ambient", "100", true, false, "", 0, 100)
 local combatVolume = CreateClientConVar("battlebeats_volume_combat", "100", true, false, "", 0, 100)
@@ -371,6 +374,13 @@ local function PlayNextTrack(track, time, noFade, priority)
                 --station:SetVolume(volumeSet:GetInt() / 100)
             end
 
+            if enableSubtitles:GetBool() then
+                local subtitleTrack = BATTLEBEATS.FormatTrackName(track)
+                if BATTLEBEATS.parsedSubtitles and BATTLEBEATS.parsedSubtitles[string.lower(subtitleTrack)] then
+                    BATTLEBEATS.StartSubtitles(subtitleTrack, station)
+                end
+            end
+
             removeSoundTimers()
 
             --instantly store the current music position to prevent rare issue
@@ -393,16 +403,18 @@ local function PlayNextTrack(track, time, noFade, priority)
             timer.Create("BattleBeats_NextTrack", playDuration, 1, function() -- timer to play next track when current finishes
                 debugPrint("[PlayNextTrack] Timer reached end. Selecting next track")
                 if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
+                if (isInCombat and not enableCombat:GetBool()) or
+                    (not isInCombat and not enableAmbient:GetBool()) then
+                    return
+                end
                 if priority then -- looping assigned tracks
                     PlayNextTrack(track, 0, false, priority)
                     local state = BATTLEBEATS.priorityStates[priority] or {}
                     state.length = 0
                     BATTLEBEATS.priorityStates[priority] = state
                 else
-                    if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-                        local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
-                        if nextTrack then PlayNextTrack(nextTrack) end
-                    end
+                    local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
+                    if nextTrack then PlayNextTrack(nextTrack) end
                 end
             end)
 
@@ -421,10 +433,8 @@ local function PlayNextTrack(track, time, noFade, priority)
                         state.length = 0
                         BATTLEBEATS.priorityStates[priority] = state
                     else
-                        if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-                            local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
-                            if nextTrack then PlayNextTrack(nextTrack) end
-                        end
+                        local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
+                        if nextTrack then PlayNextTrack(nextTrack) end
                     end
                 end
                 -- update playback length and position
@@ -454,10 +464,8 @@ local function PlayNextTrack(track, time, noFade, priority)
             end)
         else
             printStationError(track, errCode, errStr)
-            if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-                local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
-                if nextTrack then PlayNextTrack(nextTrack) end
-            end
+            local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks)
+            if nextTrack then PlayNextTrack(nextTrack) end
         end
     end)
 end
@@ -466,10 +474,19 @@ function BATTLEBEATS.PlayNextTrack(track, time, noFade, priority)
     PlayNextTrack(track, time, noFade, priority)
 end
 
+local cleanupTrack = nil
+local cleanupTime = nil
+hook.Add("PreCleanupMap", "BattleBeats_SaveMusic", function()
+    if IsValid(currentStation) then
+        cleanupTrack = currentStation:GetFileName()
+        cleanupTime = currentStation:GetTime()
+    end
+end)
+
 hook.Add("PostCleanupMap", "BattleBeats_ResumeMusic", function()
     if not isPreviewing then
-        if (isInCombat and not lastCombatTrack) or (not isInCombat and not lastAmbienceTrack) then return end
-        PlayNextTrack(isInCombat and lastCombatTrack or lastAmbienceTrack, isInCombat and (lastCombatPosition + 1) or (lastAmbiencePosition + 1))
+        if not cleanupTrack then return end
+        PlayNextTrack(cleanupTrack, cleanupTime)
     else
         if not BATTLEBEATS.currentPreviewTrack then return end
         PlayNextTrackPreview(BATTLEBEATS.currentPreviewTrack, BATTLEBEATS.currentPreviewPosition)
@@ -747,6 +764,9 @@ timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
     if not IsValid(ply) then return end
 
     isInCombat = ply:GetNWBool("BattleBeats_InCombat", false)
+    if forceCombat:GetBool() and enableCombat:GetBool() then
+        isInCombat = true
+    end
     BATTLEBEATS.isInCombat = isInCombat
 
     if isInCombat ~= lastCombatState then
@@ -815,7 +835,7 @@ cvars.AddChangeCallback("battlebeats_enable_ambient", function(_, _, newValue)
         removeSoundTimers()
         BATTLEBEATS.HideNotification()
     else
-        if not table.IsEmpty(BATTLEBEATS.currentPacks) and not isInCombat then
+        if not isInCombat then
             local track = GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
             if track then PlayNextTrack(track) end
         end
