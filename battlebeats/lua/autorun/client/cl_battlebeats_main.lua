@@ -39,7 +39,7 @@ BATTLEBEATS.npcTrackMappings = {}
 BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 
-BATTLEBEATS.currentVersion = "2.1.7"
+BATTLEBEATS.currentVersion = "2.1.9"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)

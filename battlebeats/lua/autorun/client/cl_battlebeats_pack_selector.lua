@@ -258,7 +258,7 @@ local function validateTracksInPack(packName)
 end
 
 local cHover = Color(50, 50, 50, 200)
-local cHover2 = Color(60, 60, 60, 200)
+local cHover2 = Color(65, 65, 65, 200)
 
 local c707070255 = Color(70, 70, 70, 255)
 local c808080255 = Color(80, 80, 80, 255)
@@ -272,9 +272,15 @@ local c3030300 = Color(30, 30, 30, 0)
 local c100100100 = Color(100, 100, 100)
 local c505050 = Color(50, 50, 50)
 
+local versionConVar = GetConVar("battlebeats_seen_version")
+
 --MARK:Main UI
 local function openBTBmenu()
     if IsValid(frame) then return end
+    if cookie.GetString('BattleBeats_FirstTime') ~= 'true' and versionConVar:GetString() == "" then
+        RunConsoleCommand("battlebeats_guide")
+        cookie.Set('BattleBeats_FirstTime', 'true')
+    end
     local changesMade = false
     local selectedRow = nil
     frame = vgui.Create("DFrame")
@@ -318,7 +324,7 @@ local function openBTBmenu()
     scrollPanel:SetSize(980, 600)
     scrollPanel:SetPos(10, 30)
 
-    local scrollBar = scrollPanel:GetVBar() -- custom scroll bar
+    local scrollBar = scrollPanel:GetVBar()
     local c404040200 = Color(40, 40, 40, 200)
     scrollBar.Paint = function(self, w, h)
         draw.RoundedBox(0, 0, 0, w, h, c404040200)
@@ -333,6 +339,14 @@ local function openBTBmenu()
         draw.RoundedBox(0, 0, 0, w, h, c606060)
     end
 
+    function scrollBar:AddScroll(d)
+        local animTarget = self:GetScroll() + d * 60
+        animTarget = math.Clamp(animTarget, 0, self.CanvasSize)
+        local speed = math.min(math.abs(d), 5)
+        self:Stop()
+        self:AnimateTo(animTarget, 0.5 / speed, 0, 0.3)
+    end
+
     --MARK:Option button
     local optionsButton = vgui.Create("DButton", frame)
     optionsButton:SetSize(340, 40)
@@ -340,9 +354,18 @@ local function openBTBmenu()
     optionsButton:SetText("Options")
     optionsButton:SetFont("CreditsText")
     optionsButton:SetTextColor(color_white)
+    optionsButton.currentColor = c707070255
+    optionsButton.targetColor = c707070255
+    optionsButton.Think = function(self)
+        if self:IsHovered() then
+            self.targetColor = c808080255
+        else
+            self.targetColor = c707070255
+        end
+        self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+    end
     optionsButton.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and c808080255 or c707070255
-        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+        draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
     end
     optionsButton.OnCursorEntered = function(self)
         surface.PlaySound("ui/buttonrollover.wav")
@@ -431,9 +454,18 @@ local function openBTBmenu()
     saveButton:SetText("Done")
     saveButton:SetFont("CreditsText")
     saveButton:SetTextColor(color_white)
+    saveButton.currentColor = c707070255
+    saveButton.targetColor = c707070255
+    saveButton.Think = function(self)
+        if self:IsHovered() then
+            self.targetColor = c808080255
+        else
+            self.targetColor = c707070255
+        end
+        self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+    end
     saveButton.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and c808080255 or c707070255
-        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+        draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
     end
     saveButton.OnCursorEntered = function(self)
         surface.PlaySound("ui/buttonrollover.wav")
@@ -532,88 +564,45 @@ local function openBTBmenu()
     end
 
     --MARK:Next/Previous track
+    local currentFilteredTracks
     function BATTLEBEATS.SwitchPreviewTrack(direction)
         if not BATTLEBEATS.currentPreviewTrack or not BATTLEBEATS.musicPacks then return end
 
-        local currentPack = nil
-        local trackType = nil
-        for packName, packData in pairs(BATTLEBEATS.musicPacks) do -- identify which pack and type the current preview track belongs to
-            if istable(packData.ambient) and table.HasValue(packData.ambient, BATTLEBEATS.currentPreviewTrack) then
-                currentPack = packName
-                trackType = "ambient"
-                break
-            elseif istable(packData.combat) and table.HasValue(packData.combat, BATTLEBEATS.currentPreviewTrack) then
-                currentPack = packName
-                trackType = "combat"
-                break
-            end
-        end
-        if not currentPack or not trackType then -- fallback to first track if current preview track is invalid
-            local tracks = BATTLEBEATS.musicPacks[currentPack] and BATTLEBEATS.musicPacks[currentPack][trackType] or {}
-            if #tracks > 0 then
-                BATTLEBEATS.currentPreviewTrack = tracks[1]
-            else
-                return
-            end
+        local activeList = currentFilteredTracks
+        if not activeList or #activeList == 0 then return end
+
+        local currentIndex = table.KeyFromValue(activeList, BATTLEBEATS.currentPreviewTrack)
+        if not currentIndex then
+            BATTLEBEATS.currentPreviewTrack = activeList[1]
+            currentIndex = 1
         end
 
-        local tracks = BATTLEBEATS.musicPacks[currentPack][trackType] or {}
-
-        local includedTracks, excluded = {}, {} -- separate included and excluded tracks based on exclusion list
-        for _, track in ipairs(tracks) do
-            if not BATTLEBEATS.excludedTracks[track] then
-                table.insert(includedTracks, track)
-            else
-                table.insert(excluded, track)
-            end
-        end
-
-        local function sortFavorites(list)
-            local favorites, nonFavorites = {}, {}
-            for _, track in ipairs(list) do
-                if BATTLEBEATS.favoriteTracks[track] then
-                    table.insert(favorites, track)
-                else
-                    table.insert(nonFavorites, track)
-                end
-            end
-
-            local sorted = {}
-            for _, t in ipairs(favorites) do table.insert(sorted, t) end
-            for _, t in ipairs(nonFavorites) do table.insert(sorted, t) end
-            return sorted
-        end
-
-        local trackList = sortFavorites(tracks)
-        local currentIndex = table.KeyFromValue(trackList, BATTLEBEATS.currentPreviewTrack)
-        if not currentIndex then return end
-
-        local totalTracks = #trackList
+        local totalTracks = #activeList
         local newIndex = currentIndex
 
-        if skipExcluded then -- find next non-excluded track if skipExcluded is enabled
+        if skipExcluded then
             for i = 1, totalTracks do
                 newIndex = newIndex + direction
                 if newIndex < 1 then newIndex = totalTracks end
                 if newIndex > totalTracks then newIndex = 1 end
 
-                local candidate = trackList[newIndex]
+                local candidate = activeList[newIndex]
                 if not BATTLEBEATS.excludedTracks[candidate] then
                     BATTLEBEATS.currentPreviewTrack = candidate
                     break
                 end
             end
-            if BATTLEBEATS.excludedTracks[BATTLEBEATS.currentPreviewTrack] then -- fallback in case all are excluded
+            if BATTLEBEATS.excludedTracks[BATTLEBEATS.currentPreviewTrack] then
                 newIndex = currentIndex + direction
                 if newIndex < 1 then newIndex = totalTracks end
                 if newIndex > totalTracks then newIndex = 1 end
-                BATTLEBEATS.currentPreviewTrack = trackList[newIndex]
+                BATTLEBEATS.currentPreviewTrack = activeList[newIndex]
             end
-        else -- skip logic disabled, cycle to next/previous
+        else
             newIndex = currentIndex + direction
             if newIndex < 1 then newIndex = totalTracks end
             if newIndex > totalTracks then newIndex = 1 end
-            BATTLEBEATS.currentPreviewTrack = trackList[newIndex]
+            BATTLEBEATS.currentPreviewTrack = activeList[newIndex]
         end
 
         BATTLEBEATS.PlayNextTrackPreview(BATTLEBEATS.currentPreviewTrack, nil, false, function ()
@@ -634,7 +623,6 @@ local function openBTBmenu()
         end
     end
 
-    --MARK:Next/Prev buttons
     local prevTrackBtn = vgui.Create("DButton", playerPanel)
     prevTrackBtn:SetSize(50, 50)
     prevTrackBtn:SetPos((playerPanel:GetWide() / 2) - 88, 50)
@@ -734,7 +722,7 @@ local function openBTBmenu()
     progressDot:SetSize(12, 12)
     progressDot:SetMouseInputEnabled(false)
     progressDot.Paint = function(self, w, h)
-        draw.RoundedBox(6, 0, 0, w, h, color_white)
+        draw.RoundedBox(8, 0, 0, w, h, color_white)
     end
 
     progressDot.Think = function(self)
@@ -767,7 +755,6 @@ local function openBTBmenu()
         end
     end
     --MARK:Tracks list
-    local headerExpanded = false
     local function createTrackList(parent, trackType, selectedPack)
         parent:Clear()
         selectedRow = nil
@@ -850,7 +837,7 @@ local function openBTBmenu()
             end
 
             row.OnCursorEntered = function(self)
-                surface.PlaySound("ui/buttonrollover.wav")
+                --surface.PlaySound("ui/buttonrollover.wav")
                 self:SetCursor("hand")
                 self.isScrolling = textWidth > panelWidth
             end
@@ -860,17 +847,25 @@ local function openBTBmenu()
                 self.scrollResetTime = CurTime()
             end
 
-            row.Paint = function(self, w, h)
+            row.currentColor = cHover
+            row.targetColor = cHover
+
+            row.Think = function(self)
                 local isSelected = (self == selectedRow)
-                local bg
+
                 if isSelected then
-                    bg = c808080255
+                    self.targetColor = c808080255
                 elseif self:IsHovered() then
-                    bg = cHover2
+                    self.targetColor = cHover2
                 else
-                    bg = cHover
+                    self.targetColor = cHover
                 end
-                draw.RoundedBox(4, 0, 0, w, h, bg)
+
+                self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+            end
+
+            row.Paint = function(self, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
                 local displayName = isFavorite and "★ " .. trackName or trackName
                 if self.isScrolling and textWidth > panelWidth then
                     self.textX = self.textX - (scrollSpeed * FrameTime())
@@ -942,7 +937,7 @@ local function openBTBmenu()
                     end)
                     copy:SetImage("icon16/tag.png")
 
-                    --favorites
+                    --MARK:RMB favorites
                     if isFavorite then
                         local unfavorite = menu:AddOption("Remove from Favorites", function()
                             BATTLEBEATS.favoriteTracks[track] = nil
@@ -965,7 +960,7 @@ local function openBTBmenu()
                         nofavorite:SetImage("icon16/error_delete.png")
                     end
 
-                    --offset
+                    --MARK:RMB offset
                     local offsetValue = BATTLEBEATS.trackOffsets[track] or 0
                     local offsetOption = menu:AddOption(offsetValue > 0 and "Edit Offset (" .. offsetValue .. "s)" or "Set Offset", function()
                         local offsetFrame = vgui.Create("DFrame")
@@ -1022,7 +1017,7 @@ local function openBTBmenu()
                     offsetOption:SetImage("icon16/time.png")
                     offsetOption:SetTooltip("Adds an offset to the track\nOn first play, it will start from this offset")
 
-                    --npc assign
+                    --MARK:RMB npc assign
                     if trackType == "combat" then
                         local currentNPC = BATTLEBEATS.npcTrackMappings[track]
                         local npcOptionText = currentNPC and "Edit assigned NPC" or "Assign NPC Class"
@@ -1154,7 +1149,7 @@ local function openBTBmenu()
                         assignNPC:SetTooltip("Assign an NPC class to this combat track with a priority (1-5)\nThe track with the highest priority will play when fighting multiple NPCs")
                     end
 
-                    --subtitles
+                    --MARK:RMB subtitles
                     local subs = BATTLEBEATS.parsedSubtitles[string.lower(trackName)]
                     if subs and #subs > 0 then
                         local lyricsOption = menu:AddOption("Show Lyrics", function()
@@ -1204,133 +1199,64 @@ local function openBTBmenu()
             return row
         end
 
-        --MARK:Tracks header
-        local header = vgui.Create("DPanel", parent)
-        header:Dock(TOP)
-        header:DockMargin(0, 0, 15, 5)
-        header:SetTall(headerExpanded and 60 or 25)
-        header.Paint = function(self, w, h)
-            local bgColor = self:IsHovered() and not headerExpanded and c505050 or c404040
-            draw.RoundedBox(4, 0, 0, w, h, bgColor)
-            draw.SimpleText("Name", "DermaDefaultBold", 40, 12, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            draw.SimpleText("Exclude", "DermaDefaultBold", 877, 12, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            if headerExpanded then
-                draw.SimpleText("∆", "DermaDefaultBold", 933, 12, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            else
-                draw.SimpleText("∇", "DermaDefaultBold", 930, 12, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
+        local div = vgui.Create("DPanel", parent)
+        div:Dock(TOP)
+        div:SetTall(3)
+        div:DockMargin(0, 0, 15, 5)
+        div.Paint = function(self, w, h)
+            draw.RoundedBox(1, 0, 0, w, h, c2552100)
+        end
+
+        --MARK:Sorting & search
+        local searchPanel = vgui.Create("DPanel", parent)
+        searchPanel:Dock(TOP)
+        searchPanel:SetTall(60)
+        searchPanel:DockMargin(0, 5, 15, 10)
+        searchPanel.Paint = function(self, w, h)
+            draw.RoundedBox(6, 0, 0, w, h, c404040)
+            draw.SimpleText("Name", "DermaDefaultBold", 40, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText("Exclude", "DermaDefaultBold", 877, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText("Sort: ", "DermaDefaultBold", 800, 25, color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             if trackType == "ambient" then
-                draw.SimpleText("Ambient List", "DermaDefaultBold", (w / 2) - 30, 12, color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText("Ambient List", "DermaDefaultBold", 460, 50, c100100100,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             else
-                draw.SimpleText("Combat List", "DermaDefaultBold", (w / 2) - 30, 12, color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText("Combat List", "DermaDefaultBold", 460, 50, c100100100,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
 
-        header.OnCursorEntered = function(self)
-            if not headerExpanded then
-                self:SetCursor("hand")
-            end
-        end
-        header.OnCursorExited = function(self)
-            self:SetCursor("arrow")
-        end
-
-        local function createHeaderButtons(header, parent, trackType, selectedPack)
-            for _, child in ipairs(header:GetChildren()) do
-                if IsValid(child) and child:GetClassName() == "DButton" then
-                    child:Remove()
-                end
-            end
-
-            local enableAllButton = vgui.Create("DButton", header)
-            enableAllButton:SetSize(270, 20)
-            enableAllButton:SetPos(110, 25)
-            enableAllButton:SetText("Enable All")
-            enableAllButton:SetFont("DermaDefaultBold")
-            enableAllButton:SetTextColor(color_white)
-            enableAllButton.Paint = function(self, w, h)
-                local bgColor = self:IsHovered() and c808080255 or c707070255
-                draw.RoundedBox(4, 0, 0, w, h, bgColor)
-            end
-            enableAllButton.OnCursorEntered = function()
-                surface.PlaySound("ui/buttonrollover.wav")
-            end
-            enableAllButton.DoClick = function()
-                local tracks = BATTLEBEATS.musicPacks[selectedPack][trackType] or {}
-                for _, track in ipairs(tracks) do
-                    BATTLEBEATS.excludedTracks[track] = false
-                end
-                changesMade = true
-                BATTLEBEATS.SaveExcludedTracks()
-                surface.PlaySound("btb_button_enable.mp3")
-                createTrackList(parent, trackType, selectedPack)
-            end
-
-            local disableAllButton = vgui.Create("DButton", header)
-            disableAllButton:SetSize(270, 20)
-            disableAllButton:SetPos(570, 25)
-            disableAllButton:SetText("Disable All")
-            disableAllButton:SetFont("DermaDefaultBold")
-            disableAllButton:SetTextColor(color_white)
-            disableAllButton.Paint = function(self, w, h)
-                local bgColor = self:IsHovered() and c808080255 or c707070255
-                draw.RoundedBox(4, 0, 0, w, h, bgColor)
-            end
-            disableAllButton.OnCursorEntered = function()
-                surface.PlaySound("ui/buttonrollover.wav")
-            end
-            disableAllButton.DoClick = function()
-                local tracks = BATTLEBEATS.musicPacks[selectedPack][trackType] or {}
-                for _, track in ipairs(tracks) do
-                    BATTLEBEATS.excludedTracks[track] = true
-                end
-                changesMade = true
-                BATTLEBEATS.SaveExcludedTracks()
-                surface.PlaySound("btb_button_disable.mp3")
-                createTrackList(parent, trackType, selectedPack)
+        local searchBox = vgui.Create("DTextEntry", searchPanel)
+        searchBox:SetSize(600, 30)
+        searchBox:SetPos(170, 10)
+        searchBox:SetFont("BattleBeats_Font")
+        searchBox.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, c707070255)
+            self:DrawTextEntryText(color_white, color_white, color_white)
+            if self:GetText() == "" and not self:IsEditing() then
+                draw.SimpleText("Search track...", "BattleBeats_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
 
-        if headerExpanded then
-            createHeaderButtons(header, parent, trackType, selectedPack)
+        local sortCombo = vgui.Create("DComboBox", searchPanel)
+        sortCombo:SetSize(100, 30)
+        sortCombo:SetPos(830, 11)
+        sortCombo:SetValue("A → Z")
+        sortCombo:AddChoice("A → Z", "az", false, "icon16/arrow_down.png")
+        sortCombo:AddChoice("Z → A", "za", false, "icon16/arrow_up.png")
+        sortCombo:AddChoice("Favorites only", "fav", false, "icon16/star.png")
+        sortCombo:AddChoice("Included only", "inc", false, "icon16/tick.png")
+        sortCombo:AddChoice("Excluded only", "ex", false, "icon16/cross.png")
+        sortCombo:SetSortItems(false)
+        sortCombo:ChooseOptionID(1)
+        sortCombo:SetTextColor(color_white)
+        sortCombo.Paint = function (self, w, h)
+            draw.RoundedBox(6, 0, 0, w, h, c404040)
         end
 
-        header.OnMousePressed = function(self, code)
-            if code == MOUSE_LEFT then
-                headerExpanded = not headerExpanded
-                parent:GetParent():InvalidateLayout()
-
-                if headerExpanded then
-                    createHeaderButtons(header, parent, trackType, selectedPack)
-                    self:SizeTo(-1, 60, 0.3, 0, -1)
-                else
-                    self:SizeTo(-1, 25, 0.3, 0, -1)
-                    for _, child in ipairs(self:GetChildren()) do
-                        if IsValid(child) and child:GetClassName() == "DButton" then
-                            child:Remove()
-                        end
-                    end
-                end
-            end
-        end
-
-        local tracks = BATTLEBEATS.musicPacks[selectedPack][trackType] or {}
-        local favoriteList = {}
-        local nonFavoriteList = {}
-        for _, track in ipairs(tracks) do
-            if BATTLEBEATS.favoriteTracks[track] then
-                table.insert(favoriteList, track)
-            else
-                table.insert(nonFavoriteList, track)
-            end
-        end
-
-        --MARK:SBM/Nombat info
         if BATTLEBEATS.musicPacks[selectedPack].packType == "nombat" or BATTLEBEATS.musicPacks[selectedPack].packType == "sbm" then
             local inforow = vgui.Create("DPanel", parent)
             inforow:SetSize(0, 50)
             inforow:Dock(TOP)
-            inforow:DockMargin(0, 5, 13, 3)
+            inforow:DockMargin(0, 0, 15, 10)
             inforow.Paint = function(self, w, h)
                 local bg = c404040
                 draw.RoundedBox(4, 0, 0, w, h, bg)
@@ -1342,13 +1268,84 @@ local function openBTBmenu()
             end
         end
 
-        for _, track in ipairs(favoriteList) do
-            addTrackRow(track, BATTLEBEATS.excludedTracks[track], true)
+        local divider = vgui.Create("DPanel", parent)
+        divider:Dock(TOP)
+        divider:SetTall(3)
+        divider:DockMargin(0, 0, 15, 5)
+        divider.Paint = function(self, w, h)
+            draw.RoundedBox(1, 0, 0, w, h, c2552100)
         end
-        for _, track in ipairs(nonFavoriteList) do
-            addTrackRow(track, BATTLEBEATS.excludedTracks[track], false)
+
+        local trackRows = {}
+        local noResultsLabel
+        local function filterAndSort()
+            if not IsValid(searchBox) then return end
+            local query = string.lower(searchBox:GetValue())
+            local sortMode = sortCombo:GetOptionData(sortCombo:GetSelectedID()) or "az"
+
+            for _, row in ipairs(trackRows) do row:Remove() end
+            trackRows = {}
+
+            if IsValid(noResultsLabel) then
+                noResultsLabel:Remove()
+            end
+
+            local tracks = {}
+            for _, t in ipairs(BATTLEBEATS.musicPacks[selectedPack][trackType] or {}) do
+                local name = string.lower(BATTLEBEATS.FormatTrackName(t))
+                local excluded = BATTLEBEATS.excludedTracks[t]
+                local favorite = BATTLEBEATS.favoriteTracks[t]
+
+                if query == "" or string.find(name, query, 1, true) then
+                    if sortMode == "fav" and not favorite then continue end
+                    if sortMode == "ex" and not excluded then continue end
+                    if sortMode == "inc" and excluded then continue end
+                    table.insert(tracks, { track = t, name = name, fav = favorite, ex = excluded })
+                end
+            end
+            table.sort(tracks, function(a, b)
+                if a.fav and not b.fav then return true end
+                if not a.fav and b.fav then return false end
+
+                if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" then
+                    return a.name < b.name
+                elseif sortMode == "za" then
+                    return a.name > b.name
+                end
+                return false
+            end)
+
+            currentFilteredTracks = {}
+            for _, data in ipairs(tracks) do
+                table.insert(currentFilteredTracks, data.track)
+            end
+
+            if #tracks == 0 then
+                noResultsLabel = vgui.Create("DLabel", parent)
+                noResultsLabel:SetSize(0, 50)
+                noResultsLabel:Dock(TOP)
+                noResultsLabel:DockMargin(0, 5, 0, 0)
+                noResultsLabel:SetText("Nothing found!")
+                noResultsLabel:SetFont("BattleBeats_Font")
+                noResultsLabel:SetTextColor(Color(255, 80, 80))
+                noResultsLabel:SetContentAlignment(5)
+                noResultsLabel.Paint = function(self, w, h)
+                    draw.RoundedBox(6, 0, 0, w, h, Color(40, 20, 20, 200))
+                end
+            else
+                for _, data in ipairs(tracks) do
+                    local row = addTrackRow(data.track, data.ex, data.fav)
+                    table.insert(trackRows, row)
+                end
+            end
         end
+
+        searchBox.OnChange = function() timer.Create("BattleBeats_SearchDelay", 0.3, 1, filterAndSort) end
+        sortCombo.OnSelect = filterAndSort
+        scrollPanel:ScrollToChild(searchPanel)
+        filterAndSort()
     end
+
     --MARK:Main UI list
     local expandedPanel = nil
     local selectedPanel = nil
@@ -1386,7 +1383,6 @@ local function openBTBmenu()
                 playerPanel:SetVisible(false)
                 scrollPanel:SetSize(980, 600)
                 backButton:Remove()
-                headerExpanded = false
                 showPackList()
             end
 
@@ -1494,16 +1490,19 @@ local function openBTBmenu()
             end
         end
 
-        local c705050200 = Color(70, 50, 50, 200)
-        local c50140140200 = Color(50, 140, 140, 200)
-        local c50120120200 = Color(50, 120, 120, 200)
-        local c11011060200 = Color(110, 110, 60, 200)
-        local c10010060200 = Color(100, 100, 60, 200)
-        local c12012060 = Color(120, 120, 60)
-        local c50140140 = Color(50, 140, 140)
-        local c15050060 = Color(150, 50, 0, 60)
-        local c255200060 = Color(255, 200, 0, 60)
-        local c255255255100 = Color(255, 255, 255, 100)
+        local cpanelerror = Color(70, 50, 50, 200)
+
+        local cdebughover = Color(110, 110, 60, 200)
+        local cdebugunselected = Color(100, 100, 60, 200)
+        local cdebugselected = Color(120, 120, 60)
+
+        local clocalhover = Color(50, 120, 120, 200)
+        local clocalselected = Color(50, 120, 120)
+        local clocalunselected = Color(50, 80, 80, 200)
+
+        local cvererror = Color(150, 50, 0, 60)
+        local cver = Color(255, 200, 0, 60)
+        local cvertext = Color(255, 255, 255, 100)
 
         --MARK:Packs found
         for packName, _ in pairs(BATTLEBEATS.musicPacks) do
@@ -1544,6 +1543,34 @@ local function openBTBmenu()
                 text = "Error"
             end
 
+            panel.currentColor = cHover
+            panel.targetColor = cHover
+            panel.Think = function(self)
+                if packData.verifying then return end
+                local target
+                if isErrored then
+                    target = cpanelerror
+                elseif panel == selectedPanel then
+                    if packData.debug == true then
+                        target = cdebugselected
+                    elseif packData.packType == "local" then
+                        target = clocalselected
+                    else
+                        target = c707070255
+                    end
+                else
+                    if packData.debug == true then
+                        target = self:IsHovered() and cdebughover or cdebugunselected
+                    elseif packData.packType == "local" then
+                        target = self:IsHovered() and clocalhover or clocalunselected
+                    else
+                        target = self:IsHovered() and cHover2 or cHover
+                    end
+                end
+                self.targetColor = target
+                self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+            end
+
             panel.CreateErrorCalled = false
             panel.Paint = function(self, w, h)
                 if packData.verifying then
@@ -1552,14 +1579,14 @@ local function openBTBmenu()
                     local gradRight = surface.GetTextureID("vgui/gradient-r")
                     local barWidth = 300
                     local barX = offset - barWidth
-                    local vColor = isErrored and c15050060 or c255200060
+                    local vColor = isErrored and cvererror or cver
+
                     draw.RoundedBox(4, 0, 0, w, h, Color(vColor.r, vColor.g, vColor.b, 60))
 
                     surface.SetTexture(gradRight)
                     surface.SetDrawColor(vColor.r, vColor.g, vColor.b, 200)
                     surface.DrawTexturedRect(barX, 0, barWidth / 2, h)
                     surface.SetTexture(gradLeft)
-                    surface.SetDrawColor(vColor.r, vColor.g, vColor.b, 200)
                     surface.DrawTexturedRect(barX + barWidth / 2, 0, barWidth / 2, h)
 
                     local loopX = barX - (w + barWidth)
@@ -1578,22 +1605,7 @@ local function openBTBmenu()
                     draw.RoundedBox(4, 0, 0, w, h, Color(10, 10, 10, 200))
                     return
                 end
-                local bgColor = self:IsHovered() and cHover2 or cHover
-                if packData.packType == "local" then bgColor = self:IsHovered() and c50140140200 or c50120120200 end
-                if packData.debug == true then bgColor = self:IsHovered() and c11011060200 or c10010060200 end
-                if isErrored then
-                    draw.RoundedBox(4, 0, 0, w, h, c705050200)
-                elseif panel == selectedPanel then
-                    if packData.debug == true then
-                        draw.RoundedBox(4, 0, 0, w, h, c12012060)
-                    elseif packData.packType == "local" then
-                        draw.RoundedBox(4, 0, 0, w, h, c50140140)
-                    else
-                        draw.RoundedBox(4, 0, 0, w, h, c707070255)
-                    end
-                else
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                end
+                draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
             end
 
             panel.OnCursorEntered = function(self)
@@ -1624,13 +1636,13 @@ local function openBTBmenu()
                     surface.SetMaterial(Material("ver.png"))
                     surface.SetDrawColor(255, 255, 255, 150)
                     surface.DrawTexturedRect(0, 2, 65, 65)
-                    draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, c255255255100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                    draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 elseif debugMode and not packData.debug then
                     surface.SetMaterial(Material("block.png"))
                     surface.SetDrawColor(255, 255, 255, 150)
                     surface.DrawTexturedRect(0, 2, 65, 65)
-                    draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, c255255255100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                    draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 end
                 surface.SetMaterial(iconMat)

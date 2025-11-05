@@ -311,6 +311,15 @@ local function createCustomButton(parent, x, y, labelText, cvarName, helpText)
     return button
 end
 
+local function LerpColor(t, from, to)
+    return Color(
+        Lerp(t, from.r, to.r),
+        Lerp(t, from.g, to.g),
+        Lerp(t, from.b, to.b),
+        Lerp(t, from.a or 255, to.a or 255)
+    )
+end
+
 concommand.Add("battlebeats_options", function(ply, cmd, args)
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
@@ -357,12 +366,26 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
         button:SetPos((i - 1) * tabWidth, 0)
         button:SetSize(tabWidth, 40)
         button:SetTextColor(Color(255, 255, 255))
-        button.Paint = function(self, w, h)
-            local bgColor = self:IsHovered() and Color(100, 100, 100, 255) or Color(50, 50, 50, 255)
-            if category.panel and category.panel:IsVisible() then
-                bgColor = Color(40, 40, 40, 255)
+        local hoverColor = Color(100, 100, 100, 255)
+        local normalColor = Color(50, 50, 50, 255)
+        local activeColor = Color(40, 40, 40, 255)
+        button.currentColor = Color(50, 50, 50, 255)
+        button.targetColor = Color(50, 50, 50, 255)
+        button.Think = function(self)
+            if self:IsHovered() then
+                self.targetColor = hoverColor
+            else
+                self.targetColor = normalColor
             end
-            draw.RoundedBoxEx(8, 0, 0, w, h, bgColor, true, true, false, false)
+            self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+        end
+
+        button.Paint = function(self, w, h)
+            if category.panel and category.panel:IsVisible() then 
+                draw.RoundedBoxEx(8, 0, 0, w, h, activeColor, true, true, false, false)
+                return
+            end
+            draw.RoundedBoxEx(8, 0, 0, w, h, self.currentColor, true, true, false, false)
         end
 
         local panel = vgui.Create("DPanel", contentPanel)
@@ -424,6 +447,7 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
             createCustomCheckbox(panel, contentPanel_2, 100, "Debug Mode", "battlebeats_debug_mode", "Used for testing sound packs and debugging functions. Some features may be disabled while debug mode is active\n(Requires restart or packs reload)")
             createCustomCheckbox(panel, contentPanel_2, 130, "Lower volume in menu", "battlebeats_lower_volume_in_menu", "Lowers volume in game/spawn menu ('escape' menu won't work in singleplayer - timers pause when menu is open)")
             createCustomButton(panel, contentPanel_2, 160, "Reload Packs", "battlebeats_reload_packs")
+            createCustomButton(panel, contentPanel_2, 200, "Open Guide", "battlebeats_guide")
         end
 
         button.DoClick = function()
