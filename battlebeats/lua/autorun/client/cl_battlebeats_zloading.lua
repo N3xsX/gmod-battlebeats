@@ -58,7 +58,7 @@ local function pathExistsInMusicPacks(path)
     return false
 end
 
-local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote" }
+local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote", "am_music" }
 
 local function loadGenericMusicPacks()
     local startTime = SysTime()
@@ -75,13 +75,20 @@ local function loadGenericMusicPacks()
                 local isNombat = (dir == "nombat")
                 local isSBM = (dir == "battlemusic")
                 local is16th = (dir == "16thnote")
+                local isAM = (dir == "am_music")
 
                 for _, file in ipairs(matchedFiles) do
-                    if string.EndsWith(file, ".ogg") or string.EndsWith(file, ".mp3") then
+                    if string.EndsWith(file, ".ogg") or string.EndsWith(file, ".mp3") or string.EndsWith(file, ".wav") then
                         if isNombat then
                             if file:match("/a.*%.mp3$") then -- nombat only supports .mp3 so no need to search for .ogg
                                 table.insert(ambientFiles, file)
                             elseif file:match("/c.*%.mp3$") then
+                                table.insert(combatFiles, file)
+                            end
+                        elseif isAM then
+                            if file:find("/background/", 1, true) then
+                                table.insert(ambientFiles, file)
+                            elseif file:find("/battle/", 1, true) or file:find("/battle_intensive/", 1, true) then
                                 table.insert(combatFiles, file)
                             end
                         else
@@ -95,7 +102,7 @@ local function loadGenericMusicPacks()
                 end
 
                 if not packType and (#ambientFiles > 0 or #combatFiles > 0) then
-                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or "battlebeats"
+                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or isAM and "amusic" or "battlebeats"
                 end
             end
 
@@ -367,6 +374,18 @@ local function loadSavedPacks()
     end
 end
 
+local function buildTrackMap()
+    BATTLEBEATS.trackToPack = {}
+    for packName, pack in pairs(BATTLEBEATS.musicPacks) do
+        if not pack then continue end
+        for _, category in ipairs({ pack.combat or {}, pack.ambient or {} }) do
+            for _, track in ipairs(category) do
+                BATTLEBEATS.trackToPack[track] = packName
+            end
+        end
+    end
+end
+
 local versionConVar = GetConVar("battlebeats_seen_version")
 
 hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
@@ -376,8 +395,10 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadExcludedTracks()
     loadFavoriteTracks()
     loadMappedTracks()
-    loadSavedPacks()
     loadTrackOffsets()
+    buildTrackMap()
+    --
+    loadSavedPacks()
     BATTLEBEATS.ValidatePacks()
     for songName, _ in pairs(BATTLEBEATS.subtitles) do
         BATTLEBEATS.parseSRT(songName)
@@ -406,7 +427,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -414,15 +435,15 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- You can now force combat music to play all the time\n",
-            Color(150, 255, 150), "- You can now add subtitles to your tracks"
+            Color(150, 255, 150), "- Added support for Action Music packs"
+            --Color(150, 255, 150), "- You can now add subtitles to your tracks"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

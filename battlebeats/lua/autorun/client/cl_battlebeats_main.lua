@@ -38,8 +38,9 @@ BATTLEBEATS.isInCombat = false
 BATTLEBEATS.npcTrackMappings = {}
 BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
+BATTLEBEATS.trackToPack = {}
 
-BATTLEBEATS.currentVersion = "2.1.9"
+BATTLEBEATS.currentVersion = "2.2.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -160,7 +161,7 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
             station:Stop()
             station = nil
             timer.Remove(timerName)
-        elseif progress >= 0.95 and fadeIn then -- this is redundant but well it looks nice :)
+        elseif progress >= 0.95 and fadeIn then
             debugPrint("[FadeMusic] Fade in complete, removing timer " .. tostring(station))
             timer.Remove(timerName)
         end
@@ -175,35 +176,13 @@ end
 --------------------------------------------------------------------------------------
 
 local function areTracksFromSamePack(trackA, trackB)
-    local packA, packB = nil, nil
-
-    for packName in pairs(BATTLEBEATS.currentPacks) do
-        local pack = BATTLEBEATS.musicPacks[packName]
-        if not pack then continue end
-
-        for _, category in ipairs({ pack.combat or {}, pack.ambient or {} }) do
-            for _, track in ipairs(category) do
-                if track == trackA then
-                    packA = packName
-                    debugPrint("[AreTracksFromSamePack] Found trackA in pack: " .. packA)
-                end
-                if track == trackB then
-                    packB = packName
-                    debugPrint("[AreTracksFromSamePack] Found trackB in pack: " .. packB)
-                end
-                if packA and packB then
-                    local same = packA == packB
-                    debugPrint("[AreTracksFromSamePack] Same pack: " .. tostring(same))
-                    return same, packA, packB
-                end
-            end
-        end
-    end
-    debugPrint("[AreTracksFromSamePack] One or both tracks not found. packA: ", packA, "packB:", packB)
-    return false, packA, packB
+    local packA = BATTLEBEATS.trackToPack[trackA]
+    local packB = BATTLEBEATS.trackToPack[trackB]
+    debugPrint("[AreTracksFromSamePack] packA: " .. packA .. " | packB:" .. packB)
+    return packA ~= nil and packA == packB, packA, packB
 end
 
-local function GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePlayOnly)
+local function GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
     if not packs or table.IsEmpty(packs) then
         debugPrint("[GetRandomTrack] No packs provided")
         return nil
@@ -213,10 +192,10 @@ local function GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePl
         return nil
     end
     local allTracks = {}
-    if exclusivePlay:GetBool() and lastTrack2 and exclusivePlayOnly then
-        local samePack, packName = areTracksFromSamePack(lastTrack2, lastTrack2) -- restrict to same pack if exclusive play is enabled
+    if exclusivePlay:GetBool() and previousTrack and exclusivePlayOnly then
+        local packName = BATTLEBEATS.trackToPack[previousTrack] -- restrict to same pack if exclusive play is enabled
         debugPrint("[GetRandomTrack] Exclusive play enabled. Using pack: " .. packName)
-        if samePack and packName and BATTLEBEATS.musicPacks[packName] then
+        if packName and BATTLEBEATS.musicPacks[packName] then
             local selectedTracks = isCombat and BATTLEBEATS.musicPacks[packName].combat or BATTLEBEATS.musicPacks[packName].ambient
             if selectedTracks and #selectedTracks > 0 then
                 for _, t in ipairs(selectedTracks) do
@@ -224,7 +203,7 @@ local function GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePl
                 end
             else
                 debugPrint("[GetRandomTrack] Selected pack is empty. Falling back to all")
-                for packName, _ in pairs(packs) do -- fallback: use all tracks from allowed packs
+                for packName, _ in pairs(packs) do
                     if BATTLEBEATS.musicPacks[packName] then
                         local tracks = isCombat and BATTLEBEATS.musicPacks[packName].combat or BATTLEBEATS.musicPacks[packName].ambient
                         for _, track in ipairs(tracks or {}) do
@@ -255,7 +234,7 @@ local function GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePl
         end
         debugPrint("[GetRandomTrack] Available after exclusion: " .. #availableTracks)
         if #availableTracks > 1 then
-            local lastTrack = isCombat and lastCombatTrack or lastAmbienceTrack -- get last played track
+            local lastTrack = isCombat and lastCombatTrack or lastAmbienceTrack
             if lastTrack then
                 local filteredTracks = {}
                 for _, track in ipairs(availableTracks) do
@@ -276,8 +255,8 @@ local function GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePl
     return nil
 end
 
-function BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePlayOnly)
-    return GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePlayOnly)
+function BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
+    return GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
 end
 
 local function printStationError(track, errCode, errStr)

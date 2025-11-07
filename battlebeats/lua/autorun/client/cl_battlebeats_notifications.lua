@@ -42,6 +42,7 @@ function BATTLEBEATS.FormatTrackName(trackName) -- cleans file path, extensions,
     trackName = string.match(trackName, "[^/\\]+$") -- remove file path
     trackName = string.gsub(trackName, "%.mp3$", "") -- remove mp3 suffix
     trackName = string.gsub(trackName, "%.ogg$", "") -- remove ogg suffix
+    trackName = string.gsub(trackName, "%.wav$", "") -- remove wav suffix
     trackName = string.gsub(trackName, "(_%d%d%d)$", "") -- remove numbers from the end of the track name (for SBM packs)
     trackName = capitalizeLetters(trackName)
     return trackName
@@ -134,28 +135,33 @@ local function expandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDon
     end
 end
 
-local function getPackName(trackName)
-    for packName, pack in pairs(BATTLEBEATS.musicPacks) do
-        for _, f in ipairs(pack.ambient or {}) do
-            if f == trackName then
-                local formattedName = packName:gsub("^[Bb][Aa][Tt][Tt][Ll][Ee][Bb][Ee][Aa][Tt][Ss] %- ", "", 1, true)
-                    :gsub("^[Nn][Oo][Mm][Bb][Aa][Tt] %- ", "", 1, true)
-                    :gsub("^[Ss][Bb][Mm] [Dd][Ll][Cc]: ", "", 1, true)
-                    :gsub("^%[16[Tt][Hh][Nn][Oo][Tt][Ee]%]", "", 1, true)
-                return formattedName
-            end
-        end
-        for _, f in ipairs(pack.combat or {}) do
-            if f == trackName then
-                local formattedName = packName:gsub("^[Bb][Aa][Tt][Tt][Ll][Ee][Bb][Ee][Aa][Tt][Ss] %- ", "", 1, true)
-                    :gsub("^[Nn][Oo][Mm][Bb][Aa][Tt] %- ", "", 1, true)
-                    :gsub("^[Ss][Bb][Mm] [Dd][Ll][Cc]: ", "", 1, true)
-                    :gsub("^%[16[Tt][Hh][Nn][Oo][Tt][Ee]%]", "", 1, true)
-                return formattedName
-            end
+local prefixes = {
+    {prefix = "BattleBeats", type = "battlebeats"},
+    {prefix = "Nombat", type = "nombat"},
+    {prefix = "SBM DLC", type = "sbm"},
+    {prefix = "SBM", type = "sbm"},
+    {prefix = "16th Note", type = "16th"},
+    {prefix = "Action Music", type = "amusic"},
+}
+
+function BATTLEBEATS.stripPackPrefix(name)
+    local cleanName = name
+    local normName = name:lower():gsub("[%s%[%]]", "")
+    for _, data in ipairs(prefixes) do
+        local normPrefix = data.prefix:lower():gsub("[%s%[%]]", "")
+        if normName:sub(1, #normPrefix) == normPrefix then
+            cleanName = cleanName:sub(#data.prefix + 1)
+            cleanName = cleanName:gsub("^[%s%p]+", "")
+            return cleanName:Trim(), data.type
         end
     end
-    return "Unknown Pack"
+    return cleanName:Trim(), "na"
+end
+
+local function getPackName(trackName)
+    local packName = BATTLEBEATS.trackToPack[trackName]
+    if not packName then return "Unknown Pack" end
+    return BATTLEBEATS.stripPackPrefix(packName)
 end
 
 local finalWidth, finalHeight = 300, 80
@@ -191,17 +197,12 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     local textX = 10
     local radius = 16
     local textWidth = surface.GetTextSize(trackName)
-    local panelWidth = 280
-    local scrollSpeed = 50
-    local isScrolling = textWidth > panelWidth -- scroll if text too long
+    local isScrolling = textWidth > 280 -- scroll if text too long
     local textColor = inCombat and Color(255, 165, 0) or Color(0, 255, 0) -- green = ambient, orange = in combat, gold = preview
     textColor = isPreviewedTrack and Color(255, 215, 0) or textColor
     local lastAmplitudes = {}
 
     local barWidth = 8
-    local spacing = 4
-    local maxHeight = 60
-    local startX = 7
     local bars = 24
 
     local progressBarX, progressBarY = 40, 60
@@ -256,8 +257,8 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
                         lastAmplitudes[i] = scaled
                     end
 
-                    local height = math.Clamp(lastAmplitudes[i] * maxHeight, 1, maxHeight)
-                    local x = startX + (i - 1) * (barWidth + spacing)
+                    local height = math.Clamp(lastAmplitudes[i] * 60, 1, 60)
+                    local x = 7 + (i - 1) * (barWidth + 4)
 
                     surface.SetDrawColor(textColor.r, textColor.g, textColor.b, 100)
                     surface.DrawTexturedRect(x, yBase - height, barWidth, height)
@@ -268,7 +269,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
         end
 
         if isScrolling then
-            textX = textX - (scrollSpeed * FrameTime())
+            textX = textX - (50 * FrameTime())
             if textX < -textWidth - 50 then
                 textX = textX + textWidth + 40
             end

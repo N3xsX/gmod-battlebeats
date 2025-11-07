@@ -10,6 +10,15 @@ local volumeSet = GetConVar("battlebeats_volume")
 local persistentNotification = GetConVar("battlebeats_persistent_notification")
 local showPreviewNotification = GetConVar("battlebeats_show_preview_notification")
 
+local packIcons = {
+    ["battlebeats"] = Material("packicons/btb.png"),
+    ["nombat"] = Material("packicons/nombat.jpg"),
+    ["sbm"] = Material("packicons/sbm.jpg"),
+    ["16th"] = Material("packicons/16th.jpg"),
+    ["amusic"] = Material("packicons/amusic.jpg"),
+    ["na"] = Material("na.jpg")
+}
+
 surface.CreateFont("BattleBeats_Font", {
     font = "Roboto Bold",
     size = 30,
@@ -120,39 +129,6 @@ local function createInfoPanel(panel, packData)
         applyInfo(result)
     end)
 end
-
-local function getPackInfo(packName)
-    local formattedName = packName
-    local packType = "na"
-
-    if packName:match("^[Bb][Aa][Tt][Tt][Ll][Ee][Bb][Ee][Aa][Tt][Ss] %- ") then
-        formattedName = packName:gsub("^[Bb][Aa][Tt][Tt][Ll][Ee][Bb][Ee][Aa][Tt][Ss] %- ", "", 1)
-        packType = "battlebeats"
-    elseif packName:match("^[Nn][Oo][Mm][Bb][Aa][Tt] %- ") then
-        formattedName = packName:gsub("^[Nn][Oo][Mm][Bb][Aa][Tt] %- ", "", 1)
-        packType = "nombat"
-    elseif packName:match("^[Ss][Bb][Mm]") then
-        formattedName = packName
-        formattedName = formattedName:gsub("^[Ss][Bb][Mm] [Dd][Ll][Cc]: ", "", 1)
-        formattedName = formattedName:gsub("^[Ss][Bb][Mm]: ", "", 1)
-        packType = "sbm"
-    elseif packName:match("^%[16[Tt][Hh][Nn][Oo][Tt][Ee]%]") then
-        formattedName = packName:gsub("^%[16[Tt][Hh][Nn][Oo][Tt][Ee]%]", "", 1)
-        packType = "16th"
-    else
-        packType = "na"
-    end
-
-    return formattedName:Trim(), packType
-end
-
-local packIcons = {
-    ["battlebeats"] = Material("btb.png"),
-    ["nombat"] = Material("nombat.jpg"),
-    ["sbm"] = Material("sbm.jpg"),
-    ["16th"] = Material("16th.jpg"),
-    ["na"] = Material("na.jpg")
-}
 
 local function LerpColor(t, from, to)
     return Color(
@@ -1628,7 +1604,7 @@ local function openBTBmenu()
             packLabel:SetMouseInputEnabled(false)
             packLabel:SetKeyboardInputEnabled(false)
 
-            local formattedName, packType = getPackInfo(packName)
+            local formattedName, packType = BATTLEBEATS.stripPackPrefix(packName)
             local iconMat = packIcons[packType] or packIcons["Unknown"]
 
             packLabel.Paint = function(self, w, h)

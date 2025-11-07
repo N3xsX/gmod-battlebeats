@@ -138,7 +138,7 @@ local function openGuide()
     textBg:SetZPos(-1)
 
     local btnPrev, btnNext
-    local function RefreshPage()
+    local function refreshPage()
         local data = btbGuide[currentPage]
         if not data then return end
 
@@ -187,7 +187,7 @@ local function openGuide()
 
     btnPrev = makeButton("◀ Prev", 10, function()
         currentPage = math.max(currentPage - 1, 1)
-        RefreshPage()
+        refreshPage()
     end)
 
     local btnClose = makeButton("Close", 270, function()
@@ -196,14 +196,14 @@ local function openGuide()
 
     btnNext = makeButton("Next ▶", 530, function()
         currentPage = math.min(currentPage + 1, #btbGuide)
-        RefreshPage()
+        refreshPage()
     end)
 
     frame.OnClose = function ()
         currentPage = 1
     end
 
-    RefreshPage()
+    refreshPage()
 end
 
 concommand.Add("battlebeats_guide", openGuide)
