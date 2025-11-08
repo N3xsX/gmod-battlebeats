@@ -1778,7 +1778,39 @@ local function openBTBmenu()
             end
 
             --MARK:Packs dropdown
-            panel.OnMousePressed = function()
+            panel.OnMouseReleased = function(self, keyCode)
+                if keyCode == MOUSE_RIGHT then
+                    if not packData then return end
+                    local menu = DermaMenu()
+                    menu:AddOption("Copy formatted steam description", function()
+                        local function formatList(tracks)
+                            table.sort(tracks)
+                            local lines = {}
+                            for _, track in ipairs(tracks) do
+                                local name = BATTLEBEATS.FormatTrackName(track)
+                                table.insert(lines, "[*] " .. name)
+                            end
+                            return "[olist]\n" .. table.concat(lines, "\n") .. "\n[/olist]"
+                        end
+
+                        local parts = {}
+                        if packData.ambient and #packData.ambient > 0 then
+                            table.insert(parts, "[h2]Ambient:[/h2]\n" .. formatList(packData.ambient))
+                        end
+                        if packData.combat and #packData.combat > 0 then
+                            table.insert(parts, "[h2]Combat:[/h2]\n" .. formatList(packData.combat))
+                        end
+
+                        local finalText = table.concat(parts, "\n\n")
+
+                        SetClipboardText(finalText)
+                        surface.PlaySound("buttons/button14.wav")
+                        notification.AddLegacy("Copied formatted description to clipboard!", NOTIFY_GENERIC, 3)
+                    end):SetIcon("icon16/page_copy.png")
+                    menu:Open()
+                    return
+                end
+
                 if checking and not (debugMode and not packData.debug) then
                     notification.AddLegacy("Cannot edit packs during verification", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button10.wav")
@@ -1930,7 +1962,7 @@ end)
 
 list.Set("DesktopWindows", "BattleBeatsContextMenu", {
     title = "BattleBeats",
-    icon = "btb.png",
+    icon = "packicons/btb.png",
     init = function()
         if IsValid(frame) and not frame:IsVisible() then
             frame:SetVisible(true)

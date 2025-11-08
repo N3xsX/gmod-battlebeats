@@ -427,7 +427,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -443,7 +443,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end
+    end*/
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
