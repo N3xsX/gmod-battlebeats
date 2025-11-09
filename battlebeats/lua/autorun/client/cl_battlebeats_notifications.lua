@@ -142,6 +142,8 @@ local prefixes = {
     {prefix = "SBM", type = "sbm"},
     {prefix = "16th Note", type = "16th"},
     {prefix = "Action Music", type = "amusic"},
+    {prefix = "Dynamo Pack", type = "dynamo"},
+    {prefix = "Dynamo", type = "dynamo"},
 }
 
 function BATTLEBEATS.stripPackPrefix(name)

@@ -16,6 +16,7 @@ local packIcons = {
     ["sbm"] = Material("packicons/sbm.jpg"),
     ["16th"] = Material("packicons/16th.jpg"),
     ["amusic"] = Material("packicons/amusic.jpg"),
+    ["dynamo"] = Material("packicons/dynamo.jpg"),
     ["na"] = Material("na.jpg")
 }
 
@@ -1228,6 +1229,18 @@ local function openBTBmenu()
             draw.RoundedBox(6, 0, 0, w, h, c404040)
         end
 
+        local includeExcludeCombo = vgui.Create("DComboBox", searchPanel)
+        includeExcludeCombo:SetSize(100, 30)
+        includeExcludeCombo:SetPos(50, 11)
+        includeExcludeCombo:SetValue("Options")
+        includeExcludeCombo:AddChoice("Include All", nil, false, "icon16/tick.png")
+        includeExcludeCombo:AddChoice("Exclude All", nil, false, "icon16/delete.png")
+        includeExcludeCombo:SetSortItems(false)
+        includeExcludeCombo:SetTextColor(color_white)
+        includeExcludeCombo.Paint = function(self, w, h)
+            draw.RoundedBox(6, 0, 0, w, h, c404040)
+        end
+
         if BATTLEBEATS.musicPacks[selectedPack].packType == "nombat" or BATTLEBEATS.musicPacks[selectedPack].packType == "sbm" then
             local inforow = vgui.Create("DPanel", parent)
             inforow:SetSize(0, 50)
@@ -1314,6 +1327,20 @@ local function openBTBmenu()
                     table.insert(trackRows, row)
                 end
             end
+        end
+
+        includeExcludeCombo.OnSelect = function(_, _, value)
+            if value == "Include All" then
+                for _, t in ipairs(currentFilteredTracks or {}) do
+                    BATTLEBEATS.excludedTracks[t] = false
+                end
+            elseif value == "Exclude All" then
+                for _, t in ipairs(currentFilteredTracks or {}) do
+                    BATTLEBEATS.excludedTracks[t] = true
+                end
+            end
+            includeExcludeCombo:SetValue("Options")
+            filterAndSort()
         end
 
         searchBox.OnChange = function() timer.Create("BattleBeats_SearchDelay", 0.3, 1, filterAndSort) end

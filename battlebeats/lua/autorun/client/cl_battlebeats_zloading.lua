@@ -58,7 +58,7 @@ local function pathExistsInMusicPacks(path)
     return false
 end
 
-local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote", "am_music" }
+local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus" }
 
 local function loadGenericMusicPacks()
     local startTime = SysTime()
@@ -76,6 +76,7 @@ local function loadGenericMusicPacks()
                 local isSBM = (dir == "battlemusic")
                 local is16th = (dir == "16thnote")
                 local isAM = (dir == "am_music")
+                local isDYNAMO = (dir == "ayykyu_dynmus")
 
                 for _, file in ipairs(matchedFiles) do
                     if string.EndsWith(file, ".ogg") or string.EndsWith(file, ".mp3") or string.EndsWith(file, ".wav") then
@@ -89,6 +90,15 @@ local function loadGenericMusicPacks()
                             if file:find("/background/", 1, true) then
                                 table.insert(ambientFiles, file)
                             elseif file:find("/battle/", 1, true) or file:find("/battle_intensive/", 1, true) then
+                                table.insert(combatFiles, file)
+                            end
+                        elseif isDYNAMO then
+                            if file:find("/ambient/", 1, true) then
+                                table.insert(ambientFiles, file)
+                            elseif file:find("/combat/bosses/", 1, true)
+                                or file:find("/combat/soldiers/", 1, true)
+                                or file:find("/combat/cops/", 1, true)
+                                or file:find("/combat/aliens/", 1, true) then
                                 table.insert(combatFiles, file)
                             end
                         else
@@ -270,7 +280,7 @@ local function loadExcludedTracks()
             end
         end
     end
-    cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
+    --cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
     BATTLEBEATS.SaveExcludedTracks()
 end
 
@@ -306,7 +316,7 @@ local function loadFavoriteTracks()
             end
         end
     end
-    cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+    --cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
     BATTLEBEATS.SaveFavoriteTracks()
 end
 
@@ -325,7 +335,7 @@ local function loadMappedTracks()
         local jsonData = file.Read("battlebeats/battlebeats_npc_mappings.txt", "DATA")
         BATTLEBEATS.npcTrackMappings = util.JSONToTable(jsonData) or {}
 
-        cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
+        --cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
         BATTLEBEATS.SaveNPCMappings()
     end
 end
@@ -342,7 +352,7 @@ local function loadTrackOffsets()
         local jsonData = file.Read("battlebeats/battlebeats_track_offsets.txt", "DATA")
         BATTLEBEATS.trackOffsets = util.JSONToTable(jsonData) or {}
 
-        cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
+        --cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
         BATTLEBEATS.SaveTrackOffsets()
     end
 end
@@ -427,7 +437,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -435,7 +445,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added support for Action Music packs"
+            Color(150, 255, 150), "- Added support for DYNAMO packs"
             --Color(150, 255, 150), "- You can now add subtitles to your tracks"
         )
         chat.AddText(
@@ -443,7 +453,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
@@ -453,6 +463,7 @@ concommand.Add("battlebeats_reload_packs", function()
     loadGenericMusicPacks()
     loadBattleBeatsMusicPacks(true)
     loadBattleBeatsMusicPacks(false)
+    buildTrackMap()
     BATTLEBEATS.ValidatePacks()
 end)
 
