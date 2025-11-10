@@ -40,7 +40,7 @@ BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 BATTLEBEATS.trackToPack = {}
 
-BATTLEBEATS.currentVersion = "2.2.2"
+BATTLEBEATS.currentVersion = "2.2.4"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)

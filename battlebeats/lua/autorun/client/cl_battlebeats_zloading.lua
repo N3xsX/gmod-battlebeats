@@ -1,5 +1,6 @@
 local autoPopup = CreateClientConVar("battlebeats_autopopup", "1", true, false, "", 0, 1)
 local loadLocalPacks = CreateClientConVar("battlebeats_load_local_packs", "0", true, false, "", 0, 1)
+local loadAMsuspense = CreateClientConVar("battlebeats_load_am_suspense", "0", true, false, "", 0, 1)
 local debugMode = GetConVar("battlebeats_debug_mode")
 local enableAmbient = GetConVar("battlebeats_enable_ambient")
 
@@ -81,7 +82,7 @@ local function loadGenericMusicPacks()
                 for _, file in ipairs(matchedFiles) do
                     if string.EndsWith(file, ".ogg") or string.EndsWith(file, ".mp3") or string.EndsWith(file, ".wav") then
                         if isNombat then
-                            if file:match("/a.*%.mp3$") then -- nombat only supports .mp3 so no need to search for .ogg
+                            if file:match("/a.*%.mp3$") then
                                 table.insert(ambientFiles, file)
                             elseif file:match("/c.*%.mp3$") then
                                 table.insert(combatFiles, file)
@@ -90,6 +91,10 @@ local function loadGenericMusicPacks()
                             if file:find("/background/", 1, true) then
                                 table.insert(ambientFiles, file)
                             elseif file:find("/battle/", 1, true) or file:find("/battle_intensive/", 1, true) then
+                                table.insert(combatFiles, file)
+                            end
+                            if loadAMsuspense:GetBool() and file:find("/suspense/", 1, true) then
+                                table.insert(ambientFiles, file)
                                 table.insert(combatFiles, file)
                             end
                         elseif isDYNAMO then
@@ -112,7 +117,7 @@ local function loadGenericMusicPacks()
                 end
 
                 if not packType and (#ambientFiles > 0 or #combatFiles > 0) then
-                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or isAM and "amusic" or "battlebeats"
+                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or isAM and "amusic" or isDYNAMO and "dynamo" or "battlebeats"
                 end
             end
 
@@ -437,7 +442,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -453,7 +458,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end
+    end*/
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

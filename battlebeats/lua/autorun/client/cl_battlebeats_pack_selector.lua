@@ -9,6 +9,7 @@ local wsCache = {}
 local volumeSet = GetConVar("battlebeats_volume")
 local persistentNotification = GetConVar("battlebeats_persistent_notification")
 local showPreviewNotification = GetConVar("battlebeats_show_preview_notification")
+local toogleFrame = CreateClientConVar("battlebeats_context_ui_toogle", "0", true, false, "", 0, 1)
 
 local packIcons = {
     ["battlebeats"] = Material("packicons/btb.png"),
@@ -248,6 +249,7 @@ local c404040 = Color(40, 40, 40)
 local c3030300 = Color(30, 30, 30, 0)
 local c100100100 = Color(100, 100, 100)
 local c505050 = Color(50, 50, 50)
+local c255255255200 = Color(255, 255, 255, 200)
 
 local versionConVar = GetConVar("battlebeats_seen_version")
 
@@ -592,7 +594,7 @@ local function openBTBmenu()
             local rows = scrollPanel:GetCanvas():GetChildren()
             for _, row in ipairs(rows) do
                 if row.trackPath == BATTLEBEATS.currentPreviewTrack then
-                    selectedRow = row
+                    selectedRow = row.trackName
                     scrollPanel:ScrollToChild(row)
                     break
                 end
@@ -734,7 +736,6 @@ local function openBTBmenu()
     --MARK:Tracks list
     local function createTrackList(parent, trackType, selectedPack)
         parent:Clear()
-        selectedRow = nil
         local function addTrackRow(track, excluded, isFavorite)
             local trackName = BATTLEBEATS.FormatTrackName(track)
             local row = vgui.Create("DPanel", parent)
@@ -742,6 +743,7 @@ local function openBTBmenu()
             row:Dock(TOP)
             row:DockMargin(0, 5, 13, 3)
             row.trackPath = track
+            row.trackName = trackName
             row.textX = 10
             row.isScrolling = false
             row.scrollResetTime = 0
@@ -809,7 +811,7 @@ local function openBTBmenu()
 
             row.OnMousePressed = function(self, keyCode)
                 if keyCode == MOUSE_LEFT then
-                    selectedRow = row
+                    selectedRow = row.trackName
                 end
             end
 
@@ -828,7 +830,7 @@ local function openBTBmenu()
             row.targetColor = cHover
 
             row.Think = function(self)
-                local isSelected = (self == selectedRow)
+                local isSelected = (self.trackName == selectedRow)
 
                 if isSelected then
                     self.targetColor = c808080255
@@ -1241,19 +1243,15 @@ local function openBTBmenu()
             draw.RoundedBox(6, 0, 0, w, h, c404040)
         end
 
-        if BATTLEBEATS.musicPacks[selectedPack].packType == "nombat" or BATTLEBEATS.musicPacks[selectedPack].packType == "sbm" then
+        local packType = BATTLEBEATS.musicPacks[selectedPack].packType
+        if packType ~= "16thnote" and packType ~= "battlebeats" and packType ~= "local" then
             local inforow = vgui.Create("DPanel", parent)
-            inforow:SetSize(0, 50)
+            inforow:SetSize(0, 30)
             inforow:Dock(TOP)
             inforow:DockMargin(0, 0, 15, 10)
             inforow.Paint = function(self, w, h)
-                local bg = c404040
-                draw.RoundedBox(4, 0, 0, w, h, bg)
-                if BATTLEBEATS.musicPacks[selectedPack].packType == "sbm" then
-                    draw.SimpleText("Track names may appear unusual due to the naming conventions used in SBM", "BattleBeats_Font", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-                else
-                    draw.SimpleText("Track names appear unusual due to the naming conventions used in Nombat", "BattleBeats_Font", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-                end
+                draw.RoundedBox(4, 0, 0, w, h, cHover)
+                draw.SimpleText("Track names may appear unusual or poorly formatted because they were not originally designed for display", "BattleBeats_Notification_Font_Misc", w / 2, h / 2, c255255255200, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
         end
 
@@ -1705,7 +1703,6 @@ local function openBTBmenu()
                 end
             end
 
-            local c255255255200 = Color(255, 255, 255, 200)
             local c2001300200 = Color(200, 130, 0, 200)
             local c000100 = Color(0, 0, 0, 100)
             local c303030 = Color(30, 30, 30)
@@ -1975,14 +1972,14 @@ local function openBTBmenu()
     end
 end
 
-hook.Add("OnContextMenuOpen", "BattleBeats_OpenMusicMenu", function()
+hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
     if IsValid(frame) and not frame.isMinimalized then
         frame:SetVisible(true)
     end
 end)
 
-hook.Add("OnContextMenuClose", "BattleBeats_HideMusicMenu", function()
-    if IsValid(frame) then
+hook.Add("OnContextMenuClose", "BattleBeats_HideUI", function()
+    if IsValid(frame) and not toogleFrame:GetBool() then
         frame:SetVisible(false)
     end
 end)

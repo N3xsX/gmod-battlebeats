@@ -446,8 +446,10 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
             createCustomCheckbox(panel, contentPanel_2, 70, "Load local packs", "battlebeats_load_local_packs", "Enables loading music packs directly from the addons/ folder without needing to upload them to Workshop. This will not work if Debug Mode is enabled\n(Not intended for testing sound packs - use debug mode for that instead)\n(Requires restart or packs reload)")
             createCustomCheckbox(panel, contentPanel_2, 100, "Debug Mode", "battlebeats_debug_mode", "Used for testing sound packs and debugging functions. Some features may be disabled while debug mode is active\n(Requires restart or packs reload)")
             createCustomCheckbox(panel, contentPanel_2, 130, "Lower volume in menu", "battlebeats_lower_volume_in_menu", "Lowers volume in game/spawn menu ('escape' menu won't work in singleplayer - timers pause when menu is open)")
-            createCustomButton(panel, contentPanel_2, 160, "Reload Packs", "battlebeats_reload_packs")
-            createCustomButton(panel, contentPanel_2, 200, "Open Guide", "battlebeats_guide")
+            createCustomCheckbox(panel, contentPanel_2, 160, "Load AM suspense tracks", "battlebeats_load_am_suspense", "Allows loading suspense tracks from Action Music packs into the ambient and combat categories\n(Requires restart or packs reload)")
+            createCustomCheckbox(panel, contentPanel_2, 190, "Toggle UI from context menu", "battlebeats_context_ui_toogle", "The pack selector will remain open after closing the context menu instead of being minimized")
+            createCustomButton(panel, contentPanel_2, 220, "Reload Packs", "battlebeats_reload_packs")
+            createCustomButton(panel, contentPanel_2, 260, "Open Guide", "battlebeats_guide")
         end
 
         button.DoClick = function()

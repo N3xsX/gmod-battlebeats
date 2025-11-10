@@ -10,7 +10,7 @@ end
 
 local btbGuide = {
     {
-        image = "",
+        image = "g0",
         text = "Hey! Thanks for downloading BattleBeats. Looks like it's your first time using it. Want to see a quick guide that shows most of BattleBeats features? Don't worry, you can always access this guide later in the settings"
     },
     {
@@ -23,7 +23,7 @@ local btbGuide = {
     },
     {
         image = "g3",
-        text = "Alright, here is the UI (that you are already seeing). This is the main panel"
+        text = "Alright, here is the UI (that you are already probably seeing). This is the main panel"
     },
     {
         image = "g4",
