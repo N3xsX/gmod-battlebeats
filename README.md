@@ -139,7 +139,7 @@ This table is **saved to disk** in GMod under: `data/battlebeats/battlebeats_tra
 # Essential Functions
 
 ### `BATTLEBEATS.PlayNextTrack(track, time, noFade, priority)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L278)  
+[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L312)  
 Starts playing the specified track and schedules the next track automatically
 
 | Parameter | Type | Description |
