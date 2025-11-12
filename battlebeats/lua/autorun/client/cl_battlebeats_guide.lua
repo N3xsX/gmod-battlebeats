@@ -11,91 +11,91 @@ end
 local btbGuide = {
     {
         image = "g0",
-        text = "Hey! Thanks for downloading BattleBeats. Looks like it's your first time using it. Want to see a quick guide that shows most of BattleBeats features? Don't worry, you can always access this guide later in the settings"
+        text = "#btb.guide.g0"
     },
     {
         image = "g1",
-        text = "You can access the UI using the context menu (C)"
+        text = "#btb.guide.g1"
     },
     {
         image = "g2",
-        text = "Alternatively, you can open it through Spawnmenu -> Utilities -> BattleBeats -> General (or by using the console command battlebeats_menu)"
+        text = "#btb.guide.g2"
     },
     {
         image = "g3",
-        text = "Alright, here is the UI (that you are already probably seeing). This is the main panel"
+        text = "#btb.guide.g3"
     },
     {
         image = "g4",
-        text = "You can enable each pack by pressing these buttons here"
+        text = "#btb.guide.g4"
     },
     {
         image = "g5",
-        text = "You can also click the entire panel to open a dropdown menu"
+        text = "#btb.guide.g5"
     },
     {
         image = "g6",
-        text = "By pressing either of these two buttons, you can access a list of ambient or combat tracks from the selected pack"
+        text = "#btb.guide.g6"
     },
     {
         image = "g7",
-        text = "This is the main track panel"
+        text = "#btb.guide.g7"
     },
     {
         image = "g8",
-        text = "You can search for any track name using the search bar at the top"
+        text = "#btb.guide.g8"
     },
     {
         image = "g9",
-        text = "Next to it, you can select the sorting mode for the tracks; for example, from A-Z or Z-A"
+        text = "#btb.guide.g9"
     },
     {
         image = "g10",
-        text = "Just like in the pack selector panel, you can enable or disable each track separately"
+        text = "#btb.guide.g10"
     },
     {
         image = "g11",
-        text = "Clicking any track in the list will open the player for that track"
+        text = "#btb.guide.g11"
     },
     {
         image = "g12",
-        text = "Use the controls below to, well... control playback"
+        text = "#btb.guide.g12"
     },
     {
         image = "g13",
-        text = "You can use the slider to jump to a specific timestamp in the track"
+        text = "#btb.guide.g13"
     },
     {
         image = "g14",
-        text = "Here can also adjust the volume of the playing track"
+        text = "#btb.guide.g14"
     },
     {
         image = "g15",
-        text = "Right-clicking a track opens the properties menu, where you can copy its path, add it to favorites, set an offset, or, for combat tracks, assign an NPC to it"
+        text = "#btb.guide.g15"
     },
     {
         image = "g16",
-        text = "Here you can assign a specific NPC class and set its priority"
+        text = "#btb.guide.g16"
     },
     {
         image = "g17",
-        text = "You can go back to the pack selector using the button below"
+        text = "#btb.guide.g17"
     },
     {
         image = "g18",
-        text = "Last but not least, the Options panel. You can access it by pressing the button in the lower-right corner"
+        text = "#btb.guide.g18"
     },
     {
         image = "g19",
-        text = "Here you'll find all client-side options for BattleBeats. Alternatively, you can also find them in the spawnmenu"
+        text = "#btb.guide.g19"
     },
     {
         image = "g20",
-        text = "You can switch between option categories using the tabs at the top. I won't go over every option here since each one has its own tooltip and explanation when you hover over it"
+        text = "#btb.guide.g20"
     },
     {
         image = "",
-        text = "Well, that would be it! These are all the basics you need to know about BattleBeats. Hope you enjoy using it!"
+        text = "#btb.guide.end"
     },
 }
 
@@ -150,7 +150,7 @@ local function openGuide()
         img:SetImage("materials/guide/" .. data.image .. ".jpg")
 
         text:SetText(data.text or "")
-        frame:SetTitle(string.format("BattleBeats Guide (%d / %d)", currentPage, #btbGuide))
+        frame:SetTitle("BattleBeats Guide (" .. currentPage .. "/" .. #btbGuide .. ")")
 
         btnPrev:SetVisible(currentPage > 1)
         btnNext:SetVisible(currentPage < #btbGuide)
@@ -185,16 +185,16 @@ local function openGuide()
         return btn
     end
 
-    btnPrev = makeButton("◀ Prev", 10, function()
+    btnPrev = makeButton("#btb.guide.prev", 10, function()
         currentPage = math.max(currentPage - 1, 1)
         refreshPage()
     end)
 
-    local btnClose = makeButton("Close", 270, function()
+    local btnClose = makeButton("#btb.guide.close", 270, function()
         frame:Close()
     end)
 
-    btnNext = makeButton("Next ▶", 530, function()
+    btnNext = makeButton("#btb.guide.next", 530, function()
         currentPage = math.min(currentPage + 1, #btbGuide)
         refreshPage()
     end)

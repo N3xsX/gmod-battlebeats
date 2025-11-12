@@ -60,8 +60,8 @@ local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
-    label:SetPos((300 - 150) / 2, 0)
-    label:SetSize(150, 20)
+    label:SetPos((300 - 200) / 2, 0)
+    label:SetSize(200, 20)
     label:SetTextColor(Color(255, 255, 255))
     label:SetContentAlignment(5)
 
@@ -117,8 +117,8 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
-    label:SetPos((300 - 150) / 2, 0)
-    label:SetSize(150, 20)
+    label:SetPos((300 - 200) / 2, 0)
+    label:SetSize(200, 20)
     label:SetTextColor(Color(255, 255, 255))
     label:SetContentAlignment(5)
 
@@ -324,7 +324,7 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
     frame:Center()
-    frame:SetTitle("BattleBeats Client Options")
+    frame:SetTitle("#btb.ps.options.title")
     frame:SetDraggable(true)
     frame:ShowCloseButton(true)
     frame:SetSizable(false)
@@ -343,11 +343,11 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
     end
 
     local categories = {
-        {name = "Sound", panel = nil},
-        {name = "Notifications", panel = nil},
-        {name = "Subtitles", panel = nil},
-        {name = "M. Player", panel = nil},
-        {name = "Misc", panel = nil}
+        {name = "#btb.options.cat.sound", panel = nil},
+        {name = "#btb.options.cat.notification", panel = nil},
+        {name = "#btb.options.cat.subtitles", panel = nil},
+        {name = "#btb.options.cat.music_player", panel = nil},
+        {name = "#btb.options.cat.misc", panel = nil}
     }
 
     local contentPanel = vgui.Create("DPanel", frame)
@@ -397,8 +397,19 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
         panel:SetVisible(false)
         category.panel = panel
 
+        local translation = language.GetPhrase("#btb.translated.by")
+        local lang = GetConVar("gmod_language"):GetString()
+        if lang ~= "en" and translation ~= "" then
+            local translationLabel = vgui.Create("DLabel", panel)
+            translationLabel:SetText(language.GetPhrase("#btb.translated.by.label") .. translation)
+            translationLabel:SetPos((contentPanel:GetWide() - 400) / 2, 420)
+            translationLabel:SetSize(400, 20)
+            translationLabel:SetTextColor(Color(80, 80, 80, 200))
+            translationLabel:SetContentAlignment(5)
+        end
+
         local versionlabel = vgui.Create("DLabel", panel)
-        versionlabel:SetText("BattleBeats version: " .. BATTLEBEATS.currentVersion)
+        versionlabel:SetText(language.GetPhrase("#btb.options.version.label") .. BATTLEBEATS.currentVersion)
         versionlabel:SetPos((contentPanel:GetWide() - 150) / 2, 440)
         versionlabel:SetSize(150, 20)
         versionlabel:SetTextColor(Color(80, 80, 80, 200))
@@ -406,50 +417,51 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
 
         local contentPanel_2 = contentPanel:GetWide() / 2
         local contentPanel_NumSlider = (panel:GetWide() - 300) / 2
+        local btbDefault = language.GetPhrase("btb.options.noti.default_pos")
 
-        if category.name == "Sound" then
-            createCustomNumSlider(panel, contentPanel_NumSlider, 10, "Master Volume", "battlebeats_volume", 0, 200)
-            createCustomNumSlider(panel, contentPanel_NumSlider, 50, "Ambient Volume", "battlebeats_volume_ambient", 0, 100)
-            createCustomNumSlider(panel, contentPanel_NumSlider, 90, "Combat Volume", "battlebeats_volume_combat", 0, 100)
-            createCustomCheckbox(panel, contentPanel_2, 150, "Enable Ambient", "battlebeats_enable_ambient")
-            createCustomCheckbox(panel, contentPanel_2, 180, "Enable Combat", "battlebeats_enable_combat")
-            createCustomCheckbox(panel, contentPanel_2, 210, "Force Combat", "battlebeats_force_combat", "Forces combat music to play regardless of nearby hostile NPCs. This won't work if combat music is disabled")
-            createCustomComboBox(panel, (contentPanel_2 - 100), 250, "On death behavior", "battlebeats_disable_mode", { "Nothing", "Mute completely", "Lower volume" })
-        elseif category.name == "Notifications" then
-            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "Enable notification", "battlebeats_show_notification")
-            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "Notification always visible", "battlebeats_persistent_notification", "The notification will remain visible for the entire duration of the music, instead of disappearing after a few seconds")
-            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 50, "Show progress bar", "battlebeats_show_status_bar", "Displays a progress bar for the current track (showing total time and current time) at the bottom of the notification")
-            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 50, "Show replay notification", "battlebeats_show_notification_after_continue", "Displays a notification even if the same track is replayed (e.g. after leaving combat before the wait time ends). \n(This is enabled by default if 'Notification always visible' is active)")
-            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 90, "Skip Nombat track names", "battlebeats_skip_nombat_names", "Hides track names like C7 or A2 when playing tracks from Nombat packs")
-            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 90, "Show pack name in notification", "battlebeats_show_notification_pack_name", "Shows the pack name of the currently played track in the notification")
-            createCustomCheckbox(panel, contentPanel_2, 130, "Enable preview notification", "battlebeats_show_preview_notification", "Shows notification when you are previewing tracks")
-            createCustomCheckbox(panel, contentPanel_2, 170, "Show notification visualizer", "battlebeats_show_notification_visualizer", "Show FFT bars in the track notification")
-            createCustomCheckbox(panel, contentPanel_2, 210, "Visualizer amplitude smoothing", "battlebeats_visualizer_smooth", "Enable amplitude smoothing for the visualizer")
-            createArrowStepper(panel, contentPanel_NumSlider, 250, "Visualizer Boost", "battlebeats_visualizer_boost", 1, 20, "Multiplier for visualizer amplitude boost (used in log scale)")
-            createArrowStepper(panel, contentPanel_NumSlider, 300, "Notification X position", "battlebeats_notif_x", 0, ScrW(), "Default: " .. tostring(ScrW() - 310))
-            createArrowStepper(panel, contentPanel_NumSlider, 350, "Notification Y position", "battlebeats_notif_y", 0, ScrH(), "Default: " .. tostring(ScrH() / 6))
-        elseif category.name == "Subtitles" then
-            createCustomCheckbox(panel, contentPanel_2, 10, "Enable Subtitles", "battlebeats_subtitles_enabled")
-        elseif category.name == "M. Player" then
-            createCustomCheckbox(panel, contentPanel_2, 10, "Switch to current pack only", "battlebeats_exclusive_play", "When switching between ambient and combat, only tracks from the same pack will be used. When a track ends naturally, the next one will still be chosen randomly from all enabled packs")
-            createArrowStepper(panel, contentPanel_NumSlider, 50, "Ambient wait time (in seconds)", "battlebeats_ambient_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")
-            createArrowStepper(panel, contentPanel_NumSlider, 100, "Combat wait time (in seconds)", "battlebeats_combat_wait_time", 1, 120, "Wait time defines how long the music player will wait before replacing the previous track with a new one")
-            createCustomCheckbox(panel, contentPanel_2, 160, "Always continue previous track", "battlebeats_always_continue", "Skips the wait time and always resumes the previous track until it finishes playing")
-            createCustomCheckbox(panel, contentPanel_2, 190, "NPC's fight triggers combat", "battlebeats_npc_combat", "Triggers combat when an NPC is targeting other NPCs or players")
-            createCustomCheckbox(panel, contentPanel_2, 220, "Enable assigned tracks", "battlebeats_enable_assigned_tracks", "Plays assigned tracks when their NPCs are present")
-            createCustomCheckbox(panel, contentPanel_2, 250, "Exclude assigned tracks", "battlebeats_exclude_mapped_tracks", "Tracks assigned to NPCs will not play when selecting random combat tracks")
-            createCustomCheckbox(panel, contentPanel_2, 280, "Switch to lower priority", "battlebeats_switch_on_lower_priority", "A track with higher priority will switch to a lower priority (if available) when the NPC with that priority dies")
-            createCustomComboBox(panel, (contentPanel_2 - 100), 310, "Continue Mode", "battlebeats_continue_mode", { "Resume from last position", "Play simultaneously" }, "Resume from last position: the track will continue from where it left off before switching.\nPlay simultaneously: tracks continue playing in the background during switches (not actually audible - they just remain active in the background)")
-        elseif category.name == "Misc" then
-            createCustomCheckbox(panel, contentPanel_2, 10, "NPC Combat requires LoS", "battlebeats_detection_mode", "LoS - Line of Sight. If enabled, combat will only trigger when you have visual contact with an enemy")
-            createCustomCheckbox(panel, contentPanel_2, 40, "Auto Popup", "battlebeats_autopopup", "Automatically open the BattleBeats pack selector on startup if no packs are selected")
-            createCustomCheckbox(panel, contentPanel_2, 70, "Load local packs", "battlebeats_load_local_packs", "Enables loading music packs directly from the addons/ folder without needing to upload them to Workshop. This will not work if Debug Mode is enabled\n(Not intended for testing sound packs - use debug mode for that instead)\n(Requires restart or packs reload)")
-            createCustomCheckbox(panel, contentPanel_2, 100, "Debug Mode", "battlebeats_debug_mode", "Used for testing sound packs and debugging functions. Some features may be disabled while debug mode is active\n(Requires restart or packs reload)")
-            createCustomCheckbox(panel, contentPanel_2, 130, "Lower volume in menu", "battlebeats_lower_volume_in_menu", "Lowers volume in game/spawn menu ('escape' menu won't work in singleplayer - timers pause when menu is open)")
-            createCustomCheckbox(panel, contentPanel_2, 160, "Load AM suspense tracks", "battlebeats_load_am_suspense", "Allows loading suspense tracks from Action Music packs into the ambient and combat categories\n(Requires restart or packs reload)")
-            createCustomCheckbox(panel, contentPanel_2, 190, "Toggle UI from context menu", "battlebeats_context_ui_toogle", "The pack selector will remain open after closing the context menu instead of being minimized")
-            createCustomButton(panel, contentPanel_2, 220, "Reload Packs", "battlebeats_reload_packs")
-            createCustomButton(panel, contentPanel_2, 260, "Open Guide", "battlebeats_guide")
+        if category.name == "#btb.options.cat.sound" then
+            createCustomNumSlider(panel, contentPanel_NumSlider, 10, "#btb.options.snd.master_volume", "battlebeats_volume", 0, 200)
+            createCustomNumSlider(panel, contentPanel_NumSlider, 50, "#btb.options.snd.ambient_volume", "battlebeats_volume_ambient", 0, 100)
+            createCustomNumSlider(panel, contentPanel_NumSlider, 90, "#btb.options.snd.combat_volume", "battlebeats_volume_combat", 0, 100)
+            createCustomCheckbox(panel, contentPanel_2, 150, "#btb.options.snd.enable_ambient", "battlebeats_enable_ambient")
+            createCustomCheckbox(panel, contentPanel_2, 180, "#btb.options.snd.enable_combat", "battlebeats_enable_combat")
+            createCustomCheckbox(panel, contentPanel_2, 210, "#btb.spawnmenu.general.force_combat", "battlebeats_force_combat", "#btb.spawnmenu.general.force_combat_tip")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 250, "#btb.spawnmenu.general.combo", "battlebeats_disable_mode", { "#btb.spawnmenu.general.combo_1", "#btb.spawnmenu.general.combo_2", "#btb.spawnmenu.general.combo_3" })
+        elseif category.name == "#btb.options.cat.notification" then
+            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "#btb.options.noti.enable_noti", "battlebeats_show_notification")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "#btb.options.noti.noti_always_vis", "battlebeats_persistent_notification", "#btb.options.noti.noti_always_vis_tip")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 40, "#btb.options.noti.progress_bar", "battlebeats_show_status_bar", "#btb.options.noti.progress_bar_tip")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 40, "#btb.options.noti.replay", "battlebeats_show_notification_after_continue", "#btb.options.noti.replay_tip")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 4, 70, "#btb.options.noti.show_nombat", "battlebeats_skip_nombat_names", "#btb.options.noti.show_nombat_tip")
+            createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 70, "#btb.options.noti.pack_name", "battlebeats_show_notification_pack_name", "#btb.options.noti.pack_name_tip")
+            createCustomCheckbox(panel, contentPanel_2, 100, "#btb.options.noti.preview", "battlebeats_show_preview_notification", "#btb.options.noti.preview_tip")
+            createCustomCheckbox(panel, contentPanel_2, 130, "#btb.options.noti.visualizer", "battlebeats_show_notification_visualizer", "#btb.options.noti.visualizer_tip")
+            createCustomCheckbox(panel, contentPanel_2, 160, "#btb.options.noti.visualizer_smooth", "battlebeats_visualizer_smooth", "#btb.options.noti.visualizer_smooth_tip")
+            createArrowStepper(panel, contentPanel_NumSlider, 200, "#btb.options.noti.visualizer_boost", "battlebeats_visualizer_boost", 1, 20, "#btb.options.noti.visualizer_boost_tip")
+            createArrowStepper(panel, contentPanel_NumSlider, 250, "#btb.options.noti.x_pos", "battlebeats_notif_x", 0, ScrW(), btbDefault .. tostring(ScrW() - 310))
+            createArrowStepper(panel, contentPanel_NumSlider, 300, "#btb.options.noti.y_pos", "battlebeats_notif_y", 0, ScrH(), btbDefault .. tostring(ScrH() / 6))
+        elseif category.name == "#btb.options.cat.subtitles" then
+            createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.sub.enable_sub", "battlebeats_subtitles_enabled")
+        elseif category.name == "#btb.options.cat.music_player" then
+            createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.mplayer.curr_pack_only", "battlebeats_exclusive_play", "#btb.options.mplayer.curr_pack_only_tip")
+            createArrowStepper(panel, contentPanel_NumSlider, 50, "#btb.options.mplayer.a_wait_time", "battlebeats_ambient_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip")
+            createArrowStepper(panel, contentPanel_NumSlider, 100, "#btb.options.mplayer.c_wait_time", "battlebeats_combat_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip")
+            createCustomCheckbox(panel, contentPanel_2, 160, "#btb.options.mplayer.always_continue", "battlebeats_always_continue", "#btb.options.mplayer.always_continue_tip")
+            createCustomCheckbox(panel, contentPanel_2, 190, "#btb.spawnmenu.general.npc_combat", "battlebeats_npc_combat", "#btb.spawnmenu.general.npc_combat_tip")
+            createCustomCheckbox(panel, contentPanel_2, 220, "#btb.spawnmenu.general.enable_assigned", "battlebeats_enable_assigned_tracks", "#btb.spawnmenu.general.enable_assigned_tip")
+            createCustomCheckbox(panel, contentPanel_2, 250, "#btb.options.mplayer.exclude_assigned", "battlebeats_exclude_mapped_tracks", "#btb.options.mplayer.exclude_assigned_tip")
+            createCustomCheckbox(panel, contentPanel_2, 280, "#btb.options.mplayer.switch_to_lower", "battlebeats_switch_on_lower_priority", "#btb.options.mplayer.switch_to_lower_tip")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 310, "#btb.options.mplayer.combo", "battlebeats_continue_mode", { "#btb.options.mplayer.combo_1", "#btb.options.mplayer.combo_2" }, "#btb.options.mplayer.combo_tip")
+        elseif category.name == "#btb.options.cat.misc" then
+            createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.misc.npc_los", "battlebeats_detection_mode", "#btb.spawnmenu.server.enable_pvp_los_tip")
+            createCustomCheckbox(panel, contentPanel_2, 40, "#btb.options.misc.auto_popup", "battlebeats_autopopup", "#btb.options.misc.auto_popup_tip")
+            createCustomCheckbox(panel, contentPanel_2, 70, "#btb.options.misc.load_local", "battlebeats_load_local_packs", "#btb.options.misc.load_local_tip")
+            createCustomCheckbox(panel, contentPanel_2, 100, "#btb.options.misc.debug_mode", "battlebeats_debug_mode", "#btb.options.misc.debug_mode_tip")
+            createCustomCheckbox(panel, contentPanel_2, 130, "#btb.options.misc.lower_vol_in_menu", "battlebeats_lower_volume_in_menu", "#btb.options.misc.lower_vol_in_menu_tip")
+            createCustomCheckbox(panel, contentPanel_2, 160, "#btb.options.misc.load_am_sus", "battlebeats_load_am_suspense", "#btb.options.misc.load_am_sus_tip")
+            createCustomCheckbox(panel, contentPanel_2, 190, "#btb.options.misc.toggle_ui", "battlebeats_context_ui_toogle", "#btb.options.misc.toggle_ui_tip")
+            createCustomButton(panel, contentPanel_2, 220, "#btb.options.misc.reload_packs", "battlebeats_reload_packs")
+            createCustomButton(panel, contentPanel_2, 260, "#btb.options.misc.open_guide", "battlebeats_guide")
         end
 
         button.DoClick = function()

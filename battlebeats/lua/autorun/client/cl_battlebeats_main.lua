@@ -40,7 +40,7 @@ BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 BATTLEBEATS.trackToPack = {}
 
-BATTLEBEATS.currentVersion = "2.2.4"
+BATTLEBEATS.currentVersion = "2.2.5"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -248,7 +248,7 @@ local function GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusiv
         if #availableTracks > 0 then
             return availableTracks[math.random(#availableTracks)]
         else
-            notification.AddLegacy("All tracks are excluded! Playing random one!", NOTIFY_ERROR, 4)
+            notification.AddLegacy("#btb.main.allexcluded", NOTIFY_ERROR, 4)
             return allTracks[math.random(#allTracks)] -- fallback: return random track even if excluded
         end
     end
@@ -260,7 +260,7 @@ function BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, previousTrack, ex
 end
 
 local function printStationError(track, errCode, errStr)
-    notification.AddLegacy("Failed to play sound! Check the console for details", NOTIFY_ERROR, 4)
+    notification.AddLegacy("#btb.main.soundfail", NOTIFY_ERROR, 4)
     MsgC(
         Color(255, 255, 0), "[BattleBeats Client] ",
         Color(255, 255, 255), "Error playing sound: ",
@@ -362,9 +362,6 @@ local function PlayNextTrack(track, time, noFade, priority)
 
             removeSoundTimers()
 
-            --instantly store the current music position to prevent rare issue
-            --where a newly switched track would incorrectly use the position of the previous one
-            --(only saw this twice in 40+ hours of gameplay but hey might as well fix it)
             if not isInCombat then
                 lastAmbiencePosition = station:GetTime()
                 lastAmbienceTotalLength = station:GetLength()
@@ -916,26 +913,25 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
         warningBox:SetBackgroundBlur(true)
         warningBox:ShowCloseButton(false)
         warningBox:SetDraggable(false)
+        local w2 = language.GetPhrase("btb.main.volume_warning_2")
         warningBox.Paint = function(self, w, h)
             Derma_DrawBackgroundBlur(self, 1)
             draw.RoundedBox(8, 0, 0, w, h, Color(30, 30, 30, 240))
-            draw.SimpleText("Warning: High Volume!", "DermaLarge", w / 2, 20, Color(255, 90, 90), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-            draw.SimpleText("You set the volume above 200% (" .. newVolume .. "%)", "DermaDefault", w / 2, 60, color_white, TEXT_ALIGN_CENTER)
-            draw.SimpleText("This may damage your hearing or audio equipment", "DermaDefault", w / 2, 75,
-                Color(255, 180, 180), TEXT_ALIGN_CENTER)
-            draw.SimpleText("Proceed only if you understand the risk", "DermaDefault", w / 2, 90, Color(200, 200, 255),
-                TEXT_ALIGN_CENTER)
+            draw.SimpleText("#btb.main.volume_warning_1", "DermaLarge", w / 2, 20, Color(255, 90, 90), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            draw.SimpleText(w2 ..  " (" .. newVolume .. "%)", "DermaDefault", w / 2, 60, color_white, TEXT_ALIGN_CENTER)
+            draw.SimpleText("#btb.main.volume_warning_3", "DermaDefault", w / 2, 75, Color(255, 180, 180), TEXT_ALIGN_CENTER)
+            draw.SimpleText("#btb.main.volume_warning_4", "DermaDefault", w / 2, 90, Color(200, 200, 255), TEXT_ALIGN_CENTER)
         end
         warningBox.OnClose = function ()
             volumeFrameOn = false
         end
 
-        createButton("I understand the risk", 20, 120, function()
+        createButton("#btb.main.volume_confirm", 20, 120, function()
             applyVolume(newVolume)
             warningBox:Close()
         end)
 
-        createButton("Cancel", 220, 120, function()
+        createButton("#btb.main.volume_cancel", 220, 120, function()
             RunConsoleCommand("battlebeats_volume", tostring(math.min(oldValue or 100, 200)))
             warningBox:Close()
         end, true)

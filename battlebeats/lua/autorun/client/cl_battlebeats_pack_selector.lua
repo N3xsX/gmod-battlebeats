@@ -94,9 +94,13 @@ local function createInfoBoxes(panel, size, date, ownerName)
         table.insert(panel.infoPanels, box)
     end
 
-    addInfoBox("Size: " .. size, startX)
-    addInfoBox("Created: " .. date, startX + buttonWidth + spacing)
-    addInfoBox("Author: " .. ownerName, startX + (buttonWidth + spacing) * 2)
+    local ssize = language.GetPhrase("#btb.ps.info.size")
+    local screated = language.GetPhrase("#btb.ps.info.created")
+    local sauthor = language.GetPhrase("#btb.ps.info.author")
+
+    addInfoBox(ssize .. size, startX)
+    addInfoBox(screated .. date, startX + buttonWidth + spacing)
+    addInfoBox(sauthor .. ownerName, startX + (buttonWidth + spacing) * 2)
 end
 
 local function createInfoPanel(panel, packData)
@@ -190,7 +194,7 @@ local function validateTracksInPack(packName)
                         Color(255, 0, 0), tostring(errorCount),
                         color_white, " error(s)\n"
                     )
-                    notification.AddLegacy("[BattleBeats] Pack verification FAILED! Found " .. tostring(errorCount) .. " error(s)", NOTIFY_ERROR, 4)
+                    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.ps.verification.failed_1") .. " " .. tostring(errorCount) .. " " .. language.GetPhrase("btb.ps.verification.failed_2"), NOTIFY_ERROR, 4)
                     surface.PlaySound("buttons/button8.wav")
                 else
                     MsgC(
@@ -199,7 +203,7 @@ local function validateTracksInPack(packName)
                         Color(0, 255, 0), " PASSED! ",
                         color_white, "No errors found\n"
                     )
-                    notification.AddLegacy("[BattleBeats] Pack verification PASSED!", NOTIFY_HINT, 4)
+                    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.ps.verification.pass"), NOTIFY_HINT, 4)
                     surface.PlaySound("buttons/button14.wav")
                 end
                 errorCount = 0
@@ -267,7 +271,7 @@ local function openBTBmenu()
     frame:SetSize(1000, 700)
     frame:SetSizable(false)
     frame:Center()
-    frame:SetTitle("BattleBeats Music Packs")
+    frame:SetTitle("#btb.ps.title")
     frame:MakePopup()
     frame:SetBackgroundBlur(true)
     frame.Paint = function(self, w, h)
@@ -330,7 +334,7 @@ local function openBTBmenu()
     local optionsButton = vgui.Create("DButton", frame)
     optionsButton:SetSize(340, 40)
     optionsButton:SetPos(650, 650)
-    optionsButton:SetText("Options")
+    optionsButton:SetText("#btb.ps.button.options")
     optionsButton:SetFont("CreditsText")
     optionsButton:SetTextColor(color_white)
     optionsButton.currentColor = c707070255
@@ -361,7 +365,7 @@ local function openBTBmenu()
         draw.RoundedBox(4, 0, 0, w, h, c707070255)
     end
     local volumeLabel = vgui.Create("DLabel", volumePanel)
-    volumeLabel:SetText("MASTER VOLUME")
+    volumeLabel:SetText("#btb.ps.master_volume")
     volumeLabel:SetFont("DermaDefaultBold")
     volumeLabel:SetTextColor(color_white)
     volumeLabel:SizeToContents()
@@ -370,6 +374,7 @@ local function openBTBmenu()
     local volumeBar = vgui.Create("DPanel", volumePanel)
     volumeBar:SetSize(300, 8)
     volumeBar:SetPos(15, 22)
+    volumeBar:SetCursor("hand")
     volumeBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, c909090)
         local cvar = volumeSet
@@ -419,18 +424,11 @@ local function openBTBmenu()
         end
     end
 
-    volumeBar.OnCursorEntered = function(self)
-        self:SetCursor("hand")
-    end
-    volumeBar.OnCursorExited = function(self)
-        self:SetCursor("arrow")
-    end
-
     --MARK:Save button
     local saveButton = vgui.Create("DButton", frame)
     saveButton:SetSize(290, 40)
     saveButton:SetPos(350, 650)
-    saveButton:SetText("Done")
+    saveButton:SetText("#btb.ps.button.done")
     saveButton:SetFont("CreditsText")
     saveButton:SetTextColor(color_white)
     saveButton.currentColor = c707070255
@@ -495,7 +493,7 @@ local function openBTBmenu()
     local trackNameLabel = vgui.Create("DLabel", playerPanel)
     trackNameLabel:SetPos(45, 15)
     trackNameLabel:SetSize(880, 50)
-    trackNameLabel:SetText("No Track Selected")
+    trackNameLabel:SetText("#btb.ps.ts.mp.no_track")
     trackNameLabel:SetFont("BattleBeats_Player_Font")
     trackNameLabel:SetTextColor(color_white)
     trackNameLabel:SetContentAlignment(5)
@@ -509,15 +507,15 @@ local function openBTBmenu()
     loopBtn.Paint = function(self, w, h)
         draw.RoundedBox(8, 0, 0, w, h, c3030300)
     end
-    loopBtn:SetTooltip("Loop Disabled")
+    loopBtn:SetTooltip("#btb.ps.ts.mp.loop_disabled")
     loopBtn.DoClick = function()
         isLooping = not isLooping
         if isLooping then
             loopBtn:SetTextColor(color_white)
-            loopBtn:SetTooltip("Loop Enabled")
+            loopBtn:SetTooltip("#btb.ps.ts.mp.loop_enabled")
         else
             loopBtn:SetTextColor(c100100100)
-            loopBtn:SetTooltip("Loop Disabled")
+            loopBtn:SetTooltip("#btb.ps.ts.mp.loop_disabled")
         end
     end
 
@@ -530,15 +528,15 @@ local function openBTBmenu()
     skipExcludedBtn.Paint = function(self, w, h)
         draw.RoundedBox(8, 0, 0, w, h, c3030300)
     end
-    skipExcludedBtn:SetTooltip("Playing all")
+    skipExcludedBtn:SetTooltip("#btb.ps.ts.mp.skip_play_all_tip")
     skipExcludedBtn.DoClick = function()
         skipExcluded = not skipExcluded
         if skipExcluded then
             skipExcludedBtn:SetTextColor(c100100100)
-            skipExcludedBtn:SetTooltip("Skipping Excluded Tracks")
+            skipExcludedBtn:SetTooltip("#btb.ps.ts.mp.skip_excluded_tip")
         else
             skipExcludedBtn:SetTextColor(color_white)
-            skipExcludedBtn:SetTooltip("Playing all")
+            skipExcludedBtn:SetTooltip("#btb.ps.ts.mp.skip_play_all_tip")
         end
     end
 
@@ -614,7 +612,7 @@ local function openBTBmenu()
     prevTrackBtn.DoClick = function()
         BATTLEBEATS.SwitchPreviewTrack(-1)
     end
-    prevTrackBtn:SetTooltip("Previous Track")
+    prevTrackBtn:SetTooltip("#btb.ps.ts.mp.previous_track_tip")
 
     local nextTrackBtn = vgui.Create("DButton", playerPanel)
     nextTrackBtn:SetSize(50, 50)
@@ -628,12 +626,13 @@ local function openBTBmenu()
     nextTrackBtn.DoClick = function()
         BATTLEBEATS.SwitchPreviewTrack(1)
     end
-    nextTrackBtn:SetTooltip("Next Track")
+    nextTrackBtn:SetTooltip("#btb.ps.ts.mp.next_track_tip")
     --MARK:Player bars
     local hoverTimeDisplay = nil
     local progressBar = vgui.Create("DPanel", playerPanel)
     progressBar:SetSize(800, 20)
     progressBar:SetPos(90, 110)
+    progressBar:SetCursor("hand")
     progressBar.Paint = function(self, w, h)
         local progressBarX, progressBarY = 0, h / 2 - 2
         local progressBarWidth, progressBarHeight = w, 8
@@ -690,13 +689,6 @@ local function openBTBmenu()
         end
     end
 
-    progressBar.OnCursorEntered = function(self)
-        self:SetCursor("hand")
-    end
-    progressBar.OnCursorExited = function(self)
-        self:SetCursor("arrow")
-    end
-
     local progressDot = vgui.Create("DPanel", progressBar)
     progressDot:SetSize(12, 12)
     progressDot:SetMouseInputEnabled(false)
@@ -742,11 +734,20 @@ local function openBTBmenu()
             row:SetSize(0, 50)
             row:Dock(TOP)
             row:DockMargin(0, 5, 13, 3)
+            row:SetCursor("hand")
             row.trackPath = track
             row.trackName = trackName
             row.textX = 10
             row.isScrolling = false
             row.scrollResetTime = 0
+
+            if selectedRow == row.trackName then
+                timer.Simple(0.1, function ()
+                    if IsValid(row) then
+                        scrollPanel:ScrollToChild(row)
+                    end
+                end)
+            end
 
             surface.SetFont("BattleBeats_Font")
             local textWidth = surface.GetTextSize(isFavorite and "★ " .. trackName or trackName)
@@ -754,9 +755,9 @@ local function openBTBmenu()
             local scrollSpeed = 60
 
             local iconData = {
-                {check = BATTLEBEATS.npcTrackMappings[track] ~= nil, tooltip = "This track has an assigned NPC", image = "icon16/user.png"},
-                {check = BATTLEBEATS.trackOffsets[track] ~= nil, tooltip = "This track has an assigned offset", image = "icon16/time.png"},
-                {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "This track has subtitles", image = "icon16/comments.png"}
+                {check = BATTLEBEATS.npcTrackMappings[track] ~= nil, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
+                {check = BATTLEBEATS.trackOffsets[track] ~= nil, tooltip = "#btb.ps.ts.icon_offset", image = "icon16/time.png"},
+                {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"}
             }
 
             local xOffset = 840
@@ -782,15 +783,14 @@ local function openBTBmenu()
             local customCheckbox = vgui.Create("DPanel", row)
             customCheckbox:SetSize(85, 25)
             customCheckbox:SetPos(860, 12.5)
+            customCheckbox:SetCursor("hand")
             customCheckbox.OnCursorEntered = function(self)
-                self:SetCursor("hand")
                 targetColor = excluded and Color(255, 80, 80) or Color(255, 230, 50)
             end
             customCheckbox.OnCursorExited = function(self)
-                self:SetCursor("arrow")
                 targetColor = excluded and c25500 or c2552100
             end
-            customCheckbox:SetTooltip(excluded and "Excluded tracks won't be selected by the music player" or "Included packs play normally")
+            customCheckbox:SetTooltip(excluded and "#btb.ps.ts.exclude_tip" or "#btb.ps.ts.include_tip")
 
             customCheckbox.OnMousePressed = function(self)
                 excluded = not excluded
@@ -798,14 +798,14 @@ local function openBTBmenu()
                 changesMade = true
                 BATTLEBEATS.SaveExcludedTracks()
                 targetColor = excluded and c25500 or c2552100
-                customCheckbox:SetTooltip(excluded and "Excluded tracks won't be selected by the music player" or "Included packs play normally")
+                customCheckbox:SetTooltip(excluded and "#btb.ps.ts.exclude_tip" or "#btb.ps.ts.include_tip")
                 surface.PlaySound(excluded and "btb_button_disable.mp3" or "btb_button_enable.mp3")
             end
 
             customCheckbox.Paint = function(self, w, h)
                 colorLerp = LerpColor(FrameTime() * 10, colorLerp, targetColor)
                 draw.RoundedBox(6, 0, 0, w, h, colorLerp)
-                local text = excluded and "✖ Excluded" or "✔ Included"
+                local text = excluded and "#btb.ps.ts.track_disabled" or "#btb.ps.ts.track_enabled"
                 draw.SimpleTextOutlined(text, "BattleBeats_Checkbox_Font", w / 2, 3, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 0.9, c000200)
             end
 
@@ -816,12 +816,9 @@ local function openBTBmenu()
             end
 
             row.OnCursorEntered = function(self)
-                --surface.PlaySound("ui/buttonrollover.wav")
-                self:SetCursor("hand")
                 self.isScrolling = textWidth > panelWidth
             end
             row.OnCursorExited = function(self)
-                self:SetCursor("arrow")
                 self.isScrolling = false
                 self.scrollResetTime = CurTime()
             end
@@ -911,22 +908,22 @@ local function openBTBmenu()
                     for _ in pairs(BATTLEBEATS.favoriteTracks) do
                         favoriteCount = favoriteCount + 1
                     end
-                    local copy = menu:AddOption("Copy Track Path", function()
+                    local copy = menu:AddOption("#btb.ps.ts.rmb.copy", function()
                         SetClipboardText(track)
                     end)
                     copy:SetImage("icon16/tag.png")
 
                     --MARK:RMB favorites
                     if isFavorite then
-                        local unfavorite = menu:AddOption("Remove from Favorites", function()
+                        local unfavorite = menu:AddOption("#btb.ps.ts.rmb.remove_fav", function()
                             BATTLEBEATS.favoriteTracks[track] = nil
                             BATTLEBEATS.SaveFavoriteTracks()
                             changesMade = true
                             createTrackList(parent, trackType, selectedPack)
                         end)
                         unfavorite:SetImage("icon16/cancel.png")
-                    elseif favoriteCount < 25 then
-                        local favorite = menu:AddOption("Add to Favorites", function()
+                    elseif favoriteCount < 255 then
+                        local favorite = menu:AddOption("#btb.ps.ts.rmb.add_fav", function()
                             BATTLEBEATS.favoriteTracks[track] = true
                             BATTLEBEATS.SaveFavoriteTracks()
                             changesMade = true
@@ -941,9 +938,10 @@ local function openBTBmenu()
 
                     --MARK:RMB offset
                     local offsetValue = BATTLEBEATS.trackOffsets[track] or 0
-                    local offsetOption = menu:AddOption(offsetValue > 0 and "Edit Offset (" .. offsetValue .. "s)" or "Set Offset", function()
+                    local offsetOptionTitle = language.GetPhrase("#btb.ps.ts.rmb.offset_edit")
+                    local offsetOption = menu:AddOption(offsetValue > 0 and offsetOptionTitle .. " (" .. offsetValue .. "s)" or "#btb.ps.ts.rmb.offset_set", function()
                         local offsetFrame = vgui.Create("DFrame")
-                        offsetFrame:SetTitle("Set Track Offset")
+                        offsetFrame:SetTitle("#btb.ps.ts.rmb.offset_title")
                         offsetFrame:SetSize(250, 110)
                         offsetFrame:Center()
                         offsetFrame:MakePopup()
@@ -954,7 +952,7 @@ local function openBTBmenu()
                         local label = vgui.Create("DLabel", offsetFrame)
                         label:SetPos(10, 30)
                         label:SetSize(230, 20)
-                        label:SetText("Offset (in seconds):")
+                        label:SetText("#btb.ps.ts.rmb.offset_text")
 
                         local textEntry = vgui.Create("DTextEntry", offsetFrame)
                         textEntry:SetPos(10, 50)
@@ -965,7 +963,7 @@ local function openBTBmenu()
                         local saveButton = vgui.Create("DButton", offsetFrame)
                         saveButton:SetPos(10, 75)
                         saveButton:SetSize(110, 25)
-                        saveButton:SetText("Save")
+                        saveButton:SetText("#btb.ps.ts.rmb.offset_save")
                         saveButton.DoClick = function()
                             local newOffset = tonumber(textEntry:GetValue()) or 0
                             if newOffset > 0 then
@@ -988,27 +986,29 @@ local function openBTBmenu()
                         local cancelButton = vgui.Create("DButton", offsetFrame)
                         cancelButton:SetPos(130, 75)
                         cancelButton:SetSize(110, 25)
-                        cancelButton:SetText("Cancel")
+                        cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
                         cancelButton.DoClick = function()
                             offsetFrame:Close()
                         end
                     end)
                     offsetOption:SetImage("icon16/time.png")
-                    offsetOption:SetTooltip("Adds an offset to the track\nOn first play, it will start from this offset")
+                    offsetOption:SetTooltip("#btb.ps.ts.rmb.offset_tip")
 
                     --MARK:RMB npc assign
                     if trackType == "combat" then
                         local currentNPC = BATTLEBEATS.npcTrackMappings[track]
-                        local npcOptionText = currentNPC and "Edit assigned NPC" or "Assign NPC Class"
+                        local npcOptionText = currentNPC and "#btb.ps.ts.rmb.assign_edit" or "#btb.ps.ts.rmb.assign_add"
 
                         if currentNPC then
-                            local assignInfo = menu:AddOption("Assigned NPC: " .. currentNPC.class .. " (Priority: " .. currentNPC.priority .. ")", function() end)
+                            local s1 = language.GetPhrase("#btb.ps.ts.rmb.assign_current")
+                            local s2 = language.GetPhrase("#btb.ps.ts.rmb.assign_priority")
+                            local assignInfo = menu:AddOption(s1 .. currentNPC.class .. " (" .. s2 .. currentNPC.priority .. ")", function() end)
                             assignInfo:SetImage("icon16/vcard.png")
                         end
 
                         local assignNPC = menu:AddOption(npcOptionText, function()
                             assignFrame = vgui.Create("DFrame")
-                            assignFrame:SetTitle("Assign NPC to Track")
+                            assignFrame:SetTitle("#btb.ps.ts.rmb.assign_title")
                             assignFrame:SetSize(400, 110)
                             assignFrame:Center()
                             assignFrame:MakePopup()
@@ -1019,26 +1019,26 @@ local function openBTBmenu()
                             local classLabel = vgui.Create("DLabel", assignFrame)
                             classLabel:SetPos(10, 25)
                             classLabel:SetSize(270, 20)
-                            classLabel:SetText("Class:")
+                            classLabel:SetText("#btb.ps.ts.rmb.assign_class")
 
                             local textEntry = vgui.Create("DTextEntry", assignFrame)
                             textEntry:SetPos(10, 45)
                             textEntry:SetSize(270, 20)
-                            textEntry:SetPlaceholderText("Enter NPC class (e.g npc_zombie)")
+                            textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
                             if currentNPC then textEntry:SetText(currentNPC.class) end
 
                             local priorityNames = {
-                                [1] = "1 (Highest)",
+                                [1] = "1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest"),
                                 [2] = "2",
                                 [3] = "3",
                                 [4] = "4",
-                                [5] = "5 (Lowest)"
+                                [5] = "5 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_lowest")
                             }
 
                             local priorityLabel = vgui.Create("DLabel", assignFrame)
                             priorityLabel:SetPos(290, 25)
                             priorityLabel:SetSize(100, 20)
-                            priorityLabel:SetText("Priority:")
+                            priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
 
                             local priorityCombo = vgui.Create("DComboBox", assignFrame)
                             priorityCombo:SetPos(290, 45)
@@ -1046,12 +1046,12 @@ local function openBTBmenu()
                             for i = 1, 5 do
                                 priorityCombo:AddChoice(priorityNames[i], i)
                             end
-                            priorityCombo:SetValue(currentNPC and tostring(currentNPC.priority) or "1 (Highest)")
+                            priorityCombo:SetValue(currentNPC and tostring(currentNPC.priority) or ("1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest")))
 
                             local saveButton = vgui.Create("DButton", assignFrame)
                             saveButton:SetPos(45, 75)
                             saveButton:SetSize(150, 25)
-                            saveButton:SetText(currentNPC and "Save/Remove" or "Save")
+                            saveButton:SetText(currentNPC and "#btb.ps.ts.rmb.assign_saveremove" or "#btb.ps.ts.rmb.assign_save")
                             saveButton:SetFont("CreditsText")
                             saveButton:SetTextColor(color_white)
                             saveButton.DoClick = function()
@@ -1062,10 +1062,11 @@ local function openBTBmenu()
                                 if not class or class == "" then
                                     if currentNPC then
                                         BATTLEBEATS.npcTrackMappings[track] = nil
-                                        notification.AddLegacy("Removed NPC class from track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
+                                        local removed = language.GetPhrase("#btb.ps.ts.rmb.assign_removed_noti")
+                                        notification.AddLegacy(removed .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
                                         surface.PlaySound("buttons/button14.wav")
                                     else
-                                        notification.AddLegacy("No NPC class entered", NOTIFY_ERROR, 3)
+                                        notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                         surface.PlaySound("buttons/button11.wav")
                                     end
                                     BATTLEBEATS.SaveNPCMappings()
@@ -1088,7 +1089,7 @@ local function openBTBmenu()
                                     if oldTrack then
                                         BATTLEBEATS.npcTrackMappings[oldTrack] = nil
                                     end
-                                    notification.AddLegacy("Assigned NPC class " .. class .. " with priority " .. priority .. " to track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
+                                    notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_noti_class") .. ": " .. class .. " " .. language.GetPhrase("btb.ps.ts.rmb.assign_noti_priority") .. " " .. priority .. " " .. language.GetPhrase("btb.ps.ts.rmb.assign_noti_track") .. ": " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
                                     surface.PlaySound("buttons/button14.wav")
                                     BATTLEBEATS.SaveNPCMappings()
                                     changesMade = true
@@ -1098,8 +1099,8 @@ local function openBTBmenu()
 
                                 if oldTrack then
                                     surface.PlaySound("buttons/button17.wav")
-                                    Derma_Query("NPC: (" .. class .. ") is already assigned to track: (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). Overwrite?",
-                                        "Confirm Overwrite", "Yes", function() assignNPCToTrack() end, "No", function() end)
+                                    Derma_Query("NPC: (" .. class .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"),
+                                        "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() assignNPCToTrack() end, "#btb.ps.ts.rmb.assign_no", function() end)
                                 else
                                     assignNPCToTrack()
                                 end
@@ -1112,7 +1113,7 @@ local function openBTBmenu()
                             local cancelButton = vgui.Create("DButton", assignFrame)
                             cancelButton:SetPos(205, 75)
                             cancelButton:SetSize(150, 25)
-                            cancelButton:SetText("Cancel")
+                            cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
                             cancelButton:SetFont("CreditsText")
                             cancelButton:SetTextColor(color_white)
                             cancelButton.Paint = function(self, w, h)
@@ -1125,15 +1126,16 @@ local function openBTBmenu()
                         end)
 
                         assignNPC:SetImage(currentNPC and "icon16/user_edit.png" or "icon16/user_add.png")
-                        assignNPC:SetTooltip("Assign an NPC class to this combat track with a priority (1-5)\nThe track with the highest priority will play when fighting multiple NPCs")
+                        assignNPC:SetTooltip("#btb.ps.ts.rmb.assign_tip")
                     end
 
                     --MARK:RMB subtitles
                     local subs = BATTLEBEATS.parsedSubtitles[string.lower(trackName)]
                     if subs and #subs > 0 then
-                        local lyricsOption = menu:AddOption("Show Lyrics", function()
+                        local lyricsOption = menu:AddOption("#btb.ps.ts.rmb.show_lyrics", function()
                             lframe = vgui.Create("DFrame")
-                            lframe:SetTitle("Lyrics for: " .. trackName)
+                            local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
+                            lframe:SetTitle(title .. trackName)
                             lframe:SetSize(500, 400)
                             lframe:Center()
                             lframe:MakePopup()
@@ -1193,14 +1195,18 @@ local function openBTBmenu()
         searchPanel:DockMargin(0, 5, 15, 10)
         searchPanel.Paint = function(self, w, h)
             draw.RoundedBox(6, 0, 0, w, h, c404040)
-            draw.SimpleText("Name", "DermaDefaultBold", 40, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            draw.SimpleText("Exclude", "DermaDefaultBold", 877, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            draw.SimpleText("Sort: ", "DermaDefaultBold", 800, 25, color_white,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            if trackType == "ambient" then
-                draw.SimpleText("Ambient List", "DermaDefaultBold", 460, 50, c100100100,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            else
-                draw.SimpleText("Combat List", "DermaDefaultBold", 460, 50, c100100100,TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
+            surface.SetFont("DermaDefaultBold")
+
+            local nameText = "#btb.ps.ts.header.name"
+            local excludeText = "#btb.ps.ts.header.exclude"
+            local listText = trackType == "ambient" and "#btb.ps.ts.header.ambient_list" or "#btb.ps.ts.header.combat_list"
+
+            local excludeW = surface.GetTextSize(excludeText)
+            local listW = surface.GetTextSize(listText)
+
+            draw.SimpleText(nameText, "DermaDefaultBold", 40, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(excludeText, "DermaDefaultBold", w - excludeW - 40, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(listText, "DermaDefaultBold", w / 2 - listW / 2, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end
 
         local searchBox = vgui.Create("DTextEntry", searchPanel)
@@ -1211,7 +1217,7 @@ local function openBTBmenu()
             draw.RoundedBox(4, 0, 0, w, h, c707070255)
             self:DrawTextEntryText(color_white, color_white, color_white)
             if self:GetText() == "" and not self:IsEditing() then
-                draw.SimpleText("Search track...", "BattleBeats_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.ps.search", "BattleBeats_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
 
@@ -1221,9 +1227,9 @@ local function openBTBmenu()
         sortCombo:SetValue("A → Z")
         sortCombo:AddChoice("A → Z", "az", false, "icon16/arrow_down.png")
         sortCombo:AddChoice("Z → A", "za", false, "icon16/arrow_up.png")
-        sortCombo:AddChoice("Favorites only", "fav", false, "icon16/star.png")
-        sortCombo:AddChoice("Included only", "inc", false, "icon16/tick.png")
-        sortCombo:AddChoice("Excluded only", "ex", false, "icon16/cross.png")
+        sortCombo:AddChoice("#btb.ps.sort.favorite_only", "fav", false, "icon16/star.png")
+        sortCombo:AddChoice("#btb.ps.sort.include_only", "inc", false, "icon16/tick.png")
+        sortCombo:AddChoice("#btb.ps.sort.exclude_only", "ex", false, "icon16/cross.png")
         sortCombo:SetSortItems(false)
         sortCombo:ChooseOptionID(1)
         sortCombo:SetTextColor(color_white)
@@ -1234,9 +1240,9 @@ local function openBTBmenu()
         local includeExcludeCombo = vgui.Create("DComboBox", searchPanel)
         includeExcludeCombo:SetSize(100, 30)
         includeExcludeCombo:SetPos(50, 11)
-        includeExcludeCombo:SetValue("Options")
-        includeExcludeCombo:AddChoice("Include All", nil, false, "icon16/tick.png")
-        includeExcludeCombo:AddChoice("Exclude All", nil, false, "icon16/delete.png")
+        includeExcludeCombo:SetValue("#btb.ps.sort.options")
+        includeExcludeCombo:AddChoice("#btb.ps.sort.options_include", nil, false, "icon16/tick.png")
+        includeExcludeCombo:AddChoice("#btb.ps.sort.options_exclude", nil, false, "icon16/delete.png")
         includeExcludeCombo:SetSortItems(false)
         includeExcludeCombo:SetTextColor(color_white)
         includeExcludeCombo.Paint = function(self, w, h)
@@ -1251,7 +1257,7 @@ local function openBTBmenu()
             inforow:DockMargin(0, 0, 15, 10)
             inforow.Paint = function(self, w, h)
                 draw.RoundedBox(4, 0, 0, w, h, cHover)
-                draw.SimpleText("Track names may appear unusual or poorly formatted because they were not originally designed for display", "BattleBeats_Notification_Font_Misc", w / 2, h / 2, c255255255200, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.ps.ts.format", "BattleBeats_Notification_Font_Misc", w / 2, h / 2, c255255255200, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
         end
 
@@ -1312,7 +1318,7 @@ local function openBTBmenu()
                 noResultsLabel:SetSize(0, 50)
                 noResultsLabel:Dock(TOP)
                 noResultsLabel:DockMargin(0, 5, 0, 0)
-                noResultsLabel:SetText("Nothing found!")
+                noResultsLabel:SetText("#btb.ps.sort.nothing_found")
                 noResultsLabel:SetFont("BattleBeats_Font")
                 noResultsLabel:SetTextColor(Color(255, 80, 80))
                 noResultsLabel:SetContentAlignment(5)
@@ -1328,16 +1334,16 @@ local function openBTBmenu()
         end
 
         includeExcludeCombo.OnSelect = function(_, _, value)
-            if value == "Include All" then
+            if value == "#btb.ps.sort.options_include" then
                 for _, t in ipairs(currentFilteredTracks or {}) do
                     BATTLEBEATS.excludedTracks[t] = false
                 end
-            elseif value == "Exclude All" then
+            elseif value == "#btb.ps.sort.options_exclude" then
                 for _, t in ipairs(currentFilteredTracks or {}) do
                     BATTLEBEATS.excludedTracks[t] = true
                 end
             end
-            includeExcludeCombo:SetValue("Options")
+            includeExcludeCombo:SetValue("#btb.ps.sort.options")
             filterAndSort()
         end
 
@@ -1370,7 +1376,7 @@ local function openBTBmenu()
             local backButton = vgui.Create("DButton", frame)
             backButton:SetSize(290, 40)
             backButton:SetPos(350, 650)
-            backButton:SetText("Back")
+            backButton:SetText("#btb.ps.button.back")
             backButton:SetFont("CreditsText")
             backButton:SetTextColor(color_white)
             backButton.Paint = function(self, w, h)
@@ -1397,8 +1403,8 @@ local function openBTBmenu()
             promoPanel:SetPos(80, 150)
             promoPanel.Paint = function(self, w, h)
                 draw.RoundedBox(8, 0, 0, w, h, c505050)
-                draw.SimpleText("No packs found. You might want to try one of these", "CloseCaption_Bold", w / 2, 30, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-                draw.SimpleText("Don’t see your packs? Report your issue [HERE]", "CloseCaption_Bold", w / 2, 365, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.ps.no_packs_found_1", "CloseCaption_Bold", w / 2, 30, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.ps.no_packs_found_2", "CloseCaption_Bold", w / 2, 365, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
             local rbutton = vgui.Create("DButton", promoPanel)
             rbutton:SetSize(75, 30)
@@ -1520,7 +1526,7 @@ local function openBTBmenu()
             panel:Dock(TOP)
             panel:DockMargin(0, 0, 0, 5)
             local currentColor = BATTLEBEATS.currentPacks[packName] and c2552100 or c25500
-            local text = BATTLEBEATS.currentPacks[packName] and "Enabled" or "Disabled"
+            local text = BATTLEBEATS.currentPacks[packName] and "#btb.ps.pack_enabled" or "#btb.ps.pack_disabled"
             local targetColor = currentColor
             local customCheckbox = vgui.Create("DPanel", panel)
             
@@ -1529,7 +1535,7 @@ local function openBTBmenu()
                 errorIcon:SetPos(840, 28)
                 errorIcon:SetSize(24, 24)
                 errorIcon:SetImage("icon16/exclamation.png")
-                local errorMessage = packData.error or "Unknown error"
+                local errorMessage = packData.error or "#btb.ps.unknown_error"
                 errorIcon:SetTooltip("Pack error: " .. tostring(errorMessage))
                 errorIcon.OnCursorEntered = function(self)
                     self:SetTooltip("Pack error: " .. tostring(errorMessage))
@@ -1646,7 +1652,11 @@ local function openBTBmenu()
                     draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 end
-                surface.SetMaterial(iconMat)
+                if packData.packType == "local" then
+                    surface.SetMaterial(Material("local.png"))
+                else
+                    surface.SetMaterial(iconMat)
+                end
                 surface.SetDrawColor(color_white)
                 surface.DrawTexturedRect(0, 2, 65, 65)
                 draw.SimpleTextOutlined(formattedName, "BattleBeats_Font", 80, 35, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, c000200)
@@ -1671,7 +1681,7 @@ local function openBTBmenu()
             if not isErrored then
                 customCheckbox.OnMousePressed = function()
                     if debugMode then
-                        notification.AddLegacy("Cannot toggle packs while debug mode is active!", NOTIFY_ERROR, 3)
+                        notification.AddLegacy("#btb.ps.noti.cant_toggle", NOTIFY_ERROR, 3)
                         surface.PlaySound("buttons/button10.wav")
                         return
                     end
@@ -1680,12 +1690,12 @@ local function openBTBmenu()
                         BATTLEBEATS.currentPacks[packName] = nil
                         surface.PlaySound("btb_button_disable.mp3")
                         targetColor = c25500
-                        text = "Disabled"
+                        text = "#btb.ps.pack_disabled"
                     else
                         BATTLEBEATS.currentPacks[packName] = true
                         surface.PlaySound("btb_button_enable.mp3")
                         targetColor = c2552100
-                        text = "Enabled"
+                        text = "#btb.ps.pack_enabled"
                     end
                 end
             end
@@ -1737,14 +1747,14 @@ local function openBTBmenu()
                 local ambientButton = vgui.Create("DButton", panel)
                 ambientButton:SetSize(buttonWidth, buttonHeight)
                 ambientButton:SetPos(startX, 80)
-                ambientButton:SetText("Ambient Tracks")
+                ambientButton:SetText("#btb.ps.info.ambient_button")
                 ambientButton:SetFont("DermaDefaultBold")
                 ambientButton:SetTextColor(color_white)
                 ambientButton.Paint = function(self, w, h)
                     local bgColor = self:IsHovered() and c909090 or c606060
                     if packData.packContent == "combat" then
                         bgColor = c404040
-                        self:SetTooltip("This pack doesn't have ambient tracks")
+                        self:SetTooltip("#btb.ps.info.ambient_button_tip")
                         ambientButton:SetTextColor(c200200200)
                     end
                     draw.RoundedBox(4, 0, 0, w, h, bgColor)
@@ -1757,9 +1767,6 @@ local function openBTBmenu()
                         self:SetCursor("no")
                     end
                 end
-                ambientButton.OnCursorExited = function(self)
-                    self:SetCursor("arrow")
-                end
                 ambientButton.DoClick = function()
                     if packData.packContent ~= "combat" then
                         createTrackEditor("ambient", packName, scrollPanel, frame)
@@ -1770,14 +1777,14 @@ local function openBTBmenu()
                 local combatButton = vgui.Create("DButton", panel)
                 combatButton:SetSize(buttonWidth, buttonHeight)
                 combatButton:SetPos(startX + buttonWidth + spacing, 80)
-                combatButton:SetText("Combat Tracks")
+                combatButton:SetText("#btb.ps.info.combat_button")
                 combatButton:SetFont("DermaDefaultBold")
                 combatButton:SetTextColor(color_white)
                 combatButton.Paint = function(self, w, h)
                     local bgColor = self:IsHovered() and c909090 or c606060
                     if packData.packContent == "ambient" then
                         bgColor = c404040
-                        self:SetTooltip("This pack doesn't have combat tracks")
+                        self:SetTooltip("#btb.ps.info.combat_button_tip")
                         combatButton:SetTextColor(c200200200)
                     end
                     draw.RoundedBox(4, 0, 0, w, h, bgColor)
@@ -1789,9 +1796,6 @@ local function openBTBmenu()
                     else
                         self:SetCursor("no")
                     end
-                end
-                combatButton.OnCursorExited = function(self)
-                    self:SetCursor("arrow")
                 end
                 combatButton.DoClick = function()
                     if packData.packContent ~= "ambient" then
@@ -1806,7 +1810,7 @@ local function openBTBmenu()
                 if keyCode == MOUSE_RIGHT then
                     if not packData then return end
                     local menu = DermaMenu()
-                    menu:AddOption("Copy formatted steam description", function()
+                    menu:AddOption("#btb.ps.pack_rmb.copy", function()
                         local function formatList(tracks)
                             table.sort(tracks)
                             local lines = {}
@@ -1829,22 +1833,22 @@ local function openBTBmenu()
 
                         SetClipboardText(finalText)
                         surface.PlaySound("buttons/button14.wav")
-                        notification.AddLegacy("Copied formatted description to clipboard!", NOTIFY_GENERIC, 3)
+                        notification.AddLegacy("#btb.ps.pack_rmb.copy_noti", NOTIFY_GENERIC, 3)
                     end):SetIcon("icon16/page_copy.png")
                     menu:Open()
                     return
                 end
 
                 if checking and not (debugMode and not packData.debug) then
-                    notification.AddLegacy("Cannot edit packs during verification", NOTIFY_ERROR, 3)
+                    notification.AddLegacy("#btb.ps.noti.cant_edit_ver", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button10.wav")
                     return
                 elseif isErrored then
-                    notification.AddLegacy("This pack has an error and cannot be edited!", NOTIFY_ERROR, 3)
+                    notification.AddLegacy("#btb.ps.noti.cant_edit_error", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button10.wav")
                     return
                 elseif debugMode and not packData.debug then
-                    notification.AddLegacy("Cannot edit workshop packs while debug mode is active!", NOTIFY_ERROR, 3)
+                    notification.AddLegacy("#btb.ps.noti.cant_edit_debug", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button10.wav")
                     return
                 end

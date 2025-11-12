@@ -162,7 +162,7 @@ end
 
 local function getPackName(trackName)
     local packName = BATTLEBEATS.trackToPack[trackName]
-    if not packName then return "Unknown Pack" end
+    if not packName then return "#btb.notification.unknown_pack" end
     return BATTLEBEATS.stripPackPrefix(packName)
 end
 
@@ -210,11 +210,13 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     local progressBarX, progressBarY = 40, 60
     local progressBarWidth, progressBarHeight = 216, 5
 
+    local from = language.GetPhrase("btb.notification.from")
+
     panel.Paint = function(self, w, h)
         draw.RoundedBoxEx(radius, 0, 0, w, radius, c3, true, true, false, false)
         surface.SetDrawColor(c3)
         surface.DrawRect(0, radius, w, h - radius)
-        draw.SimpleText("NOW PLAYING", "BattleBeats_Notification_Font_Misc", finalWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
+        draw.SimpleText("#btb.notification.now_playing", "BattleBeats_Notification_Font_Misc", finalWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
 
         surface.SetTexture(gradient)
         surface.DrawTexturedRect(0, 0, w, h)
@@ -288,7 +290,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
 
             local elapsedTime = CurTime() - self.startTime
             if math.floor(elapsedTime % 30) < 4 and showNotificationPackName:GetBool() then -- text visible for 4 seconds every 30 seconds
-                draw.SimpleText("From: " .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
+                draw.SimpleText(from .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
             else
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c1)
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, textColor)
@@ -296,7 +298,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
                 draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
             end
         elseif showNotificationPackName:GetBool() then
-            draw.SimpleText("From: " .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
+            draw.SimpleText(from .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
         end
     end
 
@@ -315,10 +317,7 @@ local function addNotificationPreview() -- shows outline box when adjusting noti
     hook.Add("HUDPaint", "BattleBeats_NotificationPreview", function()
         surface.SetDrawColor(255, 255, 255, 100)
         surface.DrawOutlinedRect(finalX, finalY, finalWidth, finalHeight)
-
-        draw.SimpleText("Notification Position", "DermaDefault", finalX + finalWidth / 2, finalY + finalHeight / 2,
-            Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
+        draw.SimpleText("#btb.notification.position", "DermaDefault", finalX + finalWidth / 2, finalY + finalHeight / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
         if CurTime() - startTime > 5 then
             hook.Remove("HUDPaint", "BattleBeats_NotificationPreview")
             if IsValid(trackNotification) then
