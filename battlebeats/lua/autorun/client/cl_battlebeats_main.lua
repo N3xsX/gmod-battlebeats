@@ -40,7 +40,7 @@ BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 BATTLEBEATS.trackToPack = {}
 
-BATTLEBEATS.currentVersion = "2.2.5"
+BATTLEBEATS.currentVersion = "2.2.6"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -228,7 +228,8 @@ local function GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusiv
     if #allTracks > 0 then
         local availableTracks = {}
         for _, track in ipairs(allTracks) do -- filter out excluded tracks
-            if not excluded[track] and (not excludeMappedTracks:GetBool() or not BATTLEBEATS.npcTrackMappings[track]) then
+            local hasMapping = BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs and #BATTLEBEATS.npcTrackMappings[track].npcs > 0
+            if not excluded[track] and (not excludeMappedTracks:GetBool() or not hasMapping) then
                 table.insert(availableTracks, track)
             end
         end
@@ -621,38 +622,54 @@ local function getNPCMatchingTrack()
     if table.IsEmpty(BATTLEBEATS.npcTrackMappings) then return nil end
     if not enableAssignedTracks:GetBool() then return nil end
 
-    local trackPriorities = {}
+    local trackCandidates = {}
     local nearbyNPCs = ents.FindInSphere(ply:GetPos(), maxDistance:GetInt())
 
     for _, ent in ipairs(nearbyNPCs) do
         if IsValid(ent) and (ent:IsNPC() or ent:IsNextBot()) then
             local npcClass = ent.GetClass and ent:GetClass()
-            for track, mapping in pairs(BATTLEBEATS.npcTrackMappings or {}) do
-                if mapping.class == npcClass then
-                    trackPriorities[track] = mapping.priority
+            if not npcClass then continue end
+
+            for track, mapping in pairs(BATTLEBEATS.npcTrackMappings) do
+                if mapping.npcs then
+                    for _, npcInfo in ipairs(mapping.npcs) do
+                        if npcInfo.class == npcClass then
+                            trackCandidates[track] = math.min(trackCandidates[track] or 6, npcInfo.priority)
+                        end
+                    end
                 end
             end
         end
     end
 
-    if table.IsEmpty(trackPriorities) then return nil end
+    if table.IsEmpty(trackCandidates) then return nil end
 
-    local minPriority = nil
-    for _, priority in pairs(trackPriorities) do
-        if priority > 0 and (not minPriority or priority < minPriority) then
-            minPriority = priority
+    local bestPriority = 6
+    local bestTracks = {}
+
+    for track, priority in pairs(trackCandidates) do
+        if priority < bestPriority then
+            bestPriority = priority
+            bestTracks = { track }
+        elseif priority == bestPriority then
+            table.insert(bestTracks, track)
         end
     end
 
-    local topTracks = {}
-    for track, priority in pairs(trackPriorities) do
-        if priority == minPriority then
-            table.insert(topTracks, track)
+    return bestTracks[math.random(#bestTracks)]
+end
+
+local function getTrackPriority(track)
+    if not BATTLEBEATS.npcTrackMappings[track] or not BATTLEBEATS.npcTrackMappings[track].npcs then
+        return 6
+    end
+    local minPrio = 6
+    for _, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
+        if npc.priority < minPrio then
+            minPrio = npc.priority
         end
     end
-
-    local selectedTrack = topTracks[math.random(#topTracks)]
-    return selectedTrack
+    return minPrio
 end
 
 local function SwitchTrack(npcTrack)
@@ -662,7 +679,7 @@ local function SwitchTrack(npcTrack)
     end
     if isInCombat then
         if npcTrack then
-            local priority = BATTLEBEATS.npcTrackMappings[npcTrack].priority
+            local priority = getTrackPriority(npcTrack)
             local npcState = BATTLEBEATS.priorityStates[priority]
             local shouldContinue = npcState and ((CurTime() - npcState.time <= combatWaitTime:GetInt()) or alwaysContinue:GetBool()) or false
 
@@ -766,7 +783,7 @@ timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
     elseif isInCombat then
         local npcTrack = getNPCMatchingTrack()
         if not npcTrack then return end
-        local newPriority = npcTrack and BATTLEBEATS.npcTrackMappings[npcTrack].priority or 0
+        local newPriority = getTrackPriority(npcTrack)
 
         if npcTrack ~= lastCombatTrack and npcTrack ~= pendingTrack then
             local shouldSwitch = false

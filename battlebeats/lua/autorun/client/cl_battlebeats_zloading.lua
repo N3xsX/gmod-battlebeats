@@ -327,22 +327,58 @@ end
 
 function BATTLEBEATS.SaveNPCMappings()
     local data = {}
+
     for track, mapping in pairs(BATTLEBEATS.npcTrackMappings or {}) do
-        data[track] = { class = mapping.class, priority = mapping.priority }
+        if mapping.npcs then
+            data[track] = { npcs = table.Copy(mapping.npcs) }
+        elseif mapping.class then
+            data[track] = { npcs = { { class = mapping.class, priority = mapping.priority } } }
+        end
     end
+
     file.Write("battlebeats/battlebeats_npc_mappings.txt", util.TableToJSON(data, true))
 end
 
 local function loadMappedTracks()
     BATTLEBEATS.npcTrackMappings = {}
 
-    if file.Exists("battlebeats/battlebeats_npc_mappings.txt", "DATA") then
-        local jsonData = file.Read("battlebeats/battlebeats_npc_mappings.txt", "DATA")
-        BATTLEBEATS.npcTrackMappings = util.JSONToTable(jsonData) or {}
-
-        --cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
-        BATTLEBEATS.SaveNPCMappings()
+    if not file.Exists("battlebeats/battlebeats_npc_mappings.txt", "DATA") then
+        return
     end
+
+    local jsonData = file.Read("battlebeats/battlebeats_npc_mappings.txt", "DATA")
+    local loaded = util.JSONToTable(jsonData) or {}
+
+    for track, mapping in pairs(loaded) do
+        if not mapping then continue end
+
+        if mapping.npcs and istable(mapping.npcs) then
+            BATTLEBEATS.npcTrackMappings[track] = { npcs = {} }
+            for _, npc in ipairs(mapping.npcs) do
+                if npc.class and npc.priority then
+                    table.insert(BATTLEBEATS.npcTrackMappings[track].npcs, {
+                        class = tostring(npc.class),
+                        priority = math.Clamp(tonumber(npc.priority) or 1, 1, 5)
+                    })
+                end
+            end
+        elseif mapping.class and mapping.priority then
+            BATTLEBEATS.npcTrackMappings[track] = {
+                npcs = {{
+                    class = tostring(mapping.class),
+                    priority = math.Clamp(tonumber(mapping.priority) or 1, 1, 5)
+                }}
+            }
+        end
+    end
+
+    for track, mapping in pairs(BATTLEBEATS.npcTrackMappings) do
+        if not mapping.npcs or #mapping.npcs == 0 then
+            BATTLEBEATS.npcTrackMappings[track] = nil
+        end
+    end
+
+    BATTLEBEATS.SaveNPCMappings()
 end
 
 function BATTLEBEATS.SaveTrackOffsets()
@@ -442,7 +478,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -450,7 +486,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added support for DYNAMO packs"
+            Color(150, 255, 150), "- Added ability to assign multiple NPCs to one track"
             --Color(150, 255, 150), "- You can now add subtitles to your tracks"
         )
         chat.AddText(
@@ -458,7 +494,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

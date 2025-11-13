@@ -399,7 +399,7 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
 
         local translation = language.GetPhrase("#btb.translated.by")
         local lang = GetConVar("gmod_language"):GetString()
-        if lang ~= "en" and translation ~= "" then
+        if lang ~= "en" and translation ~= "///" then
             local translationLabel = vgui.Create("DLabel", panel)
             translationLabel:SetText(language.GetPhrase("#btb.translated.by.label") .. translation)
             translationLabel:SetPos((contentPanel:GetWide() - 400) / 2, 420)

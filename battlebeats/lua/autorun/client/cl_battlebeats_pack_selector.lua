@@ -996,17 +996,18 @@ local function openBTBmenu()
 
                     --MARK:RMB npc assign
                     if trackType == "combat" then
-                        local currentNPC = BATTLEBEATS.npcTrackMappings[track]
-                        local npcOptionText = currentNPC and "#btb.ps.ts.rmb.assign_edit" or "#btb.ps.ts.rmb.assign_add"
+                        local currentNPCs = BATTLEBEATS.npcTrackMappings[track] and
+                        BATTLEBEATS.npcTrackMappings[track].npcs or {}
 
-                        if currentNPC then
-                            local s1 = language.GetPhrase("#btb.ps.ts.rmb.assign_current")
-                            local s2 = language.GetPhrase("#btb.ps.ts.rmb.assign_priority")
-                            local assignInfo = menu:AddOption(s1 .. currentNPC.class .. " (" .. s2 .. currentNPC.priority .. ")", function() end)
-                            assignInfo:SetImage("icon16/vcard.png")
-                        end
+                        local priorityNames = {
+                            [1] = "1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest"),
+                            [2] = "2",
+                            [3] = "3",
+                            [4] = "4",
+                            [5] = "5 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_lowest")
+                        }
 
-                        local assignNPC = menu:AddOption(npcOptionText, function()
+                        local assignNPC = menu:AddOption("#btb.ps.ts.rmb.assign_add", function()
                             assignFrame = vgui.Create("DFrame")
                             assignFrame:SetTitle("#btb.ps.ts.rmb.assign_title")
                             assignFrame:SetSize(400, 110)
@@ -1025,15 +1026,6 @@ local function openBTBmenu()
                             textEntry:SetPos(10, 45)
                             textEntry:SetSize(270, 20)
                             textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
-                            if currentNPC then textEntry:SetText(currentNPC.class) end
-
-                            local priorityNames = {
-                                [1] = "1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest"),
-                                [2] = "2",
-                                [3] = "3",
-                                [4] = "4",
-                                [5] = "5 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_lowest")
-                            }
 
                             local priorityLabel = vgui.Create("DLabel", assignFrame)
                             priorityLabel:SetPos(290, 25)
@@ -1046,48 +1038,63 @@ local function openBTBmenu()
                             for i = 1, 5 do
                                 priorityCombo:AddChoice(priorityNames[i], i)
                             end
-                            priorityCombo:SetValue(currentNPC and tostring(currentNPC.priority) or ("1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest")))
+                            priorityCombo:SetValue(priorityNames[1])
 
                             local saveButton = vgui.Create("DButton", assignFrame)
                             saveButton:SetPos(45, 75)
                             saveButton:SetSize(150, 25)
-                            saveButton:SetText(currentNPC and "#btb.ps.ts.rmb.assign_saveremove" or "#btb.ps.ts.rmb.assign_save")
+                            saveButton:SetText("#btb.ps.ts.rmb.assign_save")
                             saveButton:SetFont("CreditsText")
                             saveButton:SetTextColor(color_white)
                             saveButton.DoClick = function()
-                                local class = textEntry:GetText()
+                                local class = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
                                 local _, priority = priorityCombo:GetSelected()
-                                priority = priority or 1
+                                priority = math.Clamp(priority or 1, 1, 5)
 
                                 if not class or class == "" then
-                                    if currentNPC then
-                                        BATTLEBEATS.npcTrackMappings[track] = nil
-                                        local removed = language.GetPhrase("#btb.ps.ts.rmb.assign_removed_noti")
-                                        notification.AddLegacy(removed .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
-                                        surface.PlaySound("buttons/button14.wav")
-                                    else
-                                        notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
-                                        surface.PlaySound("buttons/button11.wav")
-                                    end
-                                    BATTLEBEATS.SaveNPCMappings()
-                                    changesMade = true
-                                    assignFrame:Close()
-                                    createTrackList(parent, trackType, selectedPack)
+                                    notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
+                                    surface.PlaySound("buttons/button11.wav")
                                     return
                                 end
 
+                                local isDuplicateInTrack = false
+                                if BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs then
+                                    for _, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
+                                        if npc.class == class then
+                                            isDuplicateInTrack = true
+                                            break
+                                        end
+                                    end
+                                end
+
                                 local oldTrack = nil
-                                for t, info in pairs(BATTLEBEATS.npcTrackMappings) do
-                                    if t ~= track and info.class == class then
-                                        oldTrack = t
-                                        break
+                                if not isDuplicateInTrack then
+                                    for t, info in pairs(BATTLEBEATS.npcTrackMappings) do
+                                        if t ~= track and info.npcs then
+                                            for _, npc in ipairs(info.npcs) do
+                                                if npc.class == class then
+                                                    oldTrack = t
+                                                    break
+                                                end
+                                            end
+                                            if oldTrack then break end
+                                        end
                                     end
                                 end
 
                                 local function assignNPCToTrack()
-                                    BATTLEBEATS.npcTrackMappings[track] = { class = class, priority = math.Clamp(priority, 1, 5) }
-                                    if oldTrack then
-                                        BATTLEBEATS.npcTrackMappings[oldTrack] = nil
+                                    BATTLEBEATS.npcTrackMappings[track] = BATTLEBEATS.npcTrackMappings[track] or {npcs = {}}
+                                    table.insert(BATTLEBEATS.npcTrackMappings[track].npcs, { class = class, priority = priority })
+                                    if oldTrack and BATTLEBEATS.npcTrackMappings[oldTrack] then
+                                        for i = #BATTLEBEATS.npcTrackMappings[oldTrack].npcs, 1, -1 do
+                                            if BATTLEBEATS.npcTrackMappings[oldTrack].npcs[i].class == class then
+                                                table.remove(BATTLEBEATS.npcTrackMappings[oldTrack].npcs, i)
+                                                break
+                                            end
+                                        end
+                                        if #BATTLEBEATS.npcTrackMappings[oldTrack].npcs == 0 then
+                                            BATTLEBEATS.npcTrackMappings[oldTrack] = nil
+                                        end
                                     end
                                     notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_noti_class") .. ": " .. class .. " " .. language.GetPhrase("btb.ps.ts.rmb.assign_noti_priority") .. " " .. priority .. " " .. language.GetPhrase("btb.ps.ts.rmb.assign_noti_track") .. ": " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
                                     surface.PlaySound("buttons/button14.wav")
@@ -1097,7 +1104,10 @@ local function openBTBmenu()
                                     createTrackList(parent, trackType, selectedPack)
                                 end
 
-                                if oldTrack then
+                                if isDuplicateInTrack then
+                                    notification.AddLegacy("NPC '" .. class .. "' " .. language.GetPhrase("btb.ps.ts.rmb.assign_this_track"), NOTIFY_ERROR, 3)
+                                    surface.PlaySound("buttons/button11.wav")
+                                elseif oldTrack then
                                     surface.PlaySound("buttons/button17.wav")
                                     Derma_Query("NPC: (" .. class .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"),
                                         "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() assignNPCToTrack() end, "#btb.ps.ts.rmb.assign_no", function() end)
@@ -1120,13 +1130,185 @@ local function openBTBmenu()
                                 local bgColor = self:IsHovered() and c808080255 or c707070255
                                 draw.RoundedBox(4, 0, 0, w, h, bgColor)
                             end
-                            cancelButton.DoClick = function()
-                                assignFrame:Close()
-                            end
+                            cancelButton.DoClick = function() assignFrame:Close() end
                         end)
-
-                        assignNPC:SetImage(currentNPC and "icon16/user_edit.png" or "icon16/user_add.png")
+                        assignNPC:SetImage("icon16/user_add.png")
                         assignNPC:SetTooltip("#btb.ps.ts.rmb.assign_tip")
+
+                        for _, npcInfo in ipairs(currentNPCs) do
+                            local s1 = language.GetPhrase("#btb.ps.ts.rmb.assign_current")
+                            local s2 = language.GetPhrase("#btb.ps.ts.rmb.assign_priority")
+                            local npcText = s1 .. npcInfo.class .. " (" .. s2 .. npcInfo.priority .. ")"
+
+                            local subMenu, parentOption = menu:AddSubMenu(npcText)
+                            parentOption:SetImage("icon16/vcard.png")
+
+                            local editOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_edit", function()
+                                assignFrame = vgui.Create("DFrame")
+                                assignFrame:SetTitle(language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class)
+                                assignFrame:SetSize(400, 110)
+                                assignFrame:Center()
+                                assignFrame:MakePopup()
+                                assignFrame.Paint = function(self, w, h)
+                                    draw.RoundedBox(4, 0, 0, w, h, c000200)
+                                end
+
+                                local classLabel = vgui.Create("DLabel", assignFrame)
+                                classLabel:SetPos(10, 25)
+                                classLabel:SetSize(270, 20)
+                                classLabel:SetText("#btb.ps.ts.rmb.assign_class")
+
+                                local textEntry = vgui.Create("DTextEntry", assignFrame)
+                                textEntry:SetPos(10, 45)
+                                textEntry:SetSize(270, 20)
+                                textEntry:SetText(npcInfo.class)
+
+                                local priorityLabel = vgui.Create("DLabel", assignFrame)
+                                priorityLabel:SetPos(290, 25)
+                                priorityLabel:SetSize(100, 20)
+                                priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
+
+                                local priorityCombo = vgui.Create("DComboBox", assignFrame)
+                                priorityCombo:SetPos(290, 45)
+                                priorityCombo:SetSize(100, 20)
+                                for i = 1, 5 do
+                                    priorityCombo:AddChoice(priorityNames[i], i)
+                                end
+                                priorityCombo:SetValue(priorityNames[npcInfo.priority] or priorityNames[1])
+
+                                local saveButton = vgui.Create("DButton", assignFrame)
+                                saveButton:SetPos(45, 75)
+                                saveButton:SetSize(150, 25)
+                                saveButton:SetText("#btb.ps.ts.rmb.assign_save")
+                                saveButton:SetFont("CreditsText")
+                                saveButton:SetTextColor(color_white)
+                                saveButton.DoClick = function()
+                                    local newClass = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
+                                    local _, newPrio = priorityCombo:GetSelected()
+                                    newPrio = math.Clamp(newPrio or npcInfo.priority, 1, 5)
+
+                                    if not newClass or newClass == "" then
+                                        notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
+                                        surface.PlaySound("buttons/button11.wav")
+                                        return
+                                    end
+
+                                    if newClass == npcInfo.class then
+                                        for i, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
+                                            if npc.class == npcInfo.class then
+                                                BATTLEBEATS.npcTrackMappings[track].npcs[i].priority = newPrio
+                                                break
+                                            end
+                                        end
+                                        BATTLEBEATS.SaveNPCMappings()
+                                        changesMade = true
+                                        notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
+                                        surface.PlaySound("buttons/button14.wav")
+                                        assignFrame:Close()
+                                        createTrackList(parent, trackType, selectedPack)
+                                        return
+                                    end
+
+                                    local isDuplicateInTrack = false
+                                    for _, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
+                                        if npc.class == newClass and npc.class ~= npcInfo.class then
+                                            isDuplicateInTrack = true
+                                            break
+                                        end
+                                    end
+
+                                    if isDuplicateInTrack then
+                                        notification.AddLegacy("NPC '" .. newClass .. "' " .. language.GetPhrase("btb.ps.ts.rmb.assign_this_track"), NOTIFY_ERROR, 3)
+                                        surface.PlaySound("buttons/button11.wav")
+                                        return
+                                    end
+
+                                    local oldTrack = nil
+                                    for t, info in pairs(BATTLEBEATS.npcTrackMappings) do
+                                        if t ~= track and info.npcs then
+                                            for _, npc in ipairs(info.npcs) do
+                                                if npc.class == newClass then
+                                                    oldTrack = t
+                                                    break
+                                                end
+                                            end
+                                            if oldTrack then break end
+                                        end
+                                    end
+
+                                    local function saveEdit()
+                                        for i = #BATTLEBEATS.npcTrackMappings[track].npcs, 1, -1 do
+                                            if BATTLEBEATS.npcTrackMappings[track].npcs[i].class == npcInfo.class then
+                                                table.remove(BATTLEBEATS.npcTrackMappings[track].npcs, i)
+                                                break
+                                            end
+                                        end
+                                        table.insert(BATTLEBEATS.npcTrackMappings[track].npcs, {class = newClass, priority = newPrio})
+                                        if oldTrack and BATTLEBEATS.npcTrackMappings[oldTrack] then
+                                            for j = #BATTLEBEATS.npcTrackMappings[oldTrack].npcs, 1, -1 do
+                                                if BATTLEBEATS.npcTrackMappings[oldTrack].npcs[j].class == newClass then
+                                                    table.remove(BATTLEBEATS.npcTrackMappings[oldTrack].npcs, j)
+                                                    break
+                                                end
+                                            end
+                                            if #BATTLEBEATS.npcTrackMappings[oldTrack].npcs == 0 then
+                                                BATTLEBEATS.npcTrackMappings[oldTrack] = nil
+                                            end
+                                        end
+                                        BATTLEBEATS.SaveNPCMappings()
+                                        changesMade = true
+                                        notification.AddLegacy(
+                                        language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
+                                        surface.PlaySound("buttons/button14.wav")
+                                        assignFrame:Close()
+                                        createTrackList(parent, trackType, selectedPack)
+                                    end
+
+                                    if oldTrack then
+                                        surface.PlaySound("buttons/button17.wav")
+                                        Derma_Query("NPC: (" .. newClass .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"),
+                                        "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() saveEdit() end, "#btb.ps.ts.rmb.assign_no", function() end)
+                                    else
+                                        saveEdit()
+                                    end
+                                end
+                                saveButton.Paint = function(s, w, h)
+                                    local bg = s:IsHovered() and c808080255 or c707070255
+                                    draw.RoundedBox(4, 0, 0, w, h, bg)
+                                end
+
+                                local cancelButton = vgui.Create("DButton", assignFrame)
+                                cancelButton:SetPos(205, 75)
+                                cancelButton:SetSize(150, 25)
+                                cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
+                                cancelButton:SetFont("CreditsText")
+                                cancelButton:SetTextColor(color_white)
+                                cancelButton.Paint = function(self, w, h)
+                                    local bgColor = self:IsHovered() and c808080255 or c707070255
+                                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                                end
+                                cancelButton.DoClick = function() assignFrame:Close() end
+                            end)
+                            editOpt:SetImage("icon16/user_edit.png")
+
+                            local removeOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_remove", function()
+                                for i = #BATTLEBEATS.npcTrackMappings[track].npcs, 1, -1 do
+                                    if BATTLEBEATS.npcTrackMappings[track].npcs[i].class == npcInfo.class then
+                                        table.remove(BATTLEBEATS.npcTrackMappings[track].npcs, i)
+                                        break
+                                    end
+                                end
+                                if #BATTLEBEATS.npcTrackMappings[track].npcs == 0 then
+                                    BATTLEBEATS.npcTrackMappings[track] = nil
+                                end
+                                BATTLEBEATS.SaveNPCMappings()
+                                changesMade = true
+                                notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_removed") .. ": " .. npcInfo.class, NOTIFY_GENERIC, 3)
+                                surface.PlaySound("buttons/button3.wav")
+                                createTrackList(parent, trackType, selectedPack)
+                            end)
+                            removeOpt:SetImage("icon16/user_delete.png")
+                        end
                     end
 
                     --MARK:RMB subtitles
