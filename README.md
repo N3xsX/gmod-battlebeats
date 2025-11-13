@@ -110,13 +110,25 @@ This table is **saved to disk** in GMod under: `data/battlebeats/battlebeats_npc
 
 ```json
 {
-	"sound/battlebeats/cyberpunk2077/combat/patri(di)ots.mp3": {
-		"priority": 2,
-		"class": "npc_headcrab_black"
-	},
 	"sound/battlebeats/cyberpunk2077/combat/force projection.mp3": {
-		"priority": 1,
-		"class": "npc_zombie"
+		"npcs": [
+			{
+				"priority": 1,
+				"class": "npc_zombie"
+			},
+			{
+				"priority": 3,
+				"class": "npc_headcrab"
+			}
+		]
+	},
+	"sound/battlebeats/cyberpunk2077/combat/adam smasher.mp3": {
+		"npcs": [
+			{
+				"priority": 2,
+				"class": "npc_headcrab_black"
+			}
+		]
 	}
 }
 ```
