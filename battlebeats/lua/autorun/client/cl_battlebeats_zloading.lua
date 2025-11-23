@@ -239,6 +239,7 @@ local function cleanupInvalidTracks(tbl)
     local toRemove = {}
     for trackPath, _ in pairs(tbl) do
         if not file.Exists(trackPath, "GAME") then
+            print("[BattleBeats Cleanup] Removing: " .. trackPath)
             table.insert(toRemove, trackPath)
         end
     end
@@ -256,11 +257,6 @@ function BATTLEBEATS.SaveExcludedTracks()
     end
     local jsonData = util.TableToJSON(validExcluded)
     file.Write("battlebeats/battlebeats_excluded_tracks.txt", jsonData)
-
-    --note to myself: remove it later
-    if file.Exists("battlebeats_excluded_tracks.txt", "DATA") then
-        file.Delete("battlebeats_excluded_tracks.txt")
-    end
 end
 
 local function loadExcludedTracks()
@@ -285,18 +281,13 @@ local function loadExcludedTracks()
             end
         end
     end
-    --cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
+    cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
     BATTLEBEATS.SaveExcludedTracks()
 end
 
 function BATTLEBEATS.SaveFavoriteTracks()
     local jsonFavorites = util.TableToJSON(BATTLEBEATS.favoriteTracks)
     file.Write("battlebeats/battlebeats_favorite_tracks.txt", jsonFavorites)
-
-    --note to myself: remove it later
-    if file.Exists("battlebeats_favorite_tracks.txt", "DATA") then
-        file.Delete("battlebeats_favorite_tracks.txt")
-    end
 end
 
 local function loadFavoriteTracks()
@@ -321,7 +312,7 @@ local function loadFavoriteTracks()
             end
         end
     end
-    --cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+    cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
     BATTLEBEATS.SaveFavoriteTracks()
 end
 
@@ -378,6 +369,7 @@ local function loadMappedTracks()
         end
     end
 
+    cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
     BATTLEBEATS.SaveNPCMappings()
 end
 
@@ -393,7 +385,7 @@ local function loadTrackOffsets()
         local jsonData = file.Read("battlebeats/battlebeats_track_offsets.txt", "DATA")
         BATTLEBEATS.trackOffsets = util.JSONToTable(jsonData) or {}
 
-        --cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
+        cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
         BATTLEBEATS.SaveTrackOffsets()
     end
 end
@@ -478,7 +470,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -494,7 +486,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end
+    end*/
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

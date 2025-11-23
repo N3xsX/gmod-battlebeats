@@ -320,7 +320,7 @@ local function LerpColor(t, from, to)
     )
 end
 
-concommand.Add("battlebeats_options", function(ply, cmd, args)
+concommand.Add("battlebeats_options", function()
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
     frame:Center()
@@ -462,6 +462,7 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
             createCustomCheckbox(panel, contentPanel_2, 190, "#btb.options.misc.toggle_ui", "battlebeats_context_ui_toogle", "#btb.options.misc.toggle_ui_tip")
             createCustomButton(panel, contentPanel_2, 220, "#btb.options.misc.reload_packs", "battlebeats_reload_packs")
             createCustomButton(panel, contentPanel_2, 260, "#btb.options.misc.open_guide", "battlebeats_guide")
+            createCustomButton(panel, contentPanel_2, 300, "#btb.options.misc.restore", "battlebeats_restore_defaults")
         end
 
         button.DoClick = function()
@@ -476,4 +477,52 @@ concommand.Add("battlebeats_options", function(ply, cmd, args)
     if categories[1].panel then
         categories[1].panel:SetVisible(true)
     end
+end)
+
+local defaultX = tostring(ScrW() - 310)
+local defaultY = tostring(ScrH() / 6)
+concommand.Add("battlebeats_restore_defaults", function()
+    RunConsoleCommand("battlebeats_detection_mode", "1")
+    RunConsoleCommand("battlebeats_npc_combat", "0")
+
+    RunConsoleCommand("battlebeats_autopopup", "1")
+    RunConsoleCommand("battlebeats_load_local_packs", "0")
+    RunConsoleCommand("battlebeats_load_am_suspense", "0")
+
+    RunConsoleCommand("battlebeats_volume", "100")
+    RunConsoleCommand("battlebeats_debug_mode", "0")
+    RunConsoleCommand("battlebeats_ambient_wait_time", "40")
+    RunConsoleCommand("battlebeats_combat_wait_time", "40")
+    RunConsoleCommand("battlebeats_enable_ambient", "1")
+    RunConsoleCommand("battlebeats_enable_combat", "1")
+    RunConsoleCommand("battlebeats_disable_mode", "0")
+    RunConsoleCommand("battlebeats_persistent_notification", "0")
+    RunConsoleCommand("battlebeats_show_notification", "1")
+    RunConsoleCommand("battlebeats_show_notification_after_continue", "0")
+    RunConsoleCommand("battlebeats_exclusive_play", "0")
+    RunConsoleCommand("battlebeats_always_continue", "0")
+    RunConsoleCommand("battlebeats_continue_mode", "0")
+    RunConsoleCommand("battlebeats_show_preview_notification", "0")
+    RunConsoleCommand("battlebeats_lower_volume_in_menu", "0")
+    RunConsoleCommand("battlebeats_force_combat", "0")
+
+    RunConsoleCommand("battlebeats_subtitles_enabled", "1")
+    RunConsoleCommand("battlebeats_context_ui_toogle", "0")
+
+    RunConsoleCommand("battlebeats_volume_ambient", "100")
+    RunConsoleCommand("battlebeats_volume_combat", "100")
+
+    RunConsoleCommand("battlebeats_switch_on_lower_priority", "1")
+    RunConsoleCommand("battlebeats_enable_assigned_tracks", "1")
+    RunConsoleCommand("battlebeats_exclude_mapped_tracks", "0")
+
+    RunConsoleCommand("battlebeats_show_notification_visualizer", "1")
+    RunConsoleCommand("battlebeats_show_notification_pack_name", "1")
+    RunConsoleCommand("battlebeats_visualizer_boost", "6")
+    RunConsoleCommand("battlebeats_visualizer_smooth", "1")
+    RunConsoleCommand("battlebeats_skip_nombat_names", "1")
+    RunConsoleCommand("battlebeats_show_status_bar", "1")
+
+    RunConsoleCommand("battlebeats_notif_x", defaultX)
+    RunConsoleCommand("battlebeats_notif_y", defaultY)
 end)

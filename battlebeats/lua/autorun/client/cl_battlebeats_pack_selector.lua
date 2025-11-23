@@ -753,9 +753,12 @@ local function openBTBmenu()
             local textWidth = surface.GetTextSize(isFavorite and "★ " .. trackName or trackName)
             local panelWidth = 800
             local scrollSpeed = 60
+            local npcs = BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs
+            local count = istable(npcs) and #npcs or 0
 
             local iconData = {
-                {check = BATTLEBEATS.npcTrackMappings[track] ~= nil, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
+                {check = count == 1, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
+                {check = count >= 2, tooltip = "#btb.ps.ts.icon_assigned_multiple", image = "icon16/group.png"},
                 {check = BATTLEBEATS.trackOffsets[track] ~= nil, tooltip = "#btb.ps.ts.icon_offset", image = "icon16/time.png"},
                 {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"}
             }
@@ -1409,6 +1412,7 @@ local function openBTBmenu()
         sortCombo:SetValue("A → Z")
         sortCombo:AddChoice("A → Z", "az", false, "icon16/arrow_down.png")
         sortCombo:AddChoice("Z → A", "za", false, "icon16/arrow_up.png")
+        sortCombo:AddChoice("#btb.ps.sort.random", "rnd", false, "icon16/arrow_switch.png")
         sortCombo:AddChoice("#btb.ps.sort.favorite_only", "fav", false, "icon16/star.png")
         sortCombo:AddChoice("#btb.ps.sort.include_only", "inc", false, "icon16/tick.png")
         sortCombo:AddChoice("#btb.ps.sort.exclude_only", "ex", false, "icon16/cross.png")
@@ -1478,17 +1482,24 @@ local function openBTBmenu()
                     table.insert(tracks, { track = t, name = name, fav = favorite, ex = excluded })
                 end
             end
-            table.sort(tracks, function(a, b)
-                if a.fav and not b.fav then return true end
-                if not a.fav and b.fav then return false end
-
-                if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" then
-                    return a.name < b.name
-                elseif sortMode == "za" then
-                    return a.name > b.name
+            if sortMode == "rnd" then
+                for i = #tracks, 2, -1 do
+                    local j = math.random(i)
+                    tracks[i], tracks[j] = tracks[j], tracks[i]
                 end
-                return false
-            end)
+            else
+                table.sort(tracks, function(a, b)
+                    if a.fav and not b.fav then return true end
+                    if not a.fav and b.fav then return false end
+
+                    if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" then
+                        return a.name < b.name
+                    elseif sortMode == "za" then
+                        return a.name > b.name
+                    end
+                    return false
+                end)
+            end
 
             currentFilteredTracks = {}
             for _, data in ipairs(tracks) do
