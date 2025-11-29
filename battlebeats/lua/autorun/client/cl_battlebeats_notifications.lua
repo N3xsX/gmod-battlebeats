@@ -141,23 +141,37 @@ local prefixes = {
     {prefix = "SBM DLC", type = "sbm"},
     {prefix = "SBM", type = "sbm"},
     {prefix = "16th Note", type = "16th"},
+    {prefix = "16thNote", type = "16th"},
     {prefix = "Action Music", type = "amusic"},
     {prefix = "Dynamo Pack", type = "dynamo"},
     {prefix = "Dynamo", type = "dynamo"},
+    {prefix = "MP3 Radio", type = "mp3p"},
 }
 
 function BATTLEBEATS.stripPackPrefix(name)
-    local cleanName = name
-    local normName = name:lower():gsub("[%s%[%]]", "")
+    local original = name
     for _, data in ipairs(prefixes) do
-        local normPrefix = data.prefix:lower():gsub("[%s%[%]]", "")
-        if normName:sub(1, #normPrefix) == normPrefix then
-            cleanName = cleanName:sub(#data.prefix + 1)
-            cleanName = cleanName:gsub("^[%s%p]+", "")
-            return cleanName:Trim(), data.type
+        local prefix = data.prefix
+        local esc = prefix:gsub("([%(%)%[%]%-%_%.])", "%%%1")
+        local pattern = "^%s*[%[%(%<]*%s*" .. esc .. "%s*[%]%)%>]*%s*[%-–—:%|%!]*%s*"
+
+        local lname = name:lower()
+        local lpattern = pattern:lower()
+        local startpos, endpos = lname:find(lpattern)
+        if startpos and startpos == 1 then
+            local rend = endpos
+            local candidate = original:sub(1, endpos):match(pattern)
+            if candidate then
+                rend = #candidate
+            end
+            local clean = original:sub(rend + 1)
+            clean = clean:gsub("^[%s%p]+", ""):gsub("^%s+", ""):Trim()
+            if clean ~= "" then
+                return clean, data.type
+            end
         end
     end
-    return cleanName:Trim(), "na"
+    return original:Trim(), "na"
 end
 
 local function getPackName(trackName)

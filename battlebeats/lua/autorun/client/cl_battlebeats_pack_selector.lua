@@ -18,6 +18,7 @@ local packIcons = {
     ["16th"] = Material("packicons/16th.jpg"),
     ["amusic"] = Material("packicons/amusic.jpg"),
     ["dynamo"] = Material("packicons/dynamo.jpg"),
+    ["mp3p"] = Material("packicons/mp3p.jpg"),
     ["na"] = Material("na.jpg")
 }
 

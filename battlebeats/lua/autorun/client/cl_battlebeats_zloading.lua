@@ -59,7 +59,7 @@ local function pathExistsInMusicPacks(path)
     return false
 end
 
-local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus" }
+local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus", "gmmp" }
 
 local function loadGenericMusicPacks()
     local startTime = SysTime()
@@ -78,8 +78,13 @@ local function loadGenericMusicPacks()
                 local is16th = (dir == "16thnote")
                 local isAM = (dir == "am_music")
                 local isDYNAMO = (dir == "ayykyu_dynmus")
+                local isMP3player = (dir == "gmmp")
 
                 for _, file in ipairs(matchedFiles) do
+                    if isMP3player then
+                        table.insert(ambientFiles, file)
+                        continue
+                    end
                     if string.EndsWith(file, ".ogg") or string.EndsWith(file, ".mp3") or string.EndsWith(file, ".wav") then
                         if isNombat then
                             if file:match("/a.*%.mp3$") then
@@ -117,7 +122,7 @@ local function loadGenericMusicPacks()
                 end
 
                 if not packType and (#ambientFiles > 0 or #combatFiles > 0) then
-                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or isAM and "amusic" or isDYNAMO and "dynamo" or "battlebeats"
+                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or isAM and "amusic" or isDYNAMO and "dynamo" or isMP3player and "mp3p" or "battlebeats"
                 end
             end
 
@@ -470,7 +475,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -478,7 +483,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added ability to assign multiple NPCs to one track"
+            Color(150, 255, 150), "- Added support for MP3 Radio"
             --Color(150, 255, 150), "- You can now add subtitles to your tracks"
         )
         chat.AddText(
@@ -486,7 +491,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
