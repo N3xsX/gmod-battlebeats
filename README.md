@@ -1,4 +1,4 @@
-# 🎵 BattleBeats for Garry's Mod
+# BattleBeats for Garry's Mod
 
 BattleBeats is a powerful music management system for Garry's Mod, allowing you to control ambient and combat music with precision. While it’s designed primarily for standalone use and may have limited compatibility with other addons, it gives you full control over most music-related features   
 
