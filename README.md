@@ -151,7 +151,6 @@ This table is **saved to disk** in GMod under: `data/battlebeats/battlebeats_tra
 # Essential Functions
 
 ### `BATTLEBEATS.PlayNextTrack(track, time, noFade, priority)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L312)  
 Starts playing the specified track and schedules the next track automatically
 
 | Parameter | Type | Description |
@@ -174,7 +173,6 @@ Starts playing the specified track and schedules the next track automatically
 - If `noFade` is false, `FadeMusic` is called internally to smoothly fade in the track
 
 ### `BATTLEBEATS.FadeMusic(station, fadeIn, fadeTime, isPreview)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L125)  
 Fades a music station in or out  
 This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade), but can be called manually if needed
 
@@ -186,7 +184,6 @@ This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttrac
 | isPreview | boolean | If true, uses master volume instead of ambient/combat volume |
 
 ### `BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, lastTrack2, exclusivePlayOnly)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_main.lua#L185)  
 This function is the **core mechanism** BattleBeats uses for track selection and is called internally by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade)
 
 | Parameter | Type | Description |
@@ -216,13 +213,11 @@ This function is the **core mechanism** BattleBeats uses for track selection and
 # Utility Functions
 
 ### `BATTLEBEATS.HideNotification()`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_notifications.lua#L58)  
 Hides the current track notification if one exists
 
 > ⚠️ **WARNING**: Do NOT call this immediately after `ShowTrackNotification` or `PlayNextTrack`
 
 ### `BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)`  
-[📄 View implementation](https://github.com/N3xsX/gmod-battlebeats/blob/main/battlebeats/lua/autorun/client/cl_battlebeats_notifications.lua#L171)  
 This function is **used internally** by [PlayNextTrack](#battlebeatsplaynexttracktrack-time-nofade), but can be called manually if needed
 
 | Parameter | Type | Description |
