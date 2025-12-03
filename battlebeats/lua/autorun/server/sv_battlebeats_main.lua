@@ -10,22 +10,6 @@ local pvpTeam = CreateConVar("battlebeats_pvp_allow_team_combat", "1", { FCVAR_A
 local pvpRequireLOS = CreateConVar("battlebeats_pvp_lineofsight", "0", { FCVAR_ARCHIVE }, "", 0, 1)
 local maxDistancePVP = CreateConVar("battlebeats_pvp_max_distance", "5000", { FCVAR_ARCHIVE }, "", 100, 10000)
 
-resource.AddFile("materials/btb.png")
-resource.AddFile("materials/16th.jpg")
-resource.AddFile("materials/sbm.jpg")
-resource.AddFile("materials/nombat.jpg")
-resource.AddFile("materials/na.jpg")
-resource.AddFile("materials/ver.png")
-resource.AddFile("materials/promo/btbdmc.jpg")
-resource.AddFile("materials/promo/btbzzz.jpg")
-resource.AddFile("materials/promo/btbtw3.jpg")
-resource.AddFile("materials/promo/btbre4.jpg")
-resource.AddFile("materials/promo/btbfc4.jpg")
-resource.AddFile("materials/promo/btbcp.jpeg")
-resource.AddFile("sound/btb_button_enable.mp3")
-resource.AddFile("sound/btb_button_disable.mp3")
-resource.AddFile("sound/btb_ui_exit.mp3")
-
 local function CheckCombatState(ply)
     if not IsValid(ply) then return end
 

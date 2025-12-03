@@ -457,6 +457,8 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             ["3404184965"] = "16th Note",
             ["2911363186"] = "Action Music",
             ["2085721189"] = "Simple Battle Music",
+            ["2408876405"] = "DYNAMO",
+            ["306423885"] = "MP3 Radio",
         }
 
         local function warn(name)
@@ -475,7 +477,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             end
         end
     end)
-    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -491,7 +493,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end
+    end*/
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
