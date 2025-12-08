@@ -1,3 +1,105 @@
+local tooltipPanel = {}
+
+function tooltipPanel:PerformLayout()
+    self:SetFontInternal("HudHintTextLarge")
+    self:SetTextColor(color_white)
+    self:SetContentAlignment(5)
+    local tw, th = self:GetContentSize()
+    self:SetWide(tw + 15)
+    self:SetTall(th + 10)
+end
+function tooltipPanel:Think()
+    local mx, my = gui.MousePos()
+    if not mx or mx == 0 then return end
+    local w = self:GetWide()
+    local h = self:GetTall()
+    local targetX = mx - w / 2
+    local targetY = my - h - 12
+    self:SetPos(targetX, targetY)
+end
+function tooltipPanel:Paint(w, h)
+    draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+    draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+end
+vgui.Register("BattleBeatsTooltip", tooltipPanel, "DTooltip")
+
+local PANEL = FindMetaTable("Panel")
+function PANEL:SetImageTooltip(imagePath, text, width, maxImageHeight)
+    width = width or 350
+    maxImageHeight = maxImageHeight or 400
+
+    self:SetMouseInputEnabled(true)
+    local imgtooltipPanel = nil
+
+    self.OnCursorEntered = function()
+        if IsValid(imgtooltipPanel) then imgtooltipPanel:Remove() end
+        imgtooltipPanel = vgui.Create("DPanel")
+        imgtooltipPanel:SetAlpha(0)
+        imgtooltipPanel:MakePopup()
+        imgtooltipPanel.Think = function(self)
+            local mx, my = gui.MousePos()
+            if not mx or mx == 0 then return end
+            local w = self:GetWide()
+            local h = self:GetTall()
+            local targetX = mx - w / 2
+            local targetY = my - h - 12
+            self:SetPos(targetX, targetY)
+        end
+
+        local img = vgui.Create("DImage", imgtooltipPanel)
+        img:SetPos(10, 10)
+        img:SetSize(width - 20, maxImageHeight)
+        img:SetImage(imagePath)
+        img:SetKeepAspect(true)
+
+        local mat = Material(imagePath, "noclamp smooth")
+        local realW, realH = mat:Width(), mat:Height()
+        local targetW = width - 20
+        local scale = targetW / realW
+        local newImgH = realH * scale
+        if newImgH > maxImageHeight then
+            newImgH = maxImageHeight
+            scale = maxImageHeight / realH
+        end
+        img:SetSize(targetW, newImgH)
+
+        local imageBottom = 10 + newImgH + 15
+        if text and text ~= "" then
+            local label = vgui.Create("DLabel", imgtooltipPanel)
+            label:SetPos(10, imageBottom)
+            label:SetSize(width - 20, 20)
+            label:SetText(text)
+            label:SetTextColor(color_white)
+            label:SetFont("HudHintTextLarge")
+            label:SetWrap(true)
+            label:SetAutoStretchVertical(true)
+            timer.Simple(0, function()
+                if IsValid(label) and IsValid(imgtooltipPanel) then
+                    label:SizeToContentsY(15)
+                    local totalH = imageBottom + label:GetTall()
+                    imgtooltipPanel:SetSize(width, totalH)
+                    imgtooltipPanel:SetAlpha(255)
+                end
+            end)
+        else
+            imgtooltipPanel:SetSize(width, imageBottom)
+            imgtooltipPanel:SetAlpha(255)
+        end
+
+        imgtooltipPanel.Paint = function(self, w, h)
+            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+            draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+        end
+    end
+
+    self.OnCursorExited = function()
+        if IsValid(imgtooltipPanel) then
+            imgtooltipPanel:Remove()
+            imgtooltipPanel = nil
+        end
+    end
+end
+
 local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetTall(20)
@@ -26,12 +128,15 @@ local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
 
     if helpText then
         switch:SetTooltip(helpText)
+        switch:SetTooltipPanelOverride("BattleBeatsTooltip")
         panel:SetTooltip(helpText)
+        panel:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
-    label:SetTextColor(Color(255, 255, 255))
+    label:SetFont("DermaDefaultBold")
+    label:SetTextColor(color_white)
     label:SizeToContents()
 
     local totalWidth = 40 + 8 + label:GetWide()
@@ -60,13 +165,14 @@ local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
+    label:SetFont("DermaDefaultBold")
     label:SetPos((300 - 200) / 2, 0)
     label:SetSize(200, 20)
-    label:SetTextColor(Color(255, 255, 255))
+    label:SetTextColor(color_white)
     label:SetContentAlignment(5)
 
     local sliderBar = vgui.Create("DPanel", panel)
-    sliderBar:SetSize(300, 8)
+    sliderBar:SetSize(300, 12)
     sliderBar:SetPos(0, 25)
     sliderBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
@@ -97,6 +203,13 @@ local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max
         end
     end
 
+    panel.PaintOver = function(self, w, h)
+        local val = GetConVar(cvarName):GetInt()
+        local xx = sliderBar.x + sliderBar:GetWide() / 2
+        local yy = sliderBar.y + sliderBar:GetTall() / 2 - 1
+        draw.SimpleTextOutlined(val .. "%", "DermaDefaultBold", xx, yy, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 120))
+    end
+
     sliderBar.OnCursorEntered = function(self)
         self:SetCursor("hand")
     end
@@ -117,13 +230,15 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
+    label:SetFont("DermaDefaultBold")
     label:SetPos((300 - 200) / 2, 0)
     label:SetSize(200, 20)
-    label:SetTextColor(Color(255, 255, 255))
+    label:SetTextColor(color_white)
     label:SetContentAlignment(5)
 
     if helpText then
         panel:SetTooltip(helpText)
+        panel:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
 
     local sliderBar = vgui.Create("DPanel", panel)
@@ -138,7 +253,7 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     local leftBtn = vgui.Create("DButton", panel)
     leftBtn:SetText("<")
     leftBtn:SetFont("CreditsText")
-    leftBtn:SetTextColor(Color(255, 255, 255))
+    leftBtn:SetTextColor(color_white)
     leftBtn:SetSize(20, 20)
     leftBtn:SetPos(0, 18)
     leftBtn.Paint = function(self, w, h)
@@ -149,7 +264,7 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     local rightBtn = vgui.Create("DButton", panel)
     rightBtn:SetText(">")
     rightBtn:SetFont("CreditsText")
-    rightBtn:SetTextColor(Color(255, 255, 255))
+    rightBtn:SetTextColor(color_white)
     rightBtn:SetSize(20, 20)
     rightBtn:SetPos(280, 18)
     rightBtn.Paint = function(self, w, h)
@@ -160,7 +275,7 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     local valueLabel = vgui.Create("DLabel", panel)
     valueLabel:SetSize(40, 20)
     valueLabel:SetPos(130, 32)
-    valueLabel:SetTextColor(Color(255, 255, 255))
+    valueLabel:SetTextColor(color_white)
     valueLabel:SetContentAlignment(5)
 
     local function updateSlider(bar, x)
@@ -217,29 +332,32 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
     panel:SetSize(200, 200)
     panel:SetPos(x, y)
     panel.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 0))
+        draw.RoundedBox(4, 0, 0, w, h, color_transparent)
     end
 
     if helpText then
         panel:SetTooltip(helpText)
+        panel:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
+    label:SetFont("DermaDefaultBold")
     label:SetPos((200 - 150) / 2, 0)
     label:SetSize(150, 20)
-    label:SetTextColor(Color(255, 255, 255))
+    label:SetTextColor(color_white)
     label:SetContentAlignment(5)
 
     local combo = vgui.Create("DPanel", panel)
     combo:SetSize(200, 30)
     combo:SetPos(0, 25)
     combo.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
+        draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(90, 90, 90))
         local cvarValue = GetConVar(cvarName):GetInt()
         local index = math.Clamp(cvarValue + 1, 1, #options)
         local displayText = options[index] or "Unknown"
-        draw.SimpleText(displayText, "DermaDefault", 10, h / 2, Color(255, 255, 255), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "DermaDefault", 10, h / 2, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
     end
 
     combo.OnCursorEntered = function(self)
@@ -263,7 +381,7 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
         btn:SetText(option)
         btn:SetPos(0, (i - 1) * 30)
         btn:SetSize(200, 30)
-        btn:SetTextColor(Color(255, 255, 255))
+        btn:SetTextColor(color_white)
         btn.Paint = function(self, w, h)
             local bgColor = self:IsHovered() and Color(100, 100, 100) or Color(50, 50, 50)
             draw.RoundedBox(4, 0, 0, w, h, bgColor)
@@ -293,15 +411,17 @@ local function createCustomButton(parent, x, y, labelText, cvarName, helpText)
     button:SetSize(200, 30)
     button:SetPos(x - 100, y)
     button:SetText(labelText)
-    button:SetTextColor(Color(255, 255, 255))
-
+    button:SetFont("DermaDefaultBold")
+    button:SetTextColor(color_white)
     button.Paint = function(self, w, h)
         local bgColor = self:IsHovered() and Color(100, 100, 100) or Color(90, 90, 90)
-        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+        draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, bgColor)
     end
 
     if helpText then
         button:SetTooltip(helpText)
+        button:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
 
     button.DoClick = function()
@@ -409,9 +529,9 @@ concommand.Add("battlebeats_options", function()
         end
 
         local versionlabel = vgui.Create("DLabel", panel)
-        versionlabel:SetText(language.GetPhrase("#btb.options.version.label") .. BATTLEBEATS.currentVersion)
-        versionlabel:SetPos((contentPanel:GetWide() - 150) / 2, 440)
-        versionlabel:SetSize(150, 20)
+        versionlabel:SetText(language.GetPhrase("#btb.options.version.label") .. BATTLEBEATS.currentVersion .. "_" .. jit.arch)
+        versionlabel:SetPos((contentPanel:GetWide() - 250) / 2, 440)
+        versionlabel:SetSize(250, 20)
         versionlabel:SetTextColor(Color(80, 80, 80, 200))
         versionlabel:SetContentAlignment(5)
 
@@ -442,6 +562,7 @@ concommand.Add("battlebeats_options", function()
             createArrowStepper(panel, contentPanel_NumSlider, 300, "#btb.options.noti.y_pos", "battlebeats_notif_y", 0, ScrH(), btbDefault .. tostring(ScrH() / 6))
         elseif category.name == "#btb.options.cat.subtitles" then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.sub.enable_sub", "battlebeats_subtitles_enabled")
+            createArrowStepper(panel, contentPanel_NumSlider, 40, "#btb.options.sub.sub_height", "battlebeats_subtitles_y", 0, ScrH(), btbDefault .. tostring(ScrH() - 200))
         elseif category.name == "#btb.options.cat.music_player" then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.mplayer.curr_pack_only", "battlebeats_exclusive_play", "#btb.options.mplayer.curr_pack_only_tip")
             createArrowStepper(panel, contentPanel_NumSlider, 50, "#btb.options.mplayer.a_wait_time", "battlebeats_ambient_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip")
@@ -451,7 +572,8 @@ concommand.Add("battlebeats_options", function()
             createCustomCheckbox(panel, contentPanel_2, 220, "#btb.spawnmenu.general.enable_assigned", "battlebeats_enable_assigned_tracks", "#btb.spawnmenu.general.enable_assigned_tip")
             createCustomCheckbox(panel, contentPanel_2, 250, "#btb.options.mplayer.exclude_assigned", "battlebeats_exclude_mapped_tracks", "#btb.options.mplayer.exclude_assigned_tip")
             createCustomCheckbox(panel, contentPanel_2, 280, "#btb.options.mplayer.switch_to_lower", "battlebeats_switch_on_lower_priority", "#btb.options.mplayer.switch_to_lower_tip")
-            createCustomComboBox(panel, (contentPanel_2 - 100), 310, "#btb.options.mplayer.combo", "battlebeats_continue_mode", { "#btb.options.mplayer.combo_1", "#btb.options.mplayer.combo_2" }, "#btb.options.mplayer.combo_tip")
+            createCustomCheckbox(panel, contentPanel_2, 310, "#btb.options.mplayer.disable_fade", "battlebeats_disable_fade", "#btb.options.mplayer.disable_fade_tip")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 340, "#btb.options.mplayer.combo", "battlebeats_continue_mode", { "#btb.options.mplayer.combo_1", "#btb.options.mplayer.combo_2" }, "#btb.options.mplayer.combo_tip")
         elseif category.name == "#btb.options.cat.misc" then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.misc.npc_los", "battlebeats_detection_mode", "#btb.spawnmenu.server.enable_pvp_los_tip")
             createCustomCheckbox(panel, contentPanel_2, 40, "#btb.options.misc.auto_popup", "battlebeats_autopopup", "#btb.options.misc.auto_popup_tip")
@@ -481,6 +603,7 @@ end)
 
 local defaultX = tostring(ScrW() - 310)
 local defaultY = tostring(ScrH() / 6)
+local subdefaultY = tostring(ScrH() - 200)
 concommand.Add("battlebeats_restore_defaults", function()
     RunConsoleCommand("battlebeats_detection_mode", "1")
     RunConsoleCommand("battlebeats_npc_combat", "0")
@@ -505,6 +628,7 @@ concommand.Add("battlebeats_restore_defaults", function()
     RunConsoleCommand("battlebeats_show_preview_notification", "0")
     RunConsoleCommand("battlebeats_lower_volume_in_menu", "0")
     RunConsoleCommand("battlebeats_force_combat", "0")
+    RunConsoleCommand("battlebeats_disable_fade", "0")
 
     RunConsoleCommand("battlebeats_subtitles_enabled", "1")
     RunConsoleCommand("battlebeats_context_ui_toogle", "0")
@@ -525,4 +649,6 @@ concommand.Add("battlebeats_restore_defaults", function()
 
     RunConsoleCommand("battlebeats_notif_x", defaultX)
     RunConsoleCommand("battlebeats_notif_y", defaultY)
+
+    RunConsoleCommand("battlebeats_subtitles_y", subdefaultY)
 end)

@@ -245,7 +245,7 @@ local function cleanupInvalidTracks(tbl)
     for trackPath, _ in pairs(tbl) do
         if not file.Exists(trackPath, "GAME") then
             print("[BattleBeats Cleanup] Removing: " .. trackPath)
-            table.insert(toRemove, trackPath)
+            --table.insert(toRemove, trackPath)
         end
     end
     for _, trackPath in ipairs(toRemove) do
@@ -286,7 +286,7 @@ local function loadExcludedTracks()
             end
         end
     end
-    cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
+    --cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
     BATTLEBEATS.SaveExcludedTracks()
 end
 
@@ -317,7 +317,7 @@ local function loadFavoriteTracks()
             end
         end
     end
-    cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+    --cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
     BATTLEBEATS.SaveFavoriteTracks()
 end
 
@@ -390,7 +390,7 @@ local function loadTrackOffsets()
         local jsonData = file.Read("battlebeats/battlebeats_track_offsets.txt", "DATA")
         BATTLEBEATS.trackOffsets = util.JSONToTable(jsonData) or {}
 
-        cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
+        --cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
         BATTLEBEATS.SaveTrackOffsets()
     end
 end
@@ -434,7 +434,57 @@ local function buildTrackMap()
     end
 end
 
+local function findConflicts()
+    local conflicts = {
+        ["270169947"]  = "Nombat",
+        ["3404184965"] = "16th Note",
+        ["2911363186"] = "Action Music",
+        ["2085721189"] = "Simple Battle Music",
+        ["2408876405"] = "DYNAMO",
+        ["306423885"]  = "MP3 Radio",
+    }
+
+    local function warn(name)
+        chat.AddText(
+            Color(255, 255, 0), "[BattleBeats] ",
+            Color(255, 255, 255), "Warning! ",
+            Color(255, 100, 100), name,
+            Color(255, 255, 255), " is enabled/mounted. Please disable it to avoid conflicts"
+        )
+    end
+
+    for _, addon in ipairs(engine.GetAddons()) do
+        local name = conflicts[addon.wsid]
+        if name and addon.mounted then
+            warn(name)
+            BATTLEBEATS.activeConflicts[name] = true
+        end
+    end
+end
+
 local versionConVar = GetConVar("battlebeats_seen_version")
+
+SXNOTE = SXNOTE or {}
+local old = SXNOTE.RegisterLyrics
+function SXNOTE:RegisterLyrics(path, data)
+    if old then
+        old(self, path, data)
+    end
+    local songName = string.lower(BATTLEBEATS.FormatTrackName(path))
+    BATTLEBEATS.subtitles[songName] = {
+        keyframes = data.keyframes or {}
+    }
+end
+
+hook.Add("InitPostEntity", "BattleBeats_Load16thNoteLyrics", function()
+    local files, _ = file.Find("16thnote_lyric/*.lua", "LUA")
+    if not files or #files == 0 then
+        return
+    end
+    for _, filename in ipairs(files) do
+        include("16thnote_lyric/" .. filename)
+    end
+end)
 
 hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadGenericMusicPacks()
@@ -445,39 +495,18 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadMappedTracks()
     loadTrackOffsets()
     buildTrackMap()
+    findConflicts()
     --
     loadSavedPacks()
     BATTLEBEATS.ValidatePacks()
-    for songName, _ in pairs(BATTLEBEATS.subtitles) do
-        BATTLEBEATS.parseSRT(songName)
+    for songName, data in pairs(BATTLEBEATS.subtitles) do
+        if data.raw then
+            BATTLEBEATS.parseSRT(songName)
+        elseif data.keyframes then
+            BATTLEBEATS.parse16thNote(songName)
+        end
     end
-    timer.Simple(2, function()
-        local conflicts = {
-            ["270169947"]  = "Nombat",
-            ["3404184965"] = "16th Note",
-            ["2911363186"] = "Action Music",
-            ["2085721189"] = "Simple Battle Music",
-            ["2408876405"] = "DYNAMO",
-            ["306423885"] = "MP3 Radio",
-        }
-
-        local function warn(name)
-            chat.AddText(
-                Color(255, 255, 0), "[BattleBeats] ",
-                Color(255, 255, 255), "Warning! ",
-                Color(255, 100, 100), name,
-                Color(255, 255, 255), " is enabled/mounted. Please disable it to avoid conflicts"
-            )
-        end
-
-        for _, addon in ipairs(engine.GetAddons()) do
-            local name = conflicts[addon.wsid]
-            if name and addon.mounted then
-                warn(name)
-            end
-        end
-    end)
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
         chat.AddText(
             Color(255, 255, 0), "[BattleBeats] ",
             Color(255, 255, 255), "Welcome to version ",
@@ -485,7 +514,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added support for MP3 Radio"
+            Color(150, 255, 150), "- Added support for 16th Note lyrics"
             --Color(150, 255, 150), "- You can now add subtitles to your tracks"
         )
         chat.AddText(
@@ -493,7 +522,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         )
 
         RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    end
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
@@ -507,4 +536,4 @@ concommand.Add("battlebeats_reload_packs", function()
     BATTLEBEATS.ValidatePacks()
 end)
 
-print("BattleBeats " .. BATTLEBEATS.currentVersion .. " loaded")
+print("BattleBeats " .. BATTLEBEATS.currentVersion .. "_" .. jit.arch .. " loaded")

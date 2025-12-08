@@ -1,8 +1,11 @@
 local frame
 local assignFrame
 local lframe
+local searchBox
 local isLooping = false
 local skipExcluded = false
+
+BATTLEBEATS.activeConflicts = BATTLEBEATS.activeConflicts or {}
 
 local wsCache = {}
 
@@ -19,7 +22,7 @@ local packIcons = {
     ["amusic"] = Material("packicons/amusic.jpg"),
     ["dynamo"] = Material("packicons/dynamo.jpg"),
     ["mp3p"] = Material("packicons/mp3p.jpg"),
-    ["na"] = Material("na.jpg")
+    ["na"] = Material("btbna.jpg")
 }
 
 surface.CreateFont("BattleBeats_Font", {
@@ -67,6 +70,21 @@ surface.CreateFont("BattleBeats_Subtitles", {
 
 local c606060 = Color(60, 60, 60)
 local c200200200 = Color(200, 200, 200)
+local c2552100 = Color(255, 210, 0)
+local c2001500 = Color(200, 150, 0)
+local c404040 = Color(40, 40, 40)
+
+local function parseSize(sizeStr)
+    local num, unit = sizeStr:match("([%d%.]+)%s*(%a+)")
+    num = tonumber(num) or 0
+    if unit == "KB" then
+        return num / 1024
+    elseif unit == "GB" then
+        return num * 1024
+    else
+        return num
+    end
+end
 
 --MARK:Steamworks info
 local function createInfoBoxes(panel, size, date, ownerName)
@@ -77,18 +95,29 @@ local function createInfoBoxes(panel, size, date, ownerName)
     local startX = (panelWidth - totalWidth) / 2
     local y = 120
 
-    local function addInfoBox(text, x)
+    local sizeColor
+    local numericSize = parseSize(size)
+    if numericSize < 200 then
+        sizeColor = Color(0, 200, 0)
+    elseif numericSize < 600 then
+        sizeColor = Color(255, 140, 0)
+    else
+        sizeColor = Color(200, 0, 0)
+    end
+
+    local function addInfoBox(text, x, textColor)
         local box = vgui.Create("DPanel", panel)
         box:SetSize(buttonWidth, buttonHeight)
         box:SetPos(x, y)
         box.Paint = function(self, w, h)
-            draw.RoundedBox(4, 0, 0, w, h, c606060)
+            draw.RoundedBox(10, 0, 0, w, h, c2001500)
+            draw.RoundedBox(8, 2, 2, w - 4, h - 4, c404040)
         end
 
         local label = vgui.Create("DLabel", box)
         label:SetText(text)
         label:SetFont("DermaDefault")
-        label:SetTextColor(c200200200)
+        label:SetTextColor(textColor or c200200200)
         label:SizeToContents()
         label:Center()
 
@@ -99,7 +128,7 @@ local function createInfoBoxes(panel, size, date, ownerName)
     local screated = language.GetPhrase("#btb.ps.info.created")
     local sauthor = language.GetPhrase("#btb.ps.info.author")
 
-    addInfoBox(ssize .. size, startX)
+    addInfoBox(ssize .. size, startX, sizeColor)
     addInfoBox(screated .. date, startX + buttonWidth + spacing)
     addInfoBox(sauthor .. ownerName, startX + (buttonWidth + spacing) * 2)
 end
@@ -257,13 +286,12 @@ local c808080255 = Color(80, 80, 80, 255)
 
 local c000200 = Color(0, 0, 0, 200)
 local c909090 = Color(90, 90, 90)
-local c2552100 = Color(255, 210, 0)
 local c25500 = Color(255, 0, 0)
-local c404040 = Color(40, 40, 40)
 local c3030300 = Color(30, 30, 30, 0)
 local c100100100 = Color(100, 100, 100)
 local c505050 = Color(50, 50, 50)
 local c255255255200 = Color(255, 255, 255, 200)
+local c202020215 = Color(20, 20, 20, 215)
 
 local versionConVar = GetConVar("battlebeats_seen_version")
 
@@ -285,7 +313,7 @@ local function openBTBmenu()
     frame:MakePopup()
     frame:SetBackgroundBlur(true)
     frame.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, c000200)
+        draw.RoundedBox(6, 0, 0, w, h, c202020215)
     end
     frame.isMinimalized = false
 
@@ -318,19 +346,17 @@ local function openBTBmenu()
     scrollPanel:SetPos(10, 30)
 
     local scrollBar = scrollPanel:GetVBar()
+    scrollBar:SetHideButtons(true)
     local c404040200 = Color(40, 40, 40, 200)
-    /*scrollBar.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, c404040200)
+
+    scrollBar.Paint = function(self, w, h)
+        draw.RoundedBox(10, 0, 0, w, h, c404040200)
     end
     scrollBar.btnGrip.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, c606060)
+        self:SetCursor("hand")
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, c606060)
     end
-    scrollBar.btnUp.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, c606060)
-    end
-    scrollBar.btnDown.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, c606060)
-    end*/
 
     function scrollBar:AddScroll(d)
         local animTarget = self:GetScroll() + d * 60
@@ -358,7 +384,8 @@ local function openBTBmenu()
         self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
     end
     optionsButton.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, self.currentColor)
     end
     optionsButton.OnCursorEntered = function(self)
         surface.PlaySound("ui/buttonrollover.wav")
@@ -372,7 +399,8 @@ local function openBTBmenu()
     volumePanel:SetSize(330, 40)
     volumePanel:SetPos(10, 650)
     volumePanel.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, c707070255)
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, c707070255)
     end
     local volumeLabel = vgui.Create("DLabel", volumePanel)
     volumeLabel:SetText("#btb.ps.master_volume")
@@ -452,7 +480,8 @@ local function openBTBmenu()
         self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
     end
     saveButton.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, self.currentColor)
     end
     saveButton.OnCursorEntered = function(self)
         surface.PlaySound("ui/buttonrollover.wav")
@@ -463,9 +492,9 @@ local function openBTBmenu()
     playerPanel:SetSize(980, 170)
     playerPanel:SetPos(10, 470)
     playerPanel:SetVisible(false)
-    local c303030240 = Color(30, 30, 30, 240)
     playerPanel.Paint = function(self, w, h)
-        draw.RoundedBox(10, 0, 0, w, h, c303030240)
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, c404040)
     end
 
     local playPause = vgui.Create("DButton", playerPanel)
@@ -528,6 +557,7 @@ local function openBTBmenu()
             loopBtn:SetTooltip("#btb.ps.ts.mp.loop_disabled")
         end
     end
+    loopBtn:SetTooltipPanelOverride("BattleBeatsTooltip")
 
     local skipExcludedBtn = vgui.Create("DButton", playerPanel)
     skipExcludedBtn:SetSize(40, 40)
@@ -549,6 +579,7 @@ local function openBTBmenu()
             skipExcludedBtn:SetTooltip("#btb.ps.ts.mp.skip_play_all_tip")
         end
     end
+    skipExcludedBtn:SetTooltipPanelOverride("BattleBeatsTooltip")
 
     --MARK:Next/Previous track
     local currentFilteredTracks
@@ -623,6 +654,7 @@ local function openBTBmenu()
         BATTLEBEATS.SwitchPreviewTrack(-1)
     end
     prevTrackBtn:SetTooltip("#btb.ps.ts.mp.previous_track_tip")
+    prevTrackBtn:SetTooltipPanelOverride("BattleBeatsTooltip")
 
     local nextTrackBtn = vgui.Create("DButton", playerPanel)
     nextTrackBtn:SetSize(50, 50)
@@ -637,6 +669,7 @@ local function openBTBmenu()
         BATTLEBEATS.SwitchPreviewTrack(1)
     end
     nextTrackBtn:SetTooltip("#btb.ps.ts.mp.next_track_tip")
+    nextTrackBtn:SetTooltipPanelOverride("BattleBeatsTooltip")
     --MARK:Player bars
     local hoverTimeDisplay = nil
     local progressBar = vgui.Create("DPanel", playerPanel)
@@ -783,6 +816,7 @@ local function openBTBmenu()
                     tooltipFrame:SetPos(xOffset, 17)
                     tooltipFrame:SetPaintBackground(false)
                     tooltipFrame:SetTooltip(data.tooltip)
+                    tooltipFrame:SetTooltipPanelOverride("BattleBeatsTooltip")
 
                     local icon = vgui.Create("DImage", tooltipFrame)
                     icon:SetSize(16, 16)
@@ -816,6 +850,7 @@ local function openBTBmenu()
                 customCheckbox:SetTooltip(excluded and "#btb.ps.ts.exclude_tip" or "#btb.ps.ts.include_tip")
                 surface.PlaySound(excluded and "btb_button_disable.mp3" or "btb_button_enable.mp3")
             end
+            customCheckbox:SetTooltipPanelOverride("BattleBeatsTooltip")
 
             customCheckbox.Paint = function(self, w, h)
                 colorLerp = LerpColor(FrameTime() * 10, colorLerp, targetColor)
@@ -1031,6 +1066,7 @@ local function openBTBmenu()
                     end)
                     offsetOption:SetImage("icon16/time.png")
                     offsetOption:SetTooltip("#btb.ps.ts.rmb.offset_tip")
+                    offsetOption:SetTooltipPanelOverride("BattleBeatsTooltip")
 
                     --MARK:RMB npc assign
                     if row.actualType == "combat" then
@@ -1062,8 +1098,15 @@ local function openBTBmenu()
 
                             local textEntry = vgui.Create("DTextEntry", assignFrame)
                             textEntry:SetPos(10, 45)
-                            textEntry:SetSize(270, 20)
+                            textEntry:SetSize(250, 20)
                             textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
+
+                            local helpBtn = vgui.Create("DImage", assignFrame)
+                            helpBtn:SetPos(267.5, 47.5)
+                            helpBtn:SetSize(15, 15)
+                            helpBtn:SetImage("icon16/help.png")
+                            helpBtn:SetMouseInputEnabled(true)
+                            helpBtn:SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
 
                             local priorityLabel = vgui.Create("DLabel", assignFrame)
                             priorityLabel:SetPos(290, 25)
@@ -1172,6 +1215,7 @@ local function openBTBmenu()
                         end)
                         assignNPC:SetImage("icon16/user_add.png")
                         assignNPC:SetTooltip("#btb.ps.ts.rmb.assign_tip")
+                        assignNPC:SetTooltipPanelOverride("BattleBeatsTooltip")
 
                         for _, npcInfo in ipairs(currentNPCs) do
                             local s1 = language.GetPhrase("#btb.ps.ts.rmb.assign_current")
@@ -1198,8 +1242,15 @@ local function openBTBmenu()
 
                                 local textEntry = vgui.Create("DTextEntry", assignFrame)
                                 textEntry:SetPos(10, 45)
-                                textEntry:SetSize(270, 20)
+                                textEntry:SetSize(250, 20)
                                 textEntry:SetText(npcInfo.class)
+
+                                local helpBtn = vgui.Create("DImage", assignFrame)
+                                helpBtn:SetPos(267.5, 47.5)
+                                helpBtn:SetSize(15, 15)
+                                helpBtn:SetImage("icon16/help.png")
+                                helpBtn:SetMouseInputEnabled(true)
+                                helpBtn:SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
 
                                 local priorityLabel = vgui.Create("DLabel", assignFrame)
                                 priorityLabel:SetPos(290, 25)
@@ -1414,7 +1465,8 @@ local function openBTBmenu()
         searchPanel:SetTall(60)
         searchPanel:DockMargin(0, 5, 15, 10)
         searchPanel.Paint = function(self, w, h)
-            draw.RoundedBox(6, 0, 0, w, h, c404040)
+            draw.RoundedBox(10, 0, 0, w, h, c2552100)
+            draw.RoundedBox(8, 2, 2, w - 4, h - 4, c404040)
             surface.SetFont("DermaDefaultBold")
 
             local nameText = "#btb.ps.ts.header.name"
@@ -1424,13 +1476,13 @@ local function openBTBmenu()
             local excludeW = surface.GetTextSize(excludeText)
             local listW = surface.GetTextSize(listText)
 
-            draw.SimpleText(nameText, "DermaDefaultBold", 40, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            draw.SimpleText(excludeText, "DermaDefaultBold", w - excludeW - 40, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(nameText, "DermaDefaultBold", 40, 45, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(excludeText, "DermaDefaultBold", w - excludeW - 40, 45, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             if isAllMode then return end
-            draw.SimpleText(listText, "DermaDefaultBold", w / 2 - listW / 2, 50, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(listText, "DermaDefaultBold", w / 2 - listW / 2, 45, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end
 
-        local searchBox = vgui.Create("DTextEntry", searchPanel)
+        searchBox = vgui.Create("DTextEntry", searchPanel)
         searchBox:SetSize(600, 30)
         searchBox:SetPos(170, 10)
         searchBox:SetFont("BattleBeats_Font")
@@ -1460,6 +1512,8 @@ local function openBTBmenu()
         sortCombo:ChooseOptionID(1)
         --sortCombo:SetContentAlignment(5)
         sortCombo:SetTextColor(color_white)
+        sortCombo:SetTooltip("#btb.ps.sort.tooltip")
+        sortCombo:SetTooltipPanelOverride("BattleBeatsTooltip")
         sortCombo.DropButton:SetVisible(false)
         sortCombo.Paint = function(self, w, h)
             draw.RoundedBox(6, 0, 0, w, h, c404040)
@@ -1621,31 +1675,81 @@ local function openBTBmenu()
     local selectedPackName = nil
     local expandedPackName = nil
 
+    local c2201200150 = Color(220, 120, 0, 150)
+    local function createBasePanel(parent, call)
+        local panel = vgui.Create("DPanel", parent)
+        panel:Dock(TOP)
+        panel:DockMargin(0, 5, 0, 0)
+        panel:SetTall(41)
+        panel.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, c2201200150)
+        end
+        local icon = vgui.Create("DImage", panel)
+        icon:Dock(LEFT)
+        icon:SetWide(30)
+        icon:DockMargin(5, 5, 5, 5)
+        icon:SetImage("btberror.png")
+        icon:SetKeepAspect(true)
+        if call then
+            call(panel)
+        end
+        return panel
+    end
+
+    local function showConflicts()
+        if not table.IsEmpty(BATTLEBEATS.activeConflicts) then
+            createBasePanel(scrollPanel, function(panel)
+                local conflictNames = table.GetKeys(BATTLEBEATS.activeConflicts)
+                local label1 = vgui.Create("DLabel", panel)
+                label1:Dock(TOP)
+                label1:SetTall(20)
+                label1:SetText(language.GetPhrase("btb.ps.error.conflict1") .. ": " .. table.concat(conflictNames, ", "))
+                label1:SetFont("BattleBeats_Notification_Font_Misc")
+                label1:SetTextColor(color_white)
+                label1:SetContentAlignment(5)
+                local label2 = vgui.Create("DLabel", panel)
+                label2:Dock(TOP)
+                label2:SetTall(20)
+                label2:SetText("#btb.ps.error.conflict2")
+                label2:SetFont("BattleBeats_Notification_Font_Misc")
+                label2:SetTextColor(color_white)
+                label2:SetContentAlignment(5)
+            end)
+        end
+        if GetConVar("battlebeats_debug_mode"):GetBool() then
+            createBasePanel(scrollPanel, function(panel)
+                local label1 = vgui.Create("DLabel", panel)
+                label1:Dock(TOP)
+                label1:SetTall(20)
+                label1:SetText("#btb.ps.error.debug1")
+                label1:SetFont("BattleBeats_Notification_Font_Misc")
+                label1:SetTextColor(color_white)
+                label1:SetContentAlignment(5)
+                local label2 = vgui.Create("DLabel", panel)
+                label2:Dock(TOP)
+                label2:SetTall(20)
+                label2:SetText("#btb.ps.error.debug2")
+                label2:SetFont("BattleBeats_Notification_Font_Misc")
+                label2:SetTextColor(color_white)
+                label2:SetContentAlignment(5)
+            end)
+        end
+    end
+
     local function showPackList()
         scrollPanel:Clear()
         scrollPanel:SetVisible(true)
         saveButton:SetVisible(true)
-        scrollBar.Paint = function() end
-        scrollBar.btnUp.Paint = function() end
-        scrollBar.btnDown.Paint = function() end
-        scrollBar.btnGrip.Paint = function() end
+        scrollBar:SetWide(0)
+        frame:SetTitle("#btb.ps.title")
+        showConflicts()
 
         local function createTrackEditor(trackType, packName, scrollPanel, frame)
             scrollPanel:Clear()
             scrollPanel:SetVisible(true)
             saveButton:SetVisible(false)
-            scrollBar.Paint = function(self, w, h)
-                draw.RoundedBox(0, 0, 0, w, h, c404040200)
-            end
-            scrollBar.btnGrip.Paint = function(self, w, h)
-                draw.RoundedBox(0, 0, 0, w, h, c606060)
-            end
-            scrollBar.btnUp.Paint = function(self, w, h)
-                draw.RoundedBox(0, 0, 0, w, h, c606060)
-            end
-            scrollBar.btnDown.Paint = function(self, w, h)
-                draw.RoundedBox(0, 0, 0, w, h, c606060)
-            end
+            scrollBar:SetWide(10)
+            frame:SetTitle(language.GetPhrase("btb.ps.title") .. ": " .. BATTLEBEATS.stripPackPrefix(packName))
             if IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetState() ~= GMOD_CHANNEL_STOPPED then
                 playerPanel:SetVisible(true)
                 scrollPanel:SetSize(980, 430)
@@ -1657,9 +1761,19 @@ local function openBTBmenu()
             backButton:SetText("#btb.ps.button.back")
             backButton:SetFont("CreditsText")
             backButton:SetTextColor(color_white)
+            backButton.currentColor = c707070255
+            backButton.targetColor = c707070255
+            backButton.Think = function(self)
+                if self:IsHovered() then
+                    self.targetColor = c808080255
+                else
+                    self.targetColor = c707070255
+                end
+                self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+            end
             backButton.Paint = function(self, w, h)
-                local bgColor = self:IsHovered() and c808080255 or c707070255
-                draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                draw.RoundedBox(8, 2, 2, w - 4, h - 4, self.currentColor)
             end
             backButton.OnCursorEntered = function(self)
                 surface.PlaySound("ui/buttonrollover.wav")
@@ -1680,7 +1794,8 @@ local function openBTBmenu()
             promoPanel:SetSize(850, 400)
             promoPanel:SetPos(80, 150)
             promoPanel.Paint = function(self, w, h)
-                draw.RoundedBox(8, 0, 0, w, h, c505050)
+                draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                draw.RoundedBox(8, 2, 2, w - 4, h - 4, c505050)
                 draw.SimpleText("#btb.ps.no_packs_found_1", "CloseCaption_Bold", w / 2, 30, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                 draw.SimpleText("#btb.ps.no_packs_found_2", "CloseCaption_Bold", w / 2, 365, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
@@ -1929,6 +2044,7 @@ local function openBTBmenu()
                 errorIcon.OnCursorEntered = function(self)
                     self:SetTooltip("Pack error: " .. tostring(errorMessage))
                 end
+                errorIcon:SetTooltipPanelOverride("BattleBeatsTooltip")
                 errorIcon:SetMouseInputEnabled(true)
                 errorIcon:SetVisible(true)
                 if IsValid(customCheckbox) then
@@ -2040,20 +2156,20 @@ local function openBTBmenu()
 
             packLabel.Paint = function(self, w, h)
                 if packData.verifying then
-                    surface.SetMaterial(Material("ver.png"))
+                    surface.SetMaterial(Material("btbver.png"))
                     surface.SetDrawColor(255, 255, 255, 150)
                     surface.DrawTexturedRect(0, 2, 65, 65)
                     draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 elseif debugMode and not packData.debug then
-                    surface.SetMaterial(Material("block.png"))
+                    surface.SetMaterial(Material("btbblock.png"))
                     surface.SetDrawColor(255, 255, 255, 150)
                     surface.DrawTexturedRect(0, 2, 65, 65)
                     draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 end
                 if packData.packType == "local" then
-                    surface.SetMaterial(Material("local.png"))
+                    surface.SetMaterial(Material("btblocal.png"))
                 else
                     surface.SetMaterial(iconMat)
                 end
@@ -2153,12 +2269,16 @@ local function openBTBmenu()
                 ambientButton:SetTextColor(color_white)
                 ambientButton.Paint = function(self, w, h)
                     local bgColor = self:IsHovered() and c909090 or c606060
+                    local bgOutlineColor = c2552100
                     if packData.packContent == "combat" then
                         bgColor = c404040
+                        bgOutlineColor = c2001500
                         self:SetTooltip("#btb.ps.info.ambient_button_tip")
+                        self:SetTooltipPanelOverride("BattleBeatsTooltip")
                         ambientButton:SetTextColor(c200200200)
                     end
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                    draw.RoundedBox(10, 0, 0, w, h, bgOutlineColor)
+                    draw.RoundedBox(8, 2, 2, w - 4, h - 4, bgColor)
                 end
                 ambientButton.OnCursorEntered = function(self)
                     if packData.packContent ~= "combat" then
@@ -2183,7 +2303,8 @@ local function openBTBmenu()
                 allButton:SetTextColor(color_white)
                 allButton.Paint = function(self, w, h)
                     local bgColor = self:IsHovered() and c909090 or c606060
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                    draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                    draw.RoundedBox(8, 2, 2, w - 4, h - 4, bgColor)
                 end
                 allButton.OnCursorEntered = function(self)
                     self:SetCursor("hand")
@@ -2202,12 +2323,16 @@ local function openBTBmenu()
                 combatButton:SetTextColor(color_white)
                 combatButton.Paint = function(self, w, h)
                     local bgColor = self:IsHovered() and c909090 or c606060
+                    local bgOutlineColor = c2552100
                     if packData.packContent == "ambient" then
                         bgColor = c404040
+                        bgOutlineColor = c2001500
                         self:SetTooltip("#btb.ps.info.combat_button_tip")
+                        self:SetTooltipPanelOverride("BattleBeatsTooltip")
                         combatButton:SetTextColor(c200200200)
                     end
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                    draw.RoundedBox(10, 0, 0, w, h, bgOutlineColor)
+                    draw.RoundedBox(8, 2, 2, w - 4, h - 4, bgColor)
                 end
                 combatButton.OnCursorEntered = function(self)
                     if packData.packContent ~= "ambient" then
@@ -2412,7 +2537,7 @@ hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
 end)
 
 hook.Add("OnContextMenuClose", "BattleBeats_HideUI", function()
-    if IsValid(frame) and not toogleFrame:GetBool() then
+    if IsValid(frame) and not toogleFrame:GetBool() and not (IsValid(searchBox) and searchBox:IsEditing()) then
         frame:SetVisible(false)
     end
 end)

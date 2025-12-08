@@ -40,7 +40,13 @@ BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 BATTLEBEATS.trackToPack = {}
 
-BATTLEBEATS.currentVersion = "2.2.9"
+--Dev
+BATTLEBEATS.disableFade = false
+BATTLEBEATS.disableSwitch = false -- BATTLEBEATS.isInCombat will still update
+BATTLEBEATS.disableNextTrackTimer = false
+BATTLEBEATS.disableCheckingTimer = false
+
+BATTLEBEATS.currentVersion = "2.3.0b"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -64,6 +70,7 @@ local continueMode = CreateClientConVar("battlebeats_continue_mode", "0", true, 
 local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_notification", "1", true, false, "", 0, 1)
 local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "0", true, false, "", 0, 1)
 local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, true, "", 0, 1)
+local disableFade = CreateClientConVar("battlebeats_disable_fade", "0", true, true, "", 0, 1)
 
 local enableSubtitles = CreateClientConVar("battlebeats_subtitles_enabled", "1", true, false, "", 0, 1)
 
@@ -129,6 +136,14 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
     local masterVolume = volumeSet:GetInt() / 100
     local tgVolume = muteVolume or ((volumeType / 100) * masterVolume)
     if isPreview then tgVolume = muteVolume or masterVolume end
+    if disableFade:GetBool() or BATTLEBEATS.disableFade then
+        if fadeIn then
+            station:SetVolume(tgVolume)
+        else
+            station:SetVolume(0)
+        end
+        return
+    end
 
     local startVolume = fadeIn and 0 or station:GetVolume()
     local endVolume = fadeIn and tgVolume or 0
@@ -378,6 +393,7 @@ local function PlayNextTrack(track, time, noFade, priority)
             debugPrint("[PlayNextTrack] Track length: " .. math.Truncate(trackLength or 0, 1) .. " (s) | Will play for: " .. math.Truncate(playDuration or 0, 1) .. " (s)")
 
             timer.Create("BattleBeats_NextTrack", playDuration, 1, function() -- timer to play next track when current finishes
+                if BATTLEBEATS.disableNextTrackTimer then return end
                 debugPrint("[PlayNextTrack] Timer reached end. Selecting next track")
                 if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
                 if (isInCombat and not enableCombat:GetBool()) or
@@ -397,6 +413,7 @@ local function PlayNextTrack(track, time, noFade, priority)
 
             timer.Create("BattleBeats_CheckSound", 1, 0, function() -- timer to check if track stops playing unexpectedly
                 if not IsValid(station) or station:GetState() ~= GMOD_CHANNEL_PLAYING then
+                    if BATTLEBEATS.disableCheckingTimer then return end
                     debugPrint("[PlayNextTrack] Track stopped unexpectedly. Selecting next track")
                     timer.Remove("BattleBeats_CheckSound")
                     if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
@@ -761,6 +778,8 @@ timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
         isInCombat = true
     end
     BATTLEBEATS.isInCombat = isInCombat
+
+    if BATTLEBEATS.disableSwitch then return end
 
     if isInCombat ~= lastCombatState then
         if ambienceStartTime == nil then ambienceStartTime = CurTime() end

@@ -1,76 +1,147 @@
 BATTLEBEATS.subtitles = BATTLEBEATS.subtitles or {}
 BATTLEBEATS.parsedSubtitles = BATTLEBEATS.parsedSubtitles or {}
 
+local defaultY = tostring(ScrH() - 200)
+
 local enableSubtitles = GetConVar("battlebeats_subtitles_enabled")
+local subtitlesYpos = CreateClientConVar("battlebeats_subtitles_y", defaultY, true, false, "", 0, ScrH())
+
+local debugMode = GetConVar("battlebeats_debug_mode")
+local function debugPrint(...)
+    if debugMode:GetBool() then print("[BattleBeats Debug] " .. ...) end
+end
 
 local function toSeconds(t)
     local h, m, s, ms = string.match(t, "(%d+):(%d+):(%d+),(%d+)")
     return (tonumber(h) or 0) * 3600 + (tonumber(m) or 0) * 60 + (tonumber(s) or 0) + (tonumber(ms) or 0) / 1000
 end
 
+function BATTLEBEATS.parseBlocks(rawLines, parseFunc)
+    local subs = {}
+    local i = 1
+
+    while i <= #rawLines do
+        local startSec, endSec, text, newIndex = parseFunc(rawLines, i)
+        if startSec then
+            table.insert(subs, {
+                start = startSec,
+                ['end'] = endSec,
+                text = text
+            })
+        end
+
+        if not newIndex or newIndex <= i then
+            i = i + 1
+        else
+            i = newIndex
+        end
+    end
+
+    table.sort(subs, function(a, b) return a.start < b.start end)
+    return subs
+end
+
+local function parseSRTBlock(lines, i)
+    local line = lines[i]
+    local num = string.match(line, "^%s*(%d+)%s*$")
+    if not num then return nil, nil, nil, i + 1 end
+
+    i = i + 1
+    if i > #lines then return nil end
+
+    local tsLine = lines[i]
+    local startStr, endStr = string.match(tsLine, "(%d+:%d+:%d+,%d+)%s*-->%s*(%d+:%d+:%d+,%d+)")
+    if not startStr or not endStr then
+        debugPrint("[parseSRT] Timestamp error on line " .. i .. ": '" .. tsLine .. "'")
+        return nil, nil, nil, i + 1
+    end
+
+    local startSec = toSeconds(startStr)
+    local endSec = toSeconds(endStr)
+
+    i = i + 1
+    local textLines = {}
+
+    while i <= #lines do
+        local t = lines[i]
+        if string.match(t, "^%s*$") then
+            i = i + 1
+            break
+        end
+        table.insert(textLines, t)
+        i = i + 1
+    end
+
+    local text = table.concat(textLines, "\n")
+    return startSec, endSec, text, i
+end
+
 function BATTLEBEATS.parseSRT(songName)
     songName = string.lower(songName)
+
     if not BATTLEBEATS.subtitles or not BATTLEBEATS.subtitles[songName] then
-        print("[parseSRT] No SRT found for: " .. songName)
+        debugPrint("[parseSRT] No SRT found for: " .. songName)
         return {}
     end
 
     local raw = BATTLEBEATS.subtitles[songName].raw
-    local lines = string.Explode("\n", raw, false)
+    local lines = string.Explode("\n", raw)
+
+    local subs = BATTLEBEATS.parseBlocks(lines, parseSRTBlock)
+    table.Empty(BATTLEBEATS.subtitles[songName])
+
+    BATTLEBEATS.parsedSubtitles[songName] = subs
+    debugPrint("[parseSRT] Parsed '" .. songName .. "' | Subtitles: " .. #subs .. " | Input Lines: " .. #lines)
+    return subs
+end
+
+local function parse16thBlock(frames)
     local subs = {}
-    local i = 1
 
-    while i <= #lines do
-        local line = lines[i]
+    for i, f in ipairs(frames) do
+        local start = f.time
+        local text = f.lyric or ""
+        local nextFrame = frames[i + 1]
 
-        local num = string.match(line, "^%s*(%d+)%s*$")
-        if num then
-            i = i + 1
-            if i > #lines then break end
-
-            local tsLine = lines[i]
-            local startStr, endStr = string.match(tsLine, "(%d+:%d+:%d+,%d+)%s*-->%s*(%d+:%d+:%d+,%d+)")
-            if not startStr or not endStr then -- skip this block if timestamps are wrong
-                print("[parseSRT] Timestamp error on line " .. i .. ": '" .. tsLine .. "'")
-                i = i + 1
-                goto endd
-            end
-
-            local startSec = toSeconds(startStr)
-            local endSec = toSeconds(endStr)
-
-            i = i + 1
-            local textLines = {}
-
-            while i <= #lines do
-                local textLine = lines[i]
-                if string.match(textLine, "^%s*$") then
-                    i = i + 1
-                    break -- empty line means end of subtitle block
-                end
-                table.insert(textLines, textLine)
-                i = i + 1
-            end
-
-            local text = table.concat(textLines, "\n") -- join text lines
-            if #textLines > 0 then
-                table.insert(subs, {
-                    start = startSec,
-                    ['end'] = endSec,
-                    text = text
-                })
-            end
+        local finish
+        if nextFrame then
+            finish = math.min(nextFrame.time - 0.01, start + 5)
         else
-            i = i + 1
+            finish = start + 5
         end
 
-        ::endd::
+        table.insert(subs, {
+            start = start,
+            ['end'] = finish,
+            text = text
+        })
     end
 
-    table.sort(subs, function(a, b) return a.start < b.start end) -- sort subtitles by start time
+    table.sort(subs, function(a, b) return a.start < b.start end)
+    return subs
+end
+
+function BATTLEBEATS.parse16thNote(songName)
+    songName = string.lower(songName)
+
+    if not BATTLEBEATS.subtitles or not BATTLEBEATS.subtitles[songName] then
+        debugPrint("[parse16th] No 16th-note data for: " .. songName)
+        return {}
+    end
+
+    local data = BATTLEBEATS.subtitles[songName]
+
+    if not data.keyframes then
+        debugPrint("[parse16th] Missing keyframes for: " .. songName)
+        return {}
+    end
+
+    local frames = data.keyframes
+    local subs = parse16thBlock(frames)
     table.Empty(BATTLEBEATS.subtitles[songName])
+
     BATTLEBEATS.parsedSubtitles[songName] = subs
-    print("[parseSRT] Parsed '" .. songName .. "' | Subtitles: " .. #subs .. " | Input Lines: " .. #lines)
+    debugPrint("[parse16th] Parsed '" .. songName .. "' | Blocks: " .. #subs)
     return subs
 end
 
@@ -118,7 +189,7 @@ end
 local elapsed = 0
 local fadeLine = nil
 local fadeStart = 0
-local centerY = ScrH() - 200
+local centerY = subtitlesYpos:GetInt()
 local spacing = 40
 local clamp = math.Clamp
 local start = false
@@ -147,7 +218,6 @@ local function drawSubtitles()
         transitionStart = curTime
     end
 
-    -- transition progress from 0 to 1 over 0.7 seconds
     local t = clamp((curTime - transitionStart) / 0.7, 0, 1)
     local p = easeInOut(t)
 
@@ -174,11 +244,9 @@ local function drawSubtitles()
         drawCenteredText(prevLine.text, "BattleBeats_Subtitles", prevY, prevAlpha)
     end
 
-    -- draw the current subtitle line, sliding into the center position
     local currY = centerY + spacing * (1 - p)
     drawCenteredText(currentLine.text, "BattleBeats_Subtitles", currY, 255)
 
-    -- find the next subtitle line (upcoming)
     local nextIndex = nil
     for i, sub in ipairs(activeSubtitles) do
         if sub == currentLine then
@@ -192,7 +260,6 @@ local function drawSubtitles()
         local timeToNext = nextLine.start - elapsed
         if timeToNext <= 2 then
             incomingText = true
-            -- s increases from 0 to 1 as the next line approaches
             local s = easeInOut(1 - clamp(timeToNext / 0.7, 0, 1))
             local nextAlpha = 255 * s
             local nextY = centerY + spacing + (1 - s) * 20
@@ -255,11 +322,11 @@ function BATTLEBEATS.StartSubtitles(track, channel)
     local songName = string.lower(track)
     local subs = BATTLEBEATS.parsedSubtitles and BATTLEBEATS.parsedSubtitles[songName]
     if not subs or #subs == 0 then
-        print("[StartSubtitles] No subtitles found for: " .. songName)
+        debugPrint("[StartSubtitles] No subtitles found for: " .. songName)
         return
     end
     if not channel or not IsValid(channel) then
-        print("[StartSubtitles] Invalid or missing audio channel for: " .. songName)
+        debugPrint("[StartSubtitles] Invalid or missing audio channel for: " .. songName)
         return
     end
 
@@ -274,5 +341,25 @@ function BATTLEBEATS.StartSubtitles(track, channel)
     fadeLine = nil
     elapsed = 0
 
-    print("[StartSubtitles] Now displaying subtitles for: " .. songName)
+    debugPrint("[StartSubtitles] Now displaying subtitles for: " .. songName)
 end
+
+local function addSubtitlesPreview(newValue)
+    local startTime = CurTime()
+    local finalX = ScrW() / 2 - 300
+    local finalY = subtitlesYpos:GetInt()
+
+    hook.Add("HUDPaint", "BattleBeats_NotificationPreview", function()
+        surface.SetDrawColor(255, 255, 255, 100)
+        surface.DrawOutlinedRect(finalX, finalY - 75, 600, 150)
+        draw.SimpleText("#btb.options.sub.sub_height_noti_text", "DermaDefault", finalX + 600 / 2, (finalY + 150 / 2) - 75, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        if CurTime() - startTime > 5 then
+            hook.Remove("HUDPaint", "BattleBeats_NotificationPreview")
+            centerY = newValue
+        end
+    end)
+end
+
+cvars.AddChangeCallback("battlebeats_subtitles_y", function(_, _, newValue)
+    addSubtitlesPreview(newValue)
+end)
