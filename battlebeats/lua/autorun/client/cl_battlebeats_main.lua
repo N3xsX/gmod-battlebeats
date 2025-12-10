@@ -46,7 +46,7 @@ BATTLEBEATS.disableSwitch = false -- BATTLEBEATS.isInCombat will still update
 BATTLEBEATS.disableNextTrackTimer = false
 BATTLEBEATS.disableCheckingTimer = false
 
-BATTLEBEATS.currentVersion = "2.3.0b"
+BATTLEBEATS.currentVersion = "2.3.1"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)

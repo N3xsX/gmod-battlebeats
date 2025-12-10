@@ -1,3 +1,5 @@
+-- pls dont kill me for this mess
+
 local frame
 local assignFrame
 local lframe
@@ -292,6 +294,12 @@ local c100100100 = Color(100, 100, 100)
 local c505050 = Color(50, 50, 50)
 local c255255255200 = Color(255, 255, 255, 200)
 local c202020215 = Color(20, 20, 20, 215)
+local c404040200 = Color(40, 40, 40, 200)
+
+local c707070200 = Color(70, 70, 70, 200)
+local c303030200 = Color(30, 30, 30, 200)
+local c1003030200 = Color(100, 30, 30, 200)
+local c602020200 = Color(60, 20, 20, 200)
 
 local versionConVar = GetConVar("battlebeats_seen_version")
 
@@ -308,26 +316,56 @@ local function openBTBmenu()
     BATTLEBEATS.frame = frame
     frame:SetSize(1000, 700)
     frame:SetSizable(false)
+    frame:SetAlpha(0)
+    frame:AlphaTo(255, 0.1)
     frame:Center()
-    frame:SetTitle("#btb.ps.title")
+    frame:SetTitle("")
     frame:MakePopup()
     frame:SetBackgroundBlur(true)
     frame.Paint = function(self, w, h)
         draw.RoundedBox(6, 0, 0, w, h, c202020215)
     end
+    frame.PerformLayout = function(self)
+        self.btnClose:SetPos(self:GetWide() - 31 - 4, 5)
+        self.btnClose:SetSize(31, 20)
+        self.btnMaxim:SetPos(self:GetWide() - 31 * 2 - 4, 5)
+        self.btnMaxim:SetSize(31, 20)
+        self.btnMinim:SetPos(self:GetWide() - 31 * 3 - 4, 5)
+        self.btnMinim:SetSize(31, 20)
+    end
     frame.isMinimalized = false
 
-    for _, child in ipairs(frame:GetChildren()) do -- cheesy way to enable minimalize button
-        if child:GetClassName() == "Label" then
-            local x = child:GetPos()
-            if x > 900 and x < 910 then
-                child:SetEnabled(true)
-                child.OnMousePressed = function()
-                    frame:SetVisible(false)
-                    frame.isMinimalized = true
-                end
-            end
-        end
+    local frameTitle = vgui.Create("DLabel", frame)
+    frameTitle:SetPos(500 - 150, 5)
+    frameTitle:SetSize(300, 20)
+    frameTitle:SetText("#btb.ps.title")
+    frameTitle:SetContentAlignment(5)
+    frameTitle:SetFont("DermaDefaultBold")
+    frameTitle:SetTextColor(color_white)
+
+    frame.btnMinim:SetEnabled(true)
+    frame.btnMinim.DoClick = function()
+        frame:SetVisible(false)
+        frame.isMinimalized = true
+    end
+    frame.btnMinim.Paint = function(self, w, h)
+        local bgColor = self:IsHovered() and c707070200 or c404040200
+        draw.RoundedBoxEx(4, 0, 0, w, h, bgColor, true, false, true, false)
+        surface.SetDrawColor(255, 255, 255, 200)
+        surface.DrawRect(w * 0.25, h * 0.65, w * 0.5, 2)
+    end
+    frame.btnMaxim:SetCursor("arrow")
+    frame.btnMaxim.Paint = function(self, w, h)
+        draw.RoundedBox(0, 0, 0, w, h, c303030200)
+        surface.SetDrawColor(100, 100, 100, 200)
+        surface.DrawOutlinedRect(w * 0.25, h * 0.35, w * 0.5, h * 0.4)
+    end
+    frame.btnClose.Paint = function(self, w, h)
+        local bgColor = self:IsHovered() and c1003030200 or c602020200
+        draw.RoundedBoxEx(4, 0, 0, w, h, bgColor, false, true, false, true)
+        surface.SetDrawColor(255, 255, 255, 200)
+        surface.DrawLine(8, 5, w - 8, h - 5)
+        surface.DrawLine(w - 8, 5, 8, h - 5)
     end
 
     for _, packData in pairs(BATTLEBEATS.musicPacks) do
@@ -347,18 +385,15 @@ local function openBTBmenu()
 
     local scrollBar = scrollPanel:GetVBar()
     scrollBar:SetHideButtons(true)
-    local c404040200 = Color(40, 40, 40, 200)
-
     scrollBar.Paint = function(self, w, h)
         draw.RoundedBox(10, 0, 0, w, h, c404040200)
     end
+    scrollBar.btnGrip:SetCursor("hand")
     scrollBar.btnGrip.Paint = function(self, w, h)
-        self:SetCursor("hand")
         draw.RoundedBox(10, 0, 0, w, h, c2552100)
         draw.RoundedBox(8, 2, 2, w - 4, h - 4, c606060)
     end
-
-    function scrollBar:AddScroll(d)
+    scrollBar.AddScroll = function(self, d)
         local animTarget = self:GetScroll() + d * 60
         animTarget = math.Clamp(animTarget, 0, self.CanvasSize)
         local speed = math.min(math.abs(d), 5)
@@ -769,6 +804,10 @@ local function openBTBmenu()
         end
     end
     --MARK:Tracks list
+    local selectedSorting = nil
+    local selectedText = nil
+    local ambientGrad = Color(60, 180, 60, 70)
+    local combatGrad = Color(255, 80, 40, 80)
     local function createTrackList(parent, trackType, selectedPack)
         parent:Clear()
         local isAllMode = (trackType == "all")
@@ -876,45 +915,48 @@ local function openBTBmenu()
             row.currentColor = cHover
             row.targetColor = cHover
             row.initialized = false
+            row.gradientWidth = 0
+            row.targetWidth = 0
 
             local texGradient = surface.GetTextureID("gui/gradient")
             row.Think = function(self)
                 local isSelected = (self.trackName == selectedRow)
 
                 if isSelected then
-                    self.targetColor = c808080255
+                    self.targetColor = c707070200
+                    self.targetWidth = self:GetWide() + 500
                 elseif self:IsHovered() then
                     self.targetColor = cHover2
+                    self.targetWidth = (self:GetWide() - 350) + 300
                 else
                     self.targetColor = cHover
+                    self.targetWidth = self:GetWide() - 350
                 end
 
                 if not self.initialized then
                     self.initialized = true
                     self.currentColor = self.targetColor
+                    self.gradientWidth = self:GetWide() - 350
                     return
                 end
 
+                self.gradientWidth = Lerp(FrameTime() * 10, self.gradientWidth, self.targetWidth)
                 if not colorsEqual(self.currentColor, self.targetColor) then
                     self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
                 end
             end
 
+            local gradientCol = nil
             row.Paint = function(self, w, h)
                 draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
-                if isAllMode then
-                    local gradientCol = Color(0, 0, 0, 0)
-
-                    if row.actualType == "combat" then
-                        gradientCol = Color(255, 80, 40, 80)
-                    elseif row.actualType == "ambient" then
-                        gradientCol = Color(60, 180, 60, 70)
-                    end
-
-                    surface.SetDrawColor(gradientCol)
-                    surface.SetTexture(texGradient)
-                    surface.DrawTexturedRect(0, 0, w - 250, h)
+                if row.actualType == "combat" then
+                    gradientCol = combatGrad
+                elseif row.actualType == "ambient" then
+                    gradientCol = ambientGrad
                 end
+                surface.SetDrawColor(gradientCol)
+                surface.SetTexture(texGradient)
+                surface.DrawTexturedRect(0, 0, self.gradientWidth, h)
                 local displayName = isFavorite and "★ " .. trackName or trackName
                 if self.isScrolling and textWidth > panelWidth then
                     self.textX = self.textX - (scrollSpeed * FrameTime())
@@ -995,7 +1037,7 @@ local function openBTBmenu()
                             createTrackList(parent, trackType, selectedPack)
                         end)
                         unfavorite:SetImage("icon16/cancel.png")
-                    elseif favoriteCount < 255 then
+                    else
                         local favorite = menu:AddOption("#btb.ps.ts.rmb.add_fav", function()
                             BATTLEBEATS.favoriteTracks[track] = true
                             BATTLEBEATS.SaveFavoriteTracks()
@@ -1003,10 +1045,6 @@ local function openBTBmenu()
                             createTrackList(parent, trackType, selectedPack)
                         end)
                         favorite:SetImage("icon16/star.png")
-                    else
-                        local nofavorite = menu:AddOption("Add to Favorites (Limit Reached [25])", function() end)
-                        nofavorite:SetEnabled(false)
-                        nofavorite:SetImage("icon16/error_delete.png")
                     end
 
                     --MARK:RMB offset
@@ -1033,11 +1071,13 @@ local function openBTBmenu()
                         textEntry:SetNumeric(true)
                         textEntry:SetValue(offsetValue)
 
-                        local saveButton = vgui.Create("DButton", offsetFrame)
-                        saveButton:SetPos(10, 75)
-                        saveButton:SetSize(110, 25)
-                        saveButton:SetText("#btb.ps.ts.rmb.offset_save")
-                        saveButton.DoClick = function()
+                        local ssaveButton = vgui.Create("DButton", offsetFrame)
+                        ssaveButton:SetPos(10, 75)
+                        ssaveButton:SetSize(110, 25)
+                        ssaveButton:SetText("#btb.ps.ts.rmb.offset_save")
+                        ssaveButton:SetFont("CreditsText")
+                        ssaveButton:SetTextColor(color_white)
+                        ssaveButton.DoClick = function()
                             local newOffset = tonumber(textEntry:GetValue()) or 0
                             if newOffset > 0 then
                                 BATTLEBEATS.trackOffsets[track] = newOffset
@@ -1055,13 +1095,23 @@ local function openBTBmenu()
                             BATTLEBEATS.SaveTrackOffsets()
                             offsetFrame:Close()
                         end
+                        ssaveButton.Paint = function(self, w, h)
+                            local bgColor = self:IsHovered() and c808080255 or c707070255
+                            draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                        end
 
                         local cancelButton = vgui.Create("DButton", offsetFrame)
                         cancelButton:SetPos(130, 75)
                         cancelButton:SetSize(110, 25)
                         cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
+                        cancelButton:SetFont("CreditsText")
+                        cancelButton:SetTextColor(color_white)
                         cancelButton.DoClick = function()
                             offsetFrame:Close()
+                        end
+                        cancelButton.Paint = function(self, w, h)
+                            local bgColor = self:IsHovered() and c808080255 or c707070255
+                            draw.RoundedBox(4, 0, 0, w, h, bgColor)
                         end
                     end)
                     offsetOption:SetImage("icon16/time.png")
@@ -1069,9 +1119,44 @@ local function openBTBmenu()
                     offsetOption:SetTooltipPanelOverride("BattleBeatsTooltip")
 
                     --MARK:RMB npc assign
-                    if row.actualType == "combat" then
-                        local currentNPCs = BATTLEBEATS.npcTrackMappings[track] and
-                        BATTLEBEATS.npcTrackMappings[track].npcs or {}
+                    local function createAssignFrame(title, defaultClass, defaultPriority, onSave)
+                        local frame = vgui.Create("DFrame")
+                        frame:SetTitle(title)
+                        frame:SetSize(400, 110)
+                        frame:Center()
+                        frame:MakePopup()
+                        frame.Paint = function(self, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, c000200)
+                        end
+
+                        local classLabel = vgui.Create("DLabel", frame)
+                        classLabel:SetPos(10, 25)
+                        classLabel:SetSize(270, 20)
+                        classLabel:SetText("#btb.ps.ts.rmb.assign_class")
+
+                        local textEntry = vgui.Create("DTextEntry", frame)
+                        textEntry:SetPos(10, 45)
+                        textEntry:SetSize(250, 20)
+                        textEntry:SetText(defaultClass or "")
+                        if not defaultClass then
+                            textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
+                        end
+
+                        local helpBtn = vgui.Create("DImage", frame)
+                        helpBtn:SetPos(267.5, 47.5)
+                        helpBtn:SetSize(15, 15)
+                        helpBtn:SetImage("icon16/help.png")
+                        helpBtn:SetMouseInputEnabled(true)
+                        helpBtn:SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
+
+                        local priorityLabel = vgui.Create("DLabel", frame)
+                        priorityLabel:SetPos(290, 25)
+                        priorityLabel:SetSize(100, 20)
+                        priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
+
+                        local priorityCombo = vgui.Create("DComboBox", frame)
+                        priorityCombo:SetPos(290, 45)
+                        priorityCombo:SetSize(100, 20)
 
                         local priorityNames = {
                             [1] = "1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest"),
@@ -1081,57 +1166,49 @@ local function openBTBmenu()
                             [5] = "5 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_lowest")
                         }
 
+                        for i = 1, 5 do
+                            priorityCombo:AddChoice(priorityNames[i], i)
+                        end
+                        priorityCombo:SetValue(priorityNames[defaultPriority or 1])
+
+                        local saveBtn = vgui.Create("DButton", frame)
+                        saveBtn:SetPos(45, 75)
+                        saveBtn:SetSize(150, 25)
+                        saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
+                        saveBtn:SetFont("CreditsText")
+                        saveBtn:SetTextColor(color_white)
+                        saveBtn.Paint = function(self, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
+                        end
+
+                        saveBtn.DoClick = function()
+                            local class = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
+                            local _, prio = priorityCombo:GetSelected()
+                            prio = math.Clamp(prio or defaultPriority or 1, 1, 5)
+
+                            onSave(class, prio, frame)
+                        end
+
+                        local cancelBtn = vgui.Create("DButton", frame)
+                        cancelBtn:SetPos(205, 75)
+                        cancelBtn:SetSize(150, 25)
+                        cancelBtn:SetText("#btb.ps.ts.rmb.offset_cancel")
+                        cancelBtn:SetFont("CreditsText")
+                        cancelBtn:SetTextColor(color_white)
+                        cancelBtn.Paint = function(self, w, h)
+                            draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
+                        end
+                        cancelBtn.DoClick = function() frame:Close() end
+
+                        return frame, textEntry, priorityCombo
+                    end
+
+                    if row.actualType == "combat" then
+                        local currentNPCs = BATTLEBEATS.npcTrackMappings[track] and
+                        BATTLEBEATS.npcTrackMappings[track].npcs or {}
+
                         local assignNPC = menu:AddOption("#btb.ps.ts.rmb.assign_add", function()
-                            assignFrame = vgui.Create("DFrame")
-                            assignFrame:SetTitle("#btb.ps.ts.rmb.assign_title")
-                            assignFrame:SetSize(400, 110)
-                            assignFrame:Center()
-                            assignFrame:MakePopup()
-                            assignFrame.Paint = function(self, w, h)
-                                draw.RoundedBox(4, 0, 0, w, h, c000200)
-                            end
-
-                            local classLabel = vgui.Create("DLabel", assignFrame)
-                            classLabel:SetPos(10, 25)
-                            classLabel:SetSize(270, 20)
-                            classLabel:SetText("#btb.ps.ts.rmb.assign_class")
-
-                            local textEntry = vgui.Create("DTextEntry", assignFrame)
-                            textEntry:SetPos(10, 45)
-                            textEntry:SetSize(250, 20)
-                            textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
-
-                            local helpBtn = vgui.Create("DImage", assignFrame)
-                            helpBtn:SetPos(267.5, 47.5)
-                            helpBtn:SetSize(15, 15)
-                            helpBtn:SetImage("icon16/help.png")
-                            helpBtn:SetMouseInputEnabled(true)
-                            helpBtn:SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
-
-                            local priorityLabel = vgui.Create("DLabel", assignFrame)
-                            priorityLabel:SetPos(290, 25)
-                            priorityLabel:SetSize(100, 20)
-                            priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
-
-                            local priorityCombo = vgui.Create("DComboBox", assignFrame)
-                            priorityCombo:SetPos(290, 45)
-                            priorityCombo:SetSize(100, 20)
-                            for i = 1, 5 do
-                                priorityCombo:AddChoice(priorityNames[i], i)
-                            end
-                            priorityCombo:SetValue(priorityNames[1])
-
-                            local saveButton = vgui.Create("DButton", assignFrame)
-                            saveButton:SetPos(45, 75)
-                            saveButton:SetSize(150, 25)
-                            saveButton:SetText("#btb.ps.ts.rmb.assign_save")
-                            saveButton:SetFont("CreditsText")
-                            saveButton:SetTextColor(color_white)
-                            saveButton.DoClick = function()
-                                local class = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
-                                local _, priority = priorityCombo:GetSelected()
-                                priority = math.Clamp(priority or 1, 1, 5)
-
+                            createAssignFrame("#btb.ps.ts.rmb.assign_title", nil, 1, function(class, priority, fframe)
                                 if not class or class == "" then
                                     notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                     surface.PlaySound("buttons/button11.wav")
@@ -1164,8 +1241,10 @@ local function openBTBmenu()
                                 end
 
                                 local function assignNPCToTrack()
-                                    BATTLEBEATS.npcTrackMappings[track] = BATTLEBEATS.npcTrackMappings[track] or {npcs = {}}
-                                    table.insert(BATTLEBEATS.npcTrackMappings[track].npcs, { class = class, priority = priority })
+                                    BATTLEBEATS.npcTrackMappings[track] = BATTLEBEATS.npcTrackMappings[track] or
+                                    { npcs = {} }
+                                    table.insert(BATTLEBEATS.npcTrackMappings[track].npcs,
+                                        { class = class, priority = priority })
                                     if oldTrack and BATTLEBEATS.npcTrackMappings[oldTrack] then
                                         for i = #BATTLEBEATS.npcTrackMappings[oldTrack].npcs, 1, -1 do
                                             if BATTLEBEATS.npcTrackMappings[oldTrack].npcs[i].class == class then
@@ -1181,7 +1260,7 @@ local function openBTBmenu()
                                     surface.PlaySound("buttons/button14.wav")
                                     BATTLEBEATS.SaveNPCMappings()
                                     changesMade = true
-                                    assignFrame:Close()
+                                    fframe:Close()
                                     createTrackList(parent, trackType, selectedPack)
                                 end
 
@@ -1190,28 +1269,11 @@ local function openBTBmenu()
                                     surface.PlaySound("buttons/button11.wav")
                                 elseif oldTrack then
                                     surface.PlaySound("buttons/button17.wav")
-                                    Derma_Query("NPC: (" .. class .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"),
-                                        "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() assignNPCToTrack() end, "#btb.ps.ts.rmb.assign_no", function() end)
+                                    Derma_Query("NPC: (" .. class .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"), "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() assignNPCToTrack() end, "#btb.ps.ts.rmb.assign_no", function() end)
                                 else
                                     assignNPCToTrack()
                                 end
-                            end
-                            saveButton.Paint = function(self, w, h)
-                                local bgColor = self:IsHovered() and c808080255 or c707070255
-                                draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                            end
-
-                            local cancelButton = vgui.Create("DButton", assignFrame)
-                            cancelButton:SetPos(205, 75)
-                            cancelButton:SetSize(150, 25)
-                            cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
-                            cancelButton:SetFont("CreditsText")
-                            cancelButton:SetTextColor(color_white)
-                            cancelButton.Paint = function(self, w, h)
-                                local bgColor = self:IsHovered() and c808080255 or c707070255
-                                draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                            end
-                            cancelButton.DoClick = function() assignFrame:Close() end
+                            end)
                         end)
                         assignNPC:SetImage("icon16/user_add.png")
                         assignNPC:SetTooltip("#btb.ps.ts.rmb.assign_tip")
@@ -1226,56 +1288,7 @@ local function openBTBmenu()
                             parentOption:SetImage("icon16/vcard.png")
 
                             local editOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_edit", function()
-                                assignFrame = vgui.Create("DFrame")
-                                assignFrame:SetTitle(language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class)
-                                assignFrame:SetSize(400, 110)
-                                assignFrame:Center()
-                                assignFrame:MakePopup()
-                                assignFrame.Paint = function(self, w, h)
-                                    draw.RoundedBox(4, 0, 0, w, h, c000200)
-                                end
-
-                                local classLabel = vgui.Create("DLabel", assignFrame)
-                                classLabel:SetPos(10, 25)
-                                classLabel:SetSize(270, 20)
-                                classLabel:SetText("#btb.ps.ts.rmb.assign_class")
-
-                                local textEntry = vgui.Create("DTextEntry", assignFrame)
-                                textEntry:SetPos(10, 45)
-                                textEntry:SetSize(250, 20)
-                                textEntry:SetText(npcInfo.class)
-
-                                local helpBtn = vgui.Create("DImage", assignFrame)
-                                helpBtn:SetPos(267.5, 47.5)
-                                helpBtn:SetSize(15, 15)
-                                helpBtn:SetImage("icon16/help.png")
-                                helpBtn:SetMouseInputEnabled(true)
-                                helpBtn:SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
-
-                                local priorityLabel = vgui.Create("DLabel", assignFrame)
-                                priorityLabel:SetPos(290, 25)
-                                priorityLabel:SetSize(100, 20)
-                                priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
-
-                                local priorityCombo = vgui.Create("DComboBox", assignFrame)
-                                priorityCombo:SetPos(290, 45)
-                                priorityCombo:SetSize(100, 20)
-                                for i = 1, 5 do
-                                    priorityCombo:AddChoice(priorityNames[i], i)
-                                end
-                                priorityCombo:SetValue(priorityNames[npcInfo.priority] or priorityNames[1])
-
-                                local saveButton = vgui.Create("DButton", assignFrame)
-                                saveButton:SetPos(45, 75)
-                                saveButton:SetSize(150, 25)
-                                saveButton:SetText("#btb.ps.ts.rmb.assign_save")
-                                saveButton:SetFont("CreditsText")
-                                saveButton:SetTextColor(color_white)
-                                saveButton.DoClick = function()
-                                    local newClass = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
-                                    local _, newPrio = priorityCombo:GetSelected()
-                                    newPrio = math.Clamp(newPrio or npcInfo.priority, 1, 5)
-
+                                createAssignFrame(language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class, npcInfo.class, npcInfo.priority, function(newClass, newPrio, fframe)
                                     if not newClass or newClass == "" then
                                         notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                         surface.PlaySound("buttons/button11.wav")
@@ -1291,9 +1304,9 @@ local function openBTBmenu()
                                         end
                                         BATTLEBEATS.SaveNPCMappings()
                                         changesMade = true
-                                        notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
+                                        notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " (" .. npcInfo.priority .. ") " .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
                                         surface.PlaySound("buttons/button14.wav")
-                                        assignFrame:Close()
+                                        fframe:Close()
                                         createTrackList(parent, trackType, selectedPack)
                                         return
                                     end
@@ -1347,9 +1360,9 @@ local function openBTBmenu()
                                         BATTLEBEATS.SaveNPCMappings()
                                         changesMade = true
                                         notification.AddLegacy(
-                                        language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
+                                        language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " (" .. npcInfo.priority .. ") " .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
                                         surface.PlaySound("buttons/button14.wav")
-                                        assignFrame:Close()
+                                        fframe:Close()
                                         createTrackList(parent, trackType, selectedPack)
                                     end
 
@@ -1360,23 +1373,7 @@ local function openBTBmenu()
                                     else
                                         saveEdit()
                                     end
-                                end
-                                saveButton.Paint = function(s, w, h)
-                                    local bg = s:IsHovered() and c808080255 or c707070255
-                                    draw.RoundedBox(4, 0, 0, w, h, bg)
-                                end
-
-                                local cancelButton = vgui.Create("DButton", assignFrame)
-                                cancelButton:SetPos(205, 75)
-                                cancelButton:SetSize(150, 25)
-                                cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
-                                cancelButton:SetFont("CreditsText")
-                                cancelButton:SetTextColor(color_white)
-                                cancelButton.Paint = function(self, w, h)
-                                    local bgColor = self:IsHovered() and c808080255 or c707070255
-                                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                                end
-                                cancelButton.DoClick = function() assignFrame:Close() end
+                                end)
                             end)
                             editOpt:SetImage("icon16/user_edit.png")
 
@@ -1497,7 +1494,7 @@ local function openBTBmenu()
         local sortCombo = vgui.Create("DComboBox", searchPanel)
         sortCombo:SetSize(100, 30)
         sortCombo:SetPos(830, 11)
-        sortCombo:SetValue("A → Z")
+        sortCombo:SetValue(selectedText or "A → Z")
         sortCombo:AddChoice("A → Z", "az", false, "icon16/arrow_down.png")
         sortCombo:AddChoice("Z → A", "za", false, "icon16/arrow_up.png")
         sortCombo:AddChoice("#btb.ps.sort.random", "rnd", false, "icon16/arrow_switch.png")
@@ -1509,7 +1506,7 @@ local function openBTBmenu()
         end
         sortCombo:AddChoice("#btb.ps.sort.offset_only", "offset", false, "icon16/time.png")
         sortCombo:SetSortItems(false)
-        sortCombo:ChooseOptionID(1)
+        sortCombo:ChooseOptionID(selectedSorting or 1)
         --sortCombo:SetContentAlignment(5)
         sortCombo:SetTextColor(color_white)
         sortCombo:SetTooltip("#btb.ps.sort.tooltip")
@@ -1664,7 +1661,11 @@ local function openBTBmenu()
         end
 
         searchBox.OnChange = function() timer.Create("BattleBeats_SearchDelay", 0.3, 1, filterAndSort) end
-        sortCombo.OnSelect = filterAndSort
+        sortCombo.OnSelect = function()
+            selectedSorting = sortCombo:GetSelectedID()
+            selectedText = sortCombo:GetOptionText(selectedSorting)
+            filterAndSort()
+        end
         scrollPanel:ScrollToChild(searchPanel)
         filterAndSort()
     end
@@ -1741,7 +1742,7 @@ local function openBTBmenu()
         scrollPanel:SetVisible(true)
         saveButton:SetVisible(true)
         scrollBar:SetWide(0)
-        frame:SetTitle("#btb.ps.title")
+        frameTitle:SetText("#btb.ps.title")
         showConflicts()
 
         local function createTrackEditor(trackType, packName, scrollPanel, frame)
@@ -1749,7 +1750,7 @@ local function openBTBmenu()
             scrollPanel:SetVisible(true)
             saveButton:SetVisible(false)
             scrollBar:SetWide(10)
-            frame:SetTitle(language.GetPhrase("btb.ps.title") .. ": " .. BATTLEBEATS.stripPackPrefix(packName))
+            frameTitle:SetText(BATTLEBEATS.stripPackPrefix(packName))
             if IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetState() ~= GMOD_CHANNEL_STOPPED then
                 playerPanel:SetVisible(true)
                 scrollPanel:SetSize(980, 430)
@@ -2491,6 +2492,15 @@ local function openBTBmenu()
 
     saveButton.DoClick = function()
         frame:Close()
+    end
+
+    local oldClose = frame.Close
+    frame.Close = function(self)
+        if self.Closing then return end
+        self.Closing = true
+        self:AlphaTo(0, 0.04, 0, function()
+            oldClose(self)
+        end)
     end
 
     frame.OnClose = function()

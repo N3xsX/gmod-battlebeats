@@ -440,11 +440,13 @@ local function LerpColor(t, from, to)
     )
 end
 
+local c1003030200 = Color(100, 30, 30, 200)
+local c602020200 = Color(60, 20, 20, 200)
 concommand.Add("battlebeats_options", function()
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
     frame:Center()
-    frame:SetTitle("#btb.ps.options.title")
+    frame:SetTitle("")
     frame:SetDraggable(true)
     frame:ShowCloseButton(true)
     frame:SetSizable(false)
@@ -452,7 +454,42 @@ concommand.Add("battlebeats_options", function()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(8, 0, 0, w, h, Color(0, 0, 0, 200))
     end
+    frame.PerformLayout = function(self)
+        self.btnClose:SetPos(self:GetWide() - 31 - 4, 5)
+        self.btnClose:SetSize(31, 20)
+        self.btnMaxim:SetPos(self:GetWide() - 31 * 2 - 4, 5)
+        self.btnMaxim:SetSize(31, 20)
+        self.btnMinim:SetPos(self:GetWide() - 31 * 3 - 4, 5)
+        self.btnMinim:SetSize(31, 20)
+    end
+    frame.btnMinim:SetCursor("arrow")
+    frame.btnMinim.Paint = function(self, w, h)
+        draw.RoundedBoxEx(4, 0, 0, w, h, Color(30, 30, 30, 200), true, false, true, false)
+        surface.SetDrawColor(100, 100, 100, 200)
+        surface.DrawRect(w * 0.25, h * 0.65, w * 0.5, 2)
+    end
+    frame.btnMaxim:SetCursor("arrow")
+    frame.btnMaxim.Paint = function(self, w, h)
+        draw.RoundedBox(0, 0, 0, w, h, Color(30, 30, 30, 200))
+        surface.SetDrawColor(100, 100, 100, 200)
+        surface.DrawOutlinedRect(w * 0.25, h * 0.35, w * 0.5, h * 0.4)
+    end
+    frame.btnClose.Paint = function(self, w, h)
+        local bgColor = self:IsHovered() and c1003030200 or c602020200
+        draw.RoundedBoxEx(4, 0, 0, w, h, bgColor, false, true, false, true)
+        surface.SetDrawColor(255, 255, 255, 200)
+        surface.DrawLine(8, 5, w - 8, h - 5)
+        surface.DrawLine(w - 8, 5, 8, h - 5)
+    end
     
+    local frameTitle = vgui.Create("DLabel", frame)
+    frameTitle:SetPos(300 - 100, 5)
+    frameTitle:SetSize(200, 20)
+    frameTitle:SetText("#btb.ps.options.title")
+    frameTitle:SetContentAlignment(5)
+    frameTitle:SetFont("DermaDefaultBold")
+    frameTitle:SetTextColor(color_white)
+
     BATTLEBEATS.optionsFrame = frame
 
     local tabPanel = vgui.Create("DPanel", frame)
