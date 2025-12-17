@@ -110,10 +110,11 @@ local c808080255 = Color(80, 80, 80, 255)
 local function openGuide()
     if IsValid(frame) then frame:Remove() end
 
+    local title = language.GetPhrase("btb.guide.title")
     frame = vgui.Create("DFrame")
     frame:SetSize(640, 580)
     frame:Center()
-    frame:SetTitle("BattleBeats Guide")
+    frame:SetTitle(title)
     frame:MakePopup()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, c000200)
@@ -150,7 +151,7 @@ local function openGuide()
         img:SetImage("materials/guide/" .. data.image .. ".jpg")
 
         text:SetText(data.text or "")
-        frame:SetTitle("BattleBeats Guide (" .. currentPage .. "/" .. #btbGuide .. ")")
+        frame:SetTitle(title .. " (" .. currentPage .. "/" .. #btbGuide .. ")")
 
         btnPrev:SetVisible(currentPage > 1)
         btnNext:SetVisible(currentPage < #btbGuide)

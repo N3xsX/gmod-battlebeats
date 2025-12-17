@@ -357,7 +357,7 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
         local cvarValue = GetConVar(cvarName):GetInt()
         local index = math.Clamp(cvarValue + 1, 1, #options)
         local displayText = options[index] or "Unknown"
-        draw.SimpleText(displayText, "DermaDefault", 10, h / 2, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(displayText, "DermaDefaultBold", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 
     combo.OnCursorEntered = function(self)
@@ -600,6 +600,8 @@ concommand.Add("battlebeats_options", function()
         elseif category.name == "#btb.options.cat.subtitles" then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.sub.enable_sub", "battlebeats_subtitles_enabled")
             createArrowStepper(panel, contentPanel_NumSlider, 40, "#btb.options.sub.sub_height", "battlebeats_subtitles_y", 0, ScrH(), btbDefault .. tostring(ScrH() - 200))
+            createCustomCheckbox(panel, contentPanel_2, 100, "#btb.options.sub.static", "battlebeats_subtitles_static", "#btb.options.sub.static_tip")
+            createCustomComboBox(panel, (contentPanel_2 - 100), 130, "#btb.options.sub.combo", "battlebeats_subtitles_mode", {"#btb.options.sub.combo1", "#btb.options.sub.combo2"}, "#btb.options.sub.combo_tip")
         elseif category.name == "#btb.options.cat.music_player" then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.mplayer.curr_pack_only", "battlebeats_exclusive_play", "#btb.options.mplayer.curr_pack_only_tip")
             createArrowStepper(panel, contentPanel_NumSlider, 50, "#btb.options.mplayer.a_wait_time", "battlebeats_ambient_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip")
@@ -621,7 +623,7 @@ concommand.Add("battlebeats_options", function()
             createCustomCheckbox(panel, contentPanel_2, 190, "#btb.options.misc.toggle_ui", "battlebeats_context_ui_toogle", "#btb.options.misc.toggle_ui_tip")
             createCustomButton(panel, contentPanel_2, 220, "#btb.options.misc.reload_packs", "battlebeats_reload_packs")
             createCustomButton(panel, contentPanel_2, 260, "#btb.options.misc.open_guide", "battlebeats_guide")
-            createCustomButton(panel, contentPanel_2, 300, "#btb.options.misc.restore", "battlebeats_restore_defaults")
+            createCustomButton(panel, contentPanel_2, 300, "#btb.options.misc.restore", "battlebeats_restore_defaults", "#btb.options.misc.restore_tip")
         end
 
         button.DoClick = function()
@@ -668,6 +670,8 @@ concommand.Add("battlebeats_restore_defaults", function()
     RunConsoleCommand("battlebeats_disable_fade", "0")
 
     RunConsoleCommand("battlebeats_subtitles_enabled", "1")
+    RunConsoleCommand("battlebeats_subtitles_mode", "1")
+    RunConsoleCommand("battlebeats_subtitles_static", "0")
     RunConsoleCommand("battlebeats_context_ui_toogle", "0")
 
     RunConsoleCommand("battlebeats_volume_ambient", "100")

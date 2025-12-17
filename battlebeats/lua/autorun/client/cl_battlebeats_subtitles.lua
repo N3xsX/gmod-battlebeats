@@ -4,6 +4,8 @@ BATTLEBEATS.parsedSubtitles = BATTLEBEATS.parsedSubtitles or {}
 local defaultY = tostring(ScrH() - 200)
 
 local enableSubtitles = GetConVar("battlebeats_subtitles_enabled")
+local subtitlesMode = CreateClientConVar("battlebeats_subtitles_mode", 1, true, false)
+local staticSubtitles = CreateClientConVar("battlebeats_subtitles_static", 0, true, false)
 local subtitlesYpos = CreateClientConVar("battlebeats_subtitles_y", defaultY, true, false, "", 0, ScrH())
 
 local debugMode = GetConVar("battlebeats_debug_mode")
@@ -16,7 +18,7 @@ local function toSeconds(t)
     return (tonumber(h) or 0) * 3600 + (tonumber(m) or 0) * 60 + (tonumber(s) or 0) + (tonumber(ms) or 0) / 1000
 end
 
-function BATTLEBEATS.parseBlocks(rawLines, parseFunc)
+local function parseBlocks(rawLines, parseFunc)
     local subs = {}
     local i = 1
 
@@ -87,7 +89,7 @@ function BATTLEBEATS.parseSRT(songName)
     local raw = BATTLEBEATS.subtitles[songName].raw
     local lines = string.Explode("\n", raw)
 
-    local subs = BATTLEBEATS.parseBlocks(lines, parseSRTBlock)
+    local subs = parseBlocks(lines, parseSRTBlock)
     table.Empty(BATTLEBEATS.subtitles[songName])
 
     BATTLEBEATS.parsedSubtitles[songName] = subs
@@ -152,8 +154,109 @@ local lastLine = nil
 local transitionStart = 0
 local incomingText = false
 
+local activeWorldSubtitles = {}
+
 local function easeInOut(x)
     return x < 0.5 and 2 * x * x or 1 - math.pow(-2 * x + 2, 2) / 2
+end
+
+local texGradient = surface.GetTextureID("gui/center_gradient")
+local function draw3DSubtitle(sub, alpha)
+    if not sub or not sub.text or sub.text == "" then return end
+    local pos = sub.pos
+    local ang = sub.ang
+    local scale = sub.scale or 0.08
+    local ignoreZ = sub.ignoreZ
+    if not staticSubtitles:GetBool() then
+        local ply = LocalPlayer()
+        if IsValid(ply) then
+            sub.lastPlayerPos = sub.lastPlayerPos or ply:GetPos()
+            local currentPos = ply:GetPos()
+            local delta = currentPos - sub.lastPlayerPos
+            pos = pos + delta * 0.9
+            sub.lastPlayerPos = currentPos
+        end
+    end
+
+    cam.Start3D2D(pos, ang, scale)
+    cam.IgnoreZ(ignoreZ)
+    surface.SetFont("BattleBeats_Subtitles")
+
+    local w, h = surface.GetTextSize(sub.text)
+
+    surface.SetDrawColor(0, 0, 0, alpha * 0.65)
+    surface.SetTexture(texGradient)
+    surface.DrawTexturedRect(-w / 2 - 150, -h / 2 - 8, w + 300, h + 16)
+
+    surface.SetTextColor(0, 0, 0, alpha)
+    for dx = -2, 2, 2 do
+        for dy = -2, 2, 2 do
+            if dx ~= 0 or dy ~= 0 then
+                surface.SetTextPos(-w / 2 + dx, -h / 2 + dy)
+                surface.DrawText(sub.text)
+            end
+        end
+    end
+
+    surface.SetTextColor(255, 255, 255, alpha)
+    surface.SetTextPos(-w / 2, -h / 2)
+    surface.DrawText(sub.text)
+    cam.IgnoreZ(false)
+    cam.End3D2D()
+    sub.pos = pos
+end
+
+local function spawnWorldSubtitle(text, lifetime)
+    local ply = LocalPlayer()
+    local eyePos = ply:EyePos()
+    local eyeAng = ply:EyeAngles()
+    local forward = eyeAng:Forward()
+    local right = eyeAng:Right()
+    local up = eyeAng:Up()
+    local offset = forward * math.random(700, 900) + up * math.random(-20, 200) + right * math.random(-300, 300)
+    local pos = eyePos + offset
+    local dir = (eyePos - pos):GetNormalized()
+    local ang = dir:Angle()
+    ang:RotateAroundAxis(ang:Right(), -90)
+    ang:RotateAroundAxis(ang:Up(), 90)
+
+    local id = #activeWorldSubtitles + 1
+    activeWorldSubtitles[id] = {
+        text = text,
+        pos = pos,
+        ang = ang,
+        scale = 0.60 + math.random() * 0.05,
+        alpha = 255,
+        birth = CurTime(),
+        death = CurTime() + (lifetime or 5),
+        ignoreZ = true,
+        lastPlayerPos = ply:GetPos()
+    }
+
+    return id
+end
+
+local fadeInTime = 0.2
+local fadeOutTime = 1.5
+local function drawAllWorldSubtitles()
+    if not enableSubtitles:GetBool() or subtitlesMode:GetInt() == 0 then return end
+    local ct = CurTime()
+    for id, sub in pairs(activeWorldSubtitles) do
+        if ct > sub.death then
+            activeWorldSubtitles[id] = nil
+            continue
+        end
+        local age = ct - sub.birth
+        local alpha = 255
+        if age < fadeInTime then
+            local progress = age / fadeInTime
+            alpha = 255 * easeInOut(progress)
+        elseif ct > sub.death - fadeOutTime then
+            local progress = (ct - (sub.death - fadeOutTime)) / fadeOutTime
+            alpha = 255 * (1 - easeInOut(progress))
+        end
+        draw3DSubtitle(sub, alpha)
+    end
 end
 
 local function drawCenteredText(text, font, y, alpha)
@@ -194,7 +297,7 @@ local spacing = 40
 local clamp = math.Clamp
 local start = false
 local function drawSubtitles()
-    if not enableSubtitles:GetBool() then return end
+    if not enableSubtitles:GetBool() or subtitlesMode:GetInt() == 1 then return end
     if BATTLEBEATS.currentStation ~= currentChannel and not fadeLine then return end
     if not activeSubtitles or not currentLine or not IsValid(currentChannel) then
         if fadeLine then
@@ -270,6 +373,7 @@ local function drawSubtitles()
     end
 end
 
+local lastSpawnedLine = nil
 local function updateSubtitleLine()
     if not enableSubtitles:GetBool() then return end
     if BATTLEBEATS.currentStation ~= currentChannel then return end
@@ -291,6 +395,10 @@ local function updateSubtitleLine()
     for _, sub in ipairs(activeSubtitles) do
         if elapsed >= sub.start and elapsed <= sub["end"] then
             currentLine = sub
+            if currentLine ~= lastSpawnedLine then
+                spawnWorldSubtitle(currentLine.text, currentLine["end"] - elapsed + 1)
+                lastSpawnedLine = currentLine
+            end
             break
         end
     end
@@ -303,8 +411,11 @@ local function updateSubtitleLine()
         currentLine = nil
         currentChannel = nil
         elapsed = 0
+        activeWorldSubtitles = {}
+        lastSpawnedLine = nil
         hook.Remove("Think", "BattleBeats_UpdateSubtitles")
         hook.Remove("HUDPaint", "BattleBeats_DrawSubtitles")
+        hook.Remove("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles")
     end
 end
 
@@ -312,9 +423,26 @@ cvars.AddChangeCallback("battlebeats_subtitles_enabled", function(_, _, newValue
     if tonumber(newValue) == 0 then
         hook.Remove("Think", "BattleBeats_UpdateSubtitles")
         hook.Remove("HUDPaint", "BattleBeats_DrawSubtitles")
+        hook.Remove("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles")
     elseif tonumber(newValue) == 1 and activeSubtitles then
         hook.Add("Think", "BattleBeats_UpdateSubtitles", updateSubtitleLine)
+        if subtitlesMode:GetInt() == 0 then
+            hook.Add("HUDPaint", "BattleBeats_DrawSubtitles", drawSubtitles)
+        else
+            hook.Add("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles", drawAllWorldSubtitles)
+        end
+    end
+end)
+
+cvars.AddChangeCallback("battlebeats_subtitles_mode", function(_, _, newValue)
+    if tonumber(newValue) == 0 and activeSubtitles then
+        hook.Remove("HUDPaint", "BattleBeats_DrawSubtitles")
+        hook.Remove("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles")
         hook.Add("HUDPaint", "BattleBeats_DrawSubtitles", drawSubtitles)
+    elseif tonumber(newValue) == 1 and activeSubtitles then
+        hook.Remove("HUDPaint", "BattleBeats_DrawSubtitles")
+        hook.Remove("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles")
+        hook.Add("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles", drawAllWorldSubtitles)
     end
 end)
 
@@ -331,7 +459,11 @@ function BATTLEBEATS.StartSubtitles(track, channel)
     end
 
     hook.Add("Think", "BattleBeats_UpdateSubtitles", updateSubtitleLine)
-    hook.Add("HUDPaint", "BattleBeats_DrawSubtitles", drawSubtitles)
+    if subtitlesMode:GetInt() == 0 then
+        hook.Add("HUDPaint", "BattleBeats_DrawSubtitles", drawSubtitles)
+    else
+        hook.Add("PostDrawTranslucentRenderables", "BattleBeats_WorldSubtitles", drawAllWorldSubtitles)
+    end
 
     start = true
     activeSubtitles = subs
@@ -340,6 +472,8 @@ function BATTLEBEATS.StartSubtitles(track, channel)
     lastLine = nil
     fadeLine = nil
     elapsed = 0
+    activeWorldSubtitles = {}
+    lastSpawnedLine = nil
 
     debugPrint("[StartSubtitles] Now displaying subtitles for: " .. songName)
 end

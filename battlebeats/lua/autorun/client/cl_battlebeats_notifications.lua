@@ -56,6 +56,8 @@ local animDur = 0.25
 local trackNotification = nil
 
 function BATTLEBEATS.HideNotification()
+    local override = hook.Run("BattleBeats_PreHideNotification")
+    if override == true then return end
     if not IsValid(trackNotification) then return end
 
     local panel = trackNotification
@@ -176,7 +178,7 @@ end
 
 local function getPackName(trackName)
     local packName = BATTLEBEATS.trackToPack[trackName]
-    if not packName then return "#btb.notification.unknown_pack" end
+    if not packName then return language.GetPhrase("btb.notification.unknown_pack") end
     return BATTLEBEATS.stripPackPrefix(packName)
 end
 
@@ -184,8 +186,24 @@ local finalWidth, finalHeight = 300, 80
 
 function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
     if not trackName then return end
+    local override = hook.Run("BattleBeats_PreShowNotification", trackName, inCombat, isPreviewedTrack)
+    if override == true then return end
     local packName = getPackName(trackName)
     trackName = BATTLEBEATS.FormatTrackName(trackName)
+
+    if istable(override) then
+        if isstring(override.trackName) then
+            trackName = override.trackName
+        end
+        if isstring(override.packName) then
+            packName = override.packName
+        end
+        if isnumber(override.type) then
+            local otype = math.Clamp(override.type, 1, 3)
+            isPreviewedTrack = (otype == 3)
+            inCombat = (otype == 2)
+        end
+    end
 
     if string.match(trackName:lower(), "^[ca]%d+$") and skipNombat:GetBool() then -- if the name of the track is letter A or C then skip it
         if IsValid(trackNotification) then BATTLEBEATS.HideNotification() end
@@ -224,13 +242,13 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     local progressBarX, progressBarY = 40, 60
     local progressBarWidth, progressBarHeight = 216, 5
 
-    local from = language.GetPhrase("btb.notification.from")
+    --local from = language.GetPhrase("btb.notification.from")
 
     panel.Paint = function(self, w, h)
         draw.RoundedBoxEx(radius, 0, 0, w, radius, c3, true, true, false, false)
         surface.SetDrawColor(c3)
         surface.DrawRect(0, radius, w, h - radius)
-        draw.SimpleText("#btb.notification.now_playing", "BattleBeats_Notification_Font_Misc", finalWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
+        draw.SimpleText("#btb.notification.now_playing", "BattleBeats_Notification_Font_Misc", progressBarX + progressBarWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
 
         surface.SetTexture(gradient)
         surface.DrawTexturedRect(0, 0, w, h)
@@ -304,7 +322,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
 
             local elapsedTime = CurTime() - self.startTime
             if math.floor(elapsedTime % 30) < 4 and showNotificationPackName:GetBool() then -- text visible for 4 seconds every 30 seconds
-                draw.SimpleText(from .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
+                draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
             else
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c1)
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, textColor)
@@ -312,7 +330,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
                 draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
             end
         elseif showNotificationPackName:GetBool() then
-            draw.SimpleText(from .. packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
+            draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
         end
     end
 
