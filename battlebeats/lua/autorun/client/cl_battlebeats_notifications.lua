@@ -10,47 +10,41 @@ local notificationVisualizerSmooth = CreateClientConVar("battlebeats_visualizer_
 local skipNombat = CreateClientConVar("battlebeats_skip_nombat_names", "1", true, false, "", 0, 1)
 local showBar = CreateClientConVar("battlebeats_show_status_bar", "1", true, false, "", 0, 1)
 
-function BATTLEBEATS.FormatTime(seconds) -- formats seconds into m:ss
+function BATTLEBEATS.FormatTime(seconds)
     if not seconds or seconds < 0 then return "0:00" end
-    local minutes = math.floor(seconds / 60)
-    local secs = math.floor(seconds % 60)
-    return string.format("%d:%02d", minutes, secs)
+    local time = string.ToMinutesSeconds(math.floor(seconds))
+    time = string.gsub(time, "^0(%d:)", "%1") -- remove unnecessary 0 in minute mark (eg 01:23 -> 1:23)
+    return time
 end
 
-local function capitalizeLetters(str) -- capitalizes words and fixes punctuation
-    local result = {}
-    for part in str:gmatch("[^%.]+") do
-        part = part:gsub("^%s+", ""):gsub("%s+$", "")
-        if part ~= "" then
-            local words = {}
-            for word in part:gmatch("%S+") do
-                table.insert(words, word:sub(1, 1):upper() .. word:sub(2):lower())
-            end
-            table.insert(result, table.concat(words, " "))
-        end
-    end
-    local final = table.concat(result, ".")
-    final = final:gsub("^%l", string.upper)
-    final = final:gsub("%. (%l)", function(letter) return ". " .. letter:upper() end)
-    final = final:gsub("([%(%[%{])(%l)", function(open, letter)
+local function capitalizeLetters(str)
+    str = string.Trim(str)
+    str = str:lower()
+    -- every first letter
+    str = str:gsub("(%S)(%S*)", function(a, b)
+        return a:upper() .. b
+    end)
+    -- . ! ? _ - space
+    str = str:gsub("([%.%!%?%_%-]%s*)(%l)", function(punct, letter)
+        return punct .. letter:upper()
+    end)
+    -- ( [ {
+    str = str:gsub("([%(%[%{])(%l)", function(open, letter)
         return open .. letter:upper()
     end)
-    return final
+    return str
 end
 
 function BATTLEBEATS.FormatTrackName(trackName) -- cleans file path, extensions, suffix numbers, capitalizes
-    trackName = string.match(trackName, "[^/\\]+$") -- remove file path
-    trackName = string.gsub(trackName, "%.mp3$", "") -- remove mp3 suffix
-    trackName = string.gsub(trackName, "%.ogg$", "") -- remove ogg suffix
-    trackName = string.gsub(trackName, "%.wav$", "") -- remove wav suffix
+    trackName = string.GetFileFromFilename(trackName)
+    trackName = string.StripExtension(trackName)
     trackName = string.gsub(trackName, "(_%d%d%d)$", "") -- remove numbers from the end of the track name (for SBM packs)
     trackName = capitalizeLetters(trackName)
     return trackName
 end
 
-local c1 = Color(100, 100, 100) -- grey
-local c2 = Color(255, 255, 255) -- white
-local c3 = Color(0, 0, 0, 200) -- transparent black
+local c100100100 = Color(100, 100, 100)
+local c000200 = Color(0, 0, 0, 200)
 local gradient = surface.GetTextureID("gui/gradient_up")
 local animDur = 0.25
 local trackNotification = nil
@@ -222,7 +216,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     trackNotification = panel
     panel:SetAlpha(0)
 
-    timer.Simple(0.1, function() -- workaround: delay to prevent animation breaking when called during Initialization
+    timer.Simple(0.1, function() -- delay to prevent animation breaking when called during Initialization
         expandPanel(panel, finalX, finalY, finalWidth, finalHeight)
     end)
 
@@ -245,10 +239,10 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     --local from = language.GetPhrase("btb.notification.from")
 
     panel.Paint = function(self, w, h)
-        draw.RoundedBoxEx(radius, 0, 0, w, radius, c3, true, true, false, false)
-        surface.SetDrawColor(c3)
+        draw.RoundedBoxEx(radius, 0, 0, w, radius, c000200, true, true, false, false)
+        surface.SetDrawColor(c000200)
         surface.DrawRect(0, radius, w, h - radius)
-        draw.SimpleText("#btb.notification.now_playing", "BattleBeats_Notification_Font_Misc", progressBarX + progressBarWidth / 2, 10, c2, TEXT_ALIGN_CENTER)
+        draw.SimpleText("#btb.notification.now_playing", "BattleBeats_Notification_Font_Misc", progressBarX + progressBarWidth / 2, 10, color_white, TEXT_ALIGN_CENTER)
 
         surface.SetTexture(gradient)
         surface.DrawTexturedRect(0, 0, w, h)
@@ -322,15 +316,15 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
 
             local elapsedTime = CurTime() - self.startTime
             if math.floor(elapsedTime % 30) < 4 and showNotificationPackName:GetBool() then -- text visible for 4 seconds every 30 seconds
-                draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
+                draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, color_white, TEXT_ALIGN_CENTER)
             else
-                draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c1)
+                draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c100100100)
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, textColor)
-                draw.SimpleText(BATTLEBEATS.FormatTime(currentTime), "CenterPrintText", progressBarX - 30, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
-                draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, c2, TEXT_ALIGN_LEFT)
+                draw.SimpleText(BATTLEBEATS.FormatTime(currentTime), "CenterPrintText", progressBarX - 30, progressBarY - 6, color_white, TEXT_ALIGN_LEFT)
+                draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, color_white, TEXT_ALIGN_LEFT)
             end
         elseif showNotificationPackName:GetBool() then
-            draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, c2, TEXT_ALIGN_CENTER)
+            draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, color_white, TEXT_ALIGN_CENTER)
         end
     end
 

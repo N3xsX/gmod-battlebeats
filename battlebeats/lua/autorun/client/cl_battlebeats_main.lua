@@ -49,7 +49,7 @@ BATTLEBEATS.disableNextTrackTimer = false
 BATTLEBEATS.disableCheckingTimer = false
 BATTLEBEATS.volumeOverride = false
 
-BATTLEBEATS.currentVersion = "2.3.3"
+BATTLEBEATS.currentVersion = "2.3.5"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)

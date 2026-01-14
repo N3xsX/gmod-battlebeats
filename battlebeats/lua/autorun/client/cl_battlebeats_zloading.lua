@@ -463,6 +463,25 @@ local function findConflicts()
 end
 
 local versionConVar = GetConVar("battlebeats_seen_version")
+local function loadPatchNotes()
+    if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
+        chat.AddText(
+            Color(255, 255, 0), "[BattleBeats] ",
+            Color(255, 255, 255), "Welcome to version ",
+            Color(100, 255, 100), BATTLEBEATS.currentVersion,
+            Color(255, 255, 255), "! Check out the new features:"
+        )
+        chat.AddText(
+            Color(150, 255, 150), "- Added support for 16th Note lyrics"
+            --Color(150, 255, 150), "- You can now add subtitles to your tracks"
+        )
+        chat.AddText(
+            Color(255, 255, 255), "See workshop page for detailed changelog!"
+        )
+
+        RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
+    end
+end
 
 SXNOTE = SXNOTE or {}
 local old = SXNOTE.RegisterLyrics
@@ -506,23 +525,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             BATTLEBEATS.parse16thNote(songName)
         end
     end
-    /*if not versionConVar or versionConVar:GetString() ~= BATTLEBEATS.currentVersion then
-        chat.AddText(
-            Color(255, 255, 0), "[BattleBeats] ",
-            Color(255, 255, 255), "Welcome to version ",
-            Color(100, 255, 100), BATTLEBEATS.currentVersion,
-            Color(255, 255, 255), "! Check out the new features:"
-        )
-        chat.AddText(
-            Color(150, 255, 150), "- Added support for 16th Note lyrics"
-            --Color(150, 255, 150), "- You can now add subtitles to your tracks"
-        )
-        chat.AddText(
-            Color(255, 255, 255), "See workshop page for detailed changelog!"
-        )
-
-        RunConsoleCommand("battlebeats_seen_version", BATTLEBEATS.currentVersion)
-    end*/
+    --loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

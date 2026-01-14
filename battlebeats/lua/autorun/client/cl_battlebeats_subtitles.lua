@@ -160,6 +160,17 @@ local function easeInOut(x)
     return x < 0.5 and 2 * x * x or 1 - math.pow(-2 * x + 2, 2) / 2
 end
 
+local function drawMultilineText(text, x, y)
+    local lines = string.Explode("\n", text)
+    local lineH = select(2, surface.GetTextSize("A")) + 2
+    for i, line in ipairs(lines) do
+        local lw = surface.GetTextSize(line)
+        surface.SetTextPos(x - lw / 2, y + (i - 1) * lineH)
+        surface.DrawText(line)
+    end
+    return #lines * lineH
+end
+
 local texGradient = surface.GetTextureID("gui/center_gradient")
 local function draw3DSubtitle(sub, alpha)
     if not sub or not sub.text or sub.text == "" then return end
@@ -182,25 +193,30 @@ local function draw3DSubtitle(sub, alpha)
     cam.IgnoreZ(ignoreZ)
     surface.SetFont("BattleBeats_Subtitles")
 
-    local w, h = surface.GetTextSize(sub.text)
+    local lines = string.Explode("\n", sub.text)
+    local maxW = 0
+    local lineH = select(2, surface.GetTextSize("A")) + 2
+    for _, line in ipairs(lines) do
+        local lw = surface.GetTextSize(line)
+        maxW = math.max(maxW, lw)
+    end
+    local totalH = #lines * lineH
 
     surface.SetDrawColor(0, 0, 0, alpha * 0.65)
     surface.SetTexture(texGradient)
-    surface.DrawTexturedRect(-w / 2 - 150, -h / 2 - 8, w + 300, h + 16)
+    surface.DrawTexturedRect(-maxW / 2 - 150, -totalH / 2 - 8, maxW + 300, totalH + 16)
 
-    surface.SetTextColor(0, 0, 0, alpha)
     for dx = -2, 2, 2 do
         for dy = -2, 2, 2 do
             if dx ~= 0 or dy ~= 0 then
-                surface.SetTextPos(-w / 2 + dx, -h / 2 + dy)
-                surface.DrawText(sub.text)
+                surface.SetTextColor(0, 0, 0, alpha)
+                drawMultilineText(sub.text, 0 + dx, -totalH / 2 + dy)
             end
         end
     end
 
     surface.SetTextColor(255, 255, 255, alpha)
-    surface.SetTextPos(-w / 2, -h / 2)
-    surface.DrawText(sub.text)
+    drawMultilineText(sub.text, 0, -totalH / 2)
     cam.IgnoreZ(false)
     cam.End3D2D()
     sub.pos = pos
