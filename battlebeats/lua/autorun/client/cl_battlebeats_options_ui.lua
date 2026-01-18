@@ -1,105 +1,3 @@
-local tooltipPanel = {}
-
-function tooltipPanel:PerformLayout()
-    self:SetFontInternal("HudHintTextLarge")
-    self:SetTextColor(color_white)
-    self:SetContentAlignment(5)
-    local tw, th = self:GetContentSize()
-    self:SetWide(tw + 15)
-    self:SetTall(th + 10)
-end
-function tooltipPanel:Think()
-    local mx, my = gui.MousePos()
-    if not mx or mx == 0 then return end
-    local w = self:GetWide()
-    local h = self:GetTall()
-    local targetX = mx - w / 2
-    local targetY = my - h - 12
-    self:SetPos(targetX, targetY)
-end
-function tooltipPanel:Paint(w, h)
-    draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-    draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
-end
-vgui.Register("BattleBeatsTooltip", tooltipPanel, "DTooltip")
-
-local PANEL = FindMetaTable("Panel")
-function PANEL:SetImageTooltip(imagePath, text, width, maxImageHeight)
-    width = width or 350
-    maxImageHeight = maxImageHeight or 400
-
-    self:SetMouseInputEnabled(true)
-    local imgtooltipPanel = nil
-
-    self.OnCursorEntered = function()
-        if IsValid(imgtooltipPanel) then imgtooltipPanel:Remove() end
-        imgtooltipPanel = vgui.Create("DPanel")
-        imgtooltipPanel:SetAlpha(0)
-        imgtooltipPanel:MakePopup()
-        imgtooltipPanel.Think = function(self)
-            local mx, my = gui.MousePos()
-            if not mx or mx == 0 then return end
-            local w = self:GetWide()
-            local h = self:GetTall()
-            local targetX = mx - w / 2
-            local targetY = my - h - 12
-            self:SetPos(targetX, targetY)
-        end
-
-        local img = vgui.Create("DImage", imgtooltipPanel)
-        img:SetPos(10, 10)
-        img:SetSize(width - 20, maxImageHeight)
-        img:SetImage(imagePath)
-        img:SetKeepAspect(true)
-
-        local mat = Material(imagePath, "noclamp smooth")
-        local realW, realH = mat:Width(), mat:Height()
-        local targetW = width - 20
-        local scale = targetW / realW
-        local newImgH = realH * scale
-        if newImgH > maxImageHeight then
-            newImgH = maxImageHeight
-            scale = maxImageHeight / realH
-        end
-        img:SetSize(targetW, newImgH)
-
-        local imageBottom = 10 + newImgH + 15
-        if text and text ~= "" then
-            local label = vgui.Create("DLabel", imgtooltipPanel)
-            label:SetPos(10, imageBottom)
-            label:SetSize(width - 20, 20)
-            label:SetText(text)
-            label:SetTextColor(color_white)
-            label:SetFont("HudHintTextLarge")
-            label:SetWrap(true)
-            label:SetAutoStretchVertical(true)
-            timer.Simple(0, function()
-                if IsValid(label) and IsValid(imgtooltipPanel) then
-                    label:SizeToContentsY(15)
-                    local totalH = imageBottom + label:GetTall()
-                    imgtooltipPanel:SetSize(width, totalH)
-                    imgtooltipPanel:SetAlpha(255)
-                end
-            end)
-        else
-            imgtooltipPanel:SetSize(width, imageBottom)
-            imgtooltipPanel:SetAlpha(255)
-        end
-
-        imgtooltipPanel.Paint = function(self, w, h)
-            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-            draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
-        end
-    end
-
-    self.OnCursorExited = function()
-        if IsValid(imgtooltipPanel) then
-            imgtooltipPanel:Remove()
-            imgtooltipPanel = nil
-        end
-    end
-end
-
 local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetTall(20)
@@ -155,12 +53,17 @@ local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     return panel
 end
 
-local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max)
+local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 40)
     panel:SetPos(x, y)
     panel.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 0))
+    end
+
+    if helpText then
+        panel:SetTooltip(helpText)
+        panel:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
 
     local label = vgui.Create("DLabel", panel)
@@ -431,6 +334,34 @@ local function createCustomButton(parent, x, y, labelText, cvarName, helpText)
     return button
 end
 
+local function warningZone(parent, x, y, w, h)
+    local frame = vgui.Create("DPanel", parent)
+    frame:SetSize(w, h)
+    frame:SetPos(x - (frame:GetWide() / 2), y)
+    frame.Paint = function(self, w, h)
+        surface.SetDrawColor(255, 255, 255, 255)
+        surface.SetMaterial(Material("btboptionbg.jpg"))
+        surface.DrawTexturedRectUV(0, 0, w, h, 0, 0, 1, 0.5)
+    end
+
+    local frameTitle = vgui.Create("DLabel", parent)
+    frameTitle:SetPos(x - 100, y - 25)
+    frameTitle:SetSize(200, 20)
+    frameTitle:SetText("DANGER ZONE")
+    frameTitle:SetContentAlignment(5)
+    frameTitle:SetFont("DermaDefaultBold")
+    frameTitle:SetTextColor(color_white)
+
+    local inner = vgui.Create("DPanel", frame)
+    inner:Dock(FILL)
+    inner:DockMargin(6, 6, 6, 6)
+    inner.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 255))
+    end
+
+    return inner
+end
+
 local function LerpColor(t, from, to)
     return Color(
         Lerp(t, from.r, to.r),
@@ -440,8 +371,6 @@ local function LerpColor(t, from, to)
     )
 end
 
-local c1003030200 = Color(100, 30, 30, 200)
-local c602020200 = Color(60, 20, 20, 200)
 concommand.Add("battlebeats_options", function()
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
@@ -454,33 +383,7 @@ concommand.Add("battlebeats_options", function()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(8, 0, 0, w, h, Color(0, 0, 0, 200))
     end
-    frame.PerformLayout = function(self)
-        self.btnClose:SetPos(self:GetWide() - 31 - 4, 5)
-        self.btnClose:SetSize(31, 20)
-        self.btnMaxim:SetPos(self:GetWide() - 31 * 2 - 4, 5)
-        self.btnMaxim:SetSize(31, 20)
-        self.btnMinim:SetPos(self:GetWide() - 31 * 3 - 4, 5)
-        self.btnMinim:SetSize(31, 20)
-    end
-    frame.btnMinim:SetCursor("arrow")
-    frame.btnMinim.Paint = function(self, w, h)
-        draw.RoundedBoxEx(4, 0, 0, w, h, Color(30, 30, 30, 200), true, false, true, false)
-        surface.SetDrawColor(100, 100, 100, 200)
-        surface.DrawRect(w * 0.25, h * 0.65, w * 0.5, 2)
-    end
-    frame.btnMaxim:SetCursor("arrow")
-    frame.btnMaxim.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, Color(30, 30, 30, 200))
-        surface.SetDrawColor(100, 100, 100, 200)
-        surface.DrawOutlinedRect(w * 0.25, h * 0.35, w * 0.5, h * 0.4)
-    end
-    frame.btnClose.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and c1003030200 or c602020200
-        draw.RoundedBoxEx(4, 0, 0, w, h, bgColor, false, true, false, true)
-        surface.SetDrawColor(255, 255, 255, 200)
-        surface.DrawLine(8, 5, w - 8, h - 5)
-        surface.DrawLine(w - 8, 5, 8, h - 5)
-    end
+    frame:BTB_SetButtons(false)
     
     local frameTitle = vgui.Create("DLabel", frame)
     frameTitle:SetPos(300 - 100, 5)
@@ -499,8 +402,9 @@ concommand.Add("battlebeats_options", function()
         draw.RoundedBox(0, 0, 0, w, h, Color(0, 0, 0, 0))
     end
 
+    local testSound = language.GetPhrase("btb.options.cat.sound")
     local categories = {
-        {name = "#btb.options.cat.sound", panel = nil},
+        {name = testSound, panel = nil},
         {name = "#btb.options.cat.notification", panel = nil},
         {name = "#btb.options.cat.subtitles", panel = nil},
         {name = "#btb.options.cat.music_player", panel = nil},
@@ -554,11 +458,11 @@ concommand.Add("battlebeats_options", function()
         panel:SetVisible(false)
         category.panel = panel
 
-        local translation = language.GetPhrase("#btb.translated.by")
+        local translation = language.GetPhrase("btb.translated.by")
         local lang = GetConVar("gmod_language"):GetString()
         if lang ~= "en" and translation ~= "///" then
             local translationLabel = vgui.Create("DLabel", panel)
-            translationLabel:SetText(language.GetPhrase("#btb.translated.by.label") .. translation)
+            translationLabel:SetText(language.GetPhrase("btb.translated.by.label") .. translation)
             translationLabel:SetPos((contentPanel:GetWide() - 400) / 2, 420)
             translationLabel:SetSize(400, 20)
             translationLabel:SetTextColor(Color(80, 80, 80, 200))
@@ -566,7 +470,7 @@ concommand.Add("battlebeats_options", function()
         end
 
         local versionlabel = vgui.Create("DLabel", panel)
-        versionlabel:SetText(language.GetPhrase("#btb.options.version.label") .. BATTLEBEATS.currentVersion .. "_" .. jit.arch)
+        versionlabel:SetText(language.GetPhrase("btb.options.version.label") .. BATTLEBEATS.currentVersion .. "_" .. jit.arch)
         versionlabel:SetPos((contentPanel:GetWide() - 250) / 2, 440)
         versionlabel:SetSize(250, 20)
         versionlabel:SetTextColor(Color(80, 80, 80, 200))
@@ -576,14 +480,15 @@ concommand.Add("battlebeats_options", function()
         local contentPanel_NumSlider = (panel:GetWide() - 300) / 2
         local btbDefault = language.GetPhrase("btb.options.noti.default_pos")
 
-        if category.name == "#btb.options.cat.sound" then
-            createCustomNumSlider(panel, contentPanel_NumSlider, 10, "#btb.options.snd.master_volume", "battlebeats_volume", 0, 200)
+        if category.name == testSound then
+            createCustomNumSlider(panel, contentPanel_NumSlider, 10, "#btb.options.snd.master_volume", "battlebeats_volume", 0, 200, "#btb.options.snd.master_volume_tip")
             createCustomNumSlider(panel, contentPanel_NumSlider, 50, "#btb.options.snd.ambient_volume", "battlebeats_volume_ambient", 0, 100)
             createCustomNumSlider(panel, contentPanel_NumSlider, 90, "#btb.options.snd.combat_volume", "battlebeats_volume_combat", 0, 100)
             createCustomCheckbox(panel, contentPanel_2, 150, "#btb.options.snd.enable_ambient", "battlebeats_enable_ambient")
             createCustomCheckbox(panel, contentPanel_2, 180, "#btb.options.snd.enable_combat", "battlebeats_enable_combat")
             createCustomCheckbox(panel, contentPanel_2, 210, "#btb.spawnmenu.general.force_combat", "battlebeats_force_combat", "#btb.spawnmenu.general.force_combat_tip")
-            createCustomComboBox(panel, (contentPanel_2 - 100), 250, "#btb.spawnmenu.general.combo", "battlebeats_disable_mode", { "#btb.spawnmenu.general.combo_1", "#btb.spawnmenu.general.combo_2", "#btb.spawnmenu.general.combo_3" })
+            createCustomComboBox(panel, (contentPanel_2 - 100) - 110, 250, "#btb.spawnmenu.general.combo", "battlebeats_disable_mode", { "#btb.spawnmenu.general.combo_1", "#btb.spawnmenu.general.combo_2", "#btb.spawnmenu.general.combo_3" })
+            createCustomComboBox(panel, (contentPanel_2 - 100) + 110, 250, "#btb.options.snd.start_mode", "battlebeats_start_mode", { "#btb.options.snd.start_mode_1", "#btb.options.snd.start_mode_2", "#btb.options.snd.start_mode_3" }, "#btb.options.snd.start_mode_tip")
         elseif category.name == "#btb.options.cat.notification" then
             createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "#btb.options.noti.enable_noti", "battlebeats_show_notification")
             createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "#btb.options.noti.noti_always_vis", "battlebeats_persistent_notification", "#btb.options.noti.noti_always_vis_tip")
@@ -621,9 +526,13 @@ concommand.Add("battlebeats_options", function()
             createCustomCheckbox(panel, contentPanel_2, 130, "#btb.options.misc.lower_vol_in_menu", "battlebeats_lower_volume_in_menu", "#btb.options.misc.lower_vol_in_menu_tip")
             createCustomCheckbox(panel, contentPanel_2, 160, "#btb.options.misc.load_am_sus", "battlebeats_load_am_suspense", "#btb.options.misc.load_am_sus_tip")
             createCustomCheckbox(panel, contentPanel_2, 190, "#btb.options.misc.toggle_ui", "battlebeats_context_ui_toogle", "#btb.options.misc.toggle_ui_tip")
-            createCustomButton(panel, contentPanel_2, 220, "#btb.options.misc.reload_packs", "battlebeats_reload_packs")
-            createCustomButton(panel, contentPanel_2, 260, "#btb.options.misc.open_guide", "battlebeats_guide")
-            createCustomButton(panel, contentPanel_2, 300, "#btb.options.misc.restore", "battlebeats_restore_defaults", "#btb.options.misc.restore_tip")
+            createCustomButton(panel, contentPanel_2 - 110, 220, "#btb.options.misc.reload_packs", "battlebeats_reload_packs")
+            createCustomButton(panel, contentPanel_2 + 110, 220, "#btb.options.misc.open_guide", "battlebeats_guide")
+            warningZone(panel, contentPanel_2, 280, 480, 120)
+            createCustomButton(panel, contentPanel_2 - 110, 300, "#btb.options.misc.restore", "battlebeats_restore_defaults", "#btb.options.misc.restore_tip")
+            createCustomButton(panel, contentPanel_2 + 110, 300, "#btb.options.misc.clean_unused_tracks", "battlebeats_clean_unused_tracks", "#btb.options.misc.clean_unused_tracks_tip")
+            createCustomButton(panel, contentPanel_2 - 110, 350, "#btb.options.misc.clean_cache", "battlebeats_clean_cache", "#btb.options.misc.clean_cache_tip")
+            createCustomButton(panel, contentPanel_2 + 110, 350, "#btb.options.misc.delete_data", "battlebeats_delete_data", "#btb.options.misc.delete_data_tip")
         end
 
         button.DoClick = function()
@@ -643,7 +552,41 @@ end)
 local defaultX = tostring(ScrW() - 310)
 local defaultY = tostring(ScrH() / 6)
 local subdefaultY = tostring(ScrH() - 200)
+
+local confirmations = {}
+local function confirmAction(id, timeout)
+    local now = CurTime()
+    local state = confirmations[id]
+    if not state or now > state.expires then
+        confirmations[id] = {expires = now + (timeout or 5)}
+        notification.AddLegacy("[BattleBeats] " .. (language.GetPhrase("btb.options.misc.button_conf")), NOTIFY_HINT, timeout or 5)
+        surface.PlaySound("ambient/water/drip" .. math.random(1, 4) .. ".wav")
+        return false
+    end
+    confirmations[id] = nil
+    surface.PlaySound("buttons/button14.wav")
+    return true
+end
+
+local function cleanupInvalidTracks(tbl)
+    local toRemove = {}
+    for trackPath, _ in pairs(tbl) do
+        if not file.Exists(trackPath, "GAME") then
+            print("[BattleBeats Cleanup] Removing: " .. trackPath)
+            table.insert(toRemove, trackPath)
+        end
+    end
+    for _, trackPath in ipairs(toRemove) do
+        tbl[trackPath] = nil
+    end
+end
+
 concommand.Add("battlebeats_restore_defaults", function()
+    if not confirmAction("restore_defaults", 5) then return end
+
+    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.restore_tip_conf"), NOTIFY_GENERIC, 3)
+    surface.PlaySound("buttons/button14.wav")
+    
     RunConsoleCommand("battlebeats_detection_mode", "1")
     RunConsoleCommand("battlebeats_npc_combat", "0")
 
@@ -668,6 +611,7 @@ concommand.Add("battlebeats_restore_defaults", function()
     RunConsoleCommand("battlebeats_lower_volume_in_menu", "0")
     RunConsoleCommand("battlebeats_force_combat", "0")
     RunConsoleCommand("battlebeats_disable_fade", "0")
+    RunConsoleCommand("battlebeats_start_mode", "0")
 
     RunConsoleCommand("battlebeats_subtitles_enabled", "1")
     RunConsoleCommand("battlebeats_subtitles_mode", "1")
@@ -692,4 +636,50 @@ concommand.Add("battlebeats_restore_defaults", function()
     RunConsoleCommand("battlebeats_notif_y", defaultY)
 
     RunConsoleCommand("battlebeats_subtitles_y", subdefaultY)
+end)
+
+concommand.Add("battlebeats_clean_cache", function()
+    if not confirmAction("clean_cache", 5) then return end
+
+    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.clean_cache_tip_conf"), NOTIFY_GENERIC, 3)
+    surface.PlaySound("buttons/button14.wav")
+    
+    RunConsoleCommand("battlebeats_seen_version", "0")
+    cookie.Delete("battlebeats_start_track")
+    cookie.Delete('BattleBeats_FirstTime')
+    cookie.Delete("battlebeats_high_volume_time")
+    cookie.Delete("battlebeats_high_volume_warn")
+end)
+
+concommand.Add("battlebeats_delete_data", function()
+    if not confirmAction("delete_data", 5) then return end
+
+    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.delete_data_tip_conf"), NOTIFY_GENERIC, 3)
+    surface.PlaySound("buttons/button14.wav")
+    
+    cookie.Delete("battlebeats_selected_packs")
+    file.Delete("battlebeats/battlebeats_excluded_tracks.txt")
+    BATTLEBEATS.excludedTracks = {}
+    file.Delete("battlebeats/battlebeats_favorite_tracks.txt")
+    BATTLEBEATS.favoriteTracks = {}
+    file.Delete("battlebeats/battlebeats_npc_mappings.txt")
+    BATTLEBEATS.npcTrackMappings = {}
+    file.Delete("battlebeats/battlebeats_track_offsets.txt")
+    BATTLEBEATS.trackOffsets = {}
+end)
+
+concommand.Add("battlebeats_clean_unused_tracks", function()
+    if not confirmAction("clean_unused_tracks", 5) then return end
+
+    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.clean_unused_tracks_tip_conf"), NOTIFY_GENERIC, 3)
+    surface.PlaySound("buttons/button14.wav")
+
+    cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
+    BATTLEBEATS.SaveExcludedTracks()
+    cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+    BATTLEBEATS.SaveFavoriteTracks()
+    cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
+    BATTLEBEATS.SaveTrackOffsets()
+    cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
+    BATTLEBEATS.SaveNPCMappings()
 end)

@@ -10,6 +10,7 @@ resource.AddFile("materials/btblocal.png")
 resource.AddFile("materials/btbblock.png")
 resource.AddFile("materials/btberror.png")
 resource.AddFile("materials/assignhelp.png")
+resource.AddFile("materials/btboptionbg.jpg")
 
 resource.AddFile("materials/promo/btbdmc.jpg")
 resource.AddFile("materials/promo/btbzzz.jpg")

@@ -297,9 +297,6 @@ local c202020215 = Color(20, 20, 20, 215)
 local c404040200 = Color(40, 40, 40, 200)
 
 local c707070200 = Color(70, 70, 70, 200)
-local c303030200 = Color(30, 30, 30, 200)
-local c1003030200 = Color(100, 30, 30, 200)
-local c602020200 = Color(60, 20, 20, 200)
 
 local versionConVar = GetConVar("battlebeats_seen_version")
 
@@ -321,18 +318,10 @@ local function openBTBmenu()
     frame:Center()
     frame:SetTitle("")
     frame:MakePopup()
-    frame:SetBackgroundBlur(true)
     frame.Paint = function(self, w, h)
         draw.RoundedBox(6, 0, 0, w, h, c202020215)
     end
-    frame.PerformLayout = function(self)
-        self.btnClose:SetPos(self:GetWide() - 31 - 4, 5)
-        self.btnClose:SetSize(31, 20)
-        self.btnMaxim:SetPos(self:GetWide() - 31 * 2 - 4, 5)
-        self.btnMaxim:SetSize(31, 20)
-        self.btnMinim:SetPos(self:GetWide() - 31 * 3 - 4, 5)
-        self.btnMinim:SetSize(31, 20)
-    end
+    frame:BTB_SetButtons(true)
     frame.isMinimalized = false
 
     local frameTitle = vgui.Create("DLabel", frame)
@@ -343,29 +332,9 @@ local function openBTBmenu()
     frameTitle:SetFont("DermaDefaultBold")
     frameTitle:SetTextColor(color_white)
 
-    frame.btnMinim:SetEnabled(true)
     frame.btnMinim.DoClick = function()
         frame:SetVisible(false)
         frame.isMinimalized = true
-    end
-    frame.btnMinim.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and c707070200 or c404040200
-        draw.RoundedBoxEx(4, 0, 0, w, h, bgColor, true, false, true, false)
-        surface.SetDrawColor(255, 255, 255, 200)
-        surface.DrawRect(w * 0.25, h * 0.65, w * 0.5, 2)
-    end
-    frame.btnMaxim:SetCursor("arrow")
-    frame.btnMaxim.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, c303030200)
-        surface.SetDrawColor(100, 100, 100, 200)
-        surface.DrawOutlinedRect(w * 0.25, h * 0.35, w * 0.5, h * 0.4)
-    end
-    frame.btnClose.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and c1003030200 or c602020200
-        draw.RoundedBoxEx(4, 0, 0, w, h, bgColor, false, true, false, true)
-        surface.SetDrawColor(255, 255, 255, 200)
-        surface.DrawLine(8, 5, w - 8, h - 5)
-        surface.DrawLine(w - 8, 5, 8, h - 5)
     end
 
     for _, packData in pairs(BATTLEBEATS.musicPacks) do
@@ -839,12 +808,14 @@ local function openBTBmenu()
             local scrollSpeed = 60
             local npcs = BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs
             local count = istable(npcs) and #npcs or 0
+            local startTrack = cookie.GetString("battlebeats_start_track", "") == track
 
             local iconData = {
                 {check = count == 1, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
                 {check = count >= 2, tooltip = "#btb.ps.ts.icon_assigned_multiple", image = "icon16/group.png"},
                 {check = BATTLEBEATS.trackOffsets[track] ~= nil, tooltip = "#btb.ps.ts.icon_offset", image = "icon16/time.png"},
-                {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"}
+                {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"},
+                {check = startTrack, tooltip = "#btb.ps.ts.icon_start", image = "icon16/door_in.png"},
             }
 
             local xOffset = 840
@@ -1047,18 +1018,48 @@ local function openBTBmenu()
                         favorite:SetImage("icon16/star.png")
                     end
 
+                    --MARK:RMB start track
+                    local currentStartTrack = cookie.GetString("battlebeats_start_track", "")
+                    if currentStartTrack == track and currentStartTrack ~= "" then
+                        local removeStart = menu:AddOption("#btb.ps.ts.rmb.remove_start_track", function()
+                            cookie.Delete("battlebeats_start_track")
+                            createTrackList(parent, trackType, selectedPack)
+                        end)
+                        removeStart:SetImage("icon16/cancel.png")
+                    else
+                        local setAsStart = menu:AddOption("#btb.ps.ts.rmb.set_start_track", function()
+                            cookie.Set("battlebeats_start_track", track)
+                            RunConsoleCommand("battlebeats_start_mode", "2")
+                            createTrackList(parent, trackType, selectedPack)
+                        end)
+                        setAsStart:SetImage("icon16/door_in.png")
+                        setAsStart:SetTooltip("#btb.ps.ts.rmb.set_start_track_tip")
+                        setAsStart:SetTooltipPanelOverride("BattleBeatsTooltip")
+                    end
+
                     --MARK:RMB offset
                     local offsetValue = BATTLEBEATS.trackOffsets[track] or 0
                     local offsetOptionTitle = language.GetPhrase("#btb.ps.ts.rmb.offset_edit")
                     local offsetOption = menu:AddOption(offsetValue > 0 and offsetOptionTitle .. " (" .. offsetValue .. "s)" or "#btb.ps.ts.rmb.offset_set", function()
                         local offsetFrame = vgui.Create("DFrame")
-                        offsetFrame:SetTitle("#btb.ps.ts.rmb.offset_title")
+                        offsetFrame:BTB_SetButtons(false)
+                        offsetFrame:SetTitle("")
                         offsetFrame:SetSize(250, 110)
                         offsetFrame:Center()
+                        offsetFrame:BTB_SetFocus()
                         offsetFrame:MakePopup()
                         offsetFrame.Paint = function(self, w, h)
+                            Derma_DrawBackgroundBlur(self, 1)
                             draw.RoundedBox(4, 0, 0, w, h, c000200)
                         end
+
+                        local fframeTitle = vgui.Create("DLabel", offsetFrame)
+                        fframeTitle:SetPos(10, 5)
+                        fframeTitle:SetSize(150, 20)
+                        fframeTitle:SetText("#btb.ps.ts.rmb.offset_title")
+                        fframeTitle:SetContentAlignment(4)
+                        fframeTitle:SetFont("DermaDefaultBold")
+                        fframeTitle:SetTextColor(color_white)
 
                         local label = vgui.Create("DLabel", offsetFrame)
                         label:SetPos(10, 30)
@@ -1121,13 +1122,24 @@ local function openBTBmenu()
                     --MARK:RMB npc assign
                     local function createAssignFrame(title, defaultClass, defaultPriority, onSave)
                         local frame = vgui.Create("DFrame")
-                        frame:SetTitle(title)
+                        frame:BTB_SetButtons(false)
+                        frame:SetTitle("")
                         frame:SetSize(400, 110)
                         frame:Center()
+                        frame:BTB_SetFocus()
                         frame:MakePopup()
                         frame.Paint = function(self, w, h)
+                            Derma_DrawBackgroundBlur(self, 1)
                             draw.RoundedBox(4, 0, 0, w, h, c000200)
                         end
+
+                        local fframeTitle = vgui.Create("DLabel", frame)
+                        fframeTitle:SetPos(10, 5)
+                        fframeTitle:SetSize(150, 20)
+                        fframeTitle:SetText(title)
+                        fframeTitle:SetContentAlignment(4)
+                        fframeTitle:SetFont("DermaDefaultBold")
+                        fframeTitle:SetTextColor(color_white)
 
                         local classLabel = vgui.Create("DLabel", frame)
                         classLabel:SetPos(10, 25)
@@ -1147,7 +1159,7 @@ local function openBTBmenu()
                         helpBtn:SetSize(15, 15)
                         helpBtn:SetImage("icon16/help.png")
                         helpBtn:SetMouseInputEnabled(true)
-                        helpBtn:SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
+                        helpBtn:BTB_SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
 
                         local priorityLabel = vgui.Create("DLabel", frame)
                         priorityLabel:SetPos(290, 25)
@@ -1402,14 +1414,25 @@ local function openBTBmenu()
                     if subs and #subs > 0 then
                         local lyricsOption = menu:AddOption("#btb.ps.ts.rmb.show_lyrics", function()
                             lframe = vgui.Create("DFrame")
+                            lframe:BTB_SetButtons(false)
                             local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
-                            lframe:SetTitle(title .. trackName)
+                            lframe:SetTitle("")
                             lframe:SetSize(500, 400)
                             lframe:Center()
+                            lframe:BTB_SetFocus()
                             lframe:MakePopup()
                             lframe.Paint = function(self, w, h)
+                                Derma_DrawBackgroundBlur(self, 1)
                                 draw.RoundedBox(4, 0, 0, w, h, c000200)
                             end
+
+                            local fframeTitle = vgui.Create("DLabel", lframe)
+                            fframeTitle:SetPos(10, 5)
+                            fframeTitle:SetSize(300, 20)
+                            fframeTitle:SetText(title .. trackName)
+                            fframeTitle:SetContentAlignment(4)
+                            fframeTitle:SetFont("DermaDefaultBold")
+                            fframeTitle:SetTextColor(color_white)
 
                             local scroll = vgui.Create("DScrollPanel", lframe)
                             scroll:SetSize(480, 360)
@@ -1697,7 +1720,48 @@ local function openBTBmenu()
         return panel
     end
 
+    local function checkVolume(parent)
+        local time = tonumber(cookie.GetString("battlebeats_high_volume_time", "0")) or 0
+        local level = tonumber(cookie.GetString("battlebeats_high_volume_warn", "0")) or 0
+        local thresholds = {
+            3600, -- 1h
+            14400, -- 4h
+            28800, -- 8h
+            86400 -- 24h
+        }
+        local newLevel = level
+        for i = level + 1, #thresholds do
+            if time >= thresholds[i] then
+                newLevel = i
+            else
+                break
+            end
+        end
+        if newLevel > level then
+            cookie.Set("battlebeats_high_volume_warn", tostring(newLevel))
+            level = newLevel
+        end
+        if level <= 0 then return end
+        createBasePanel(parent, function(panel)
+            local label1 = vgui.Create("DLabel", panel)
+            label1:Dock(TOP)
+            label1:SetTall(20)
+            label1:SetText(language.GetPhrase("btb.ps.warn.volume_" .. (level)))
+            label1:SetFont("BattleBeats_Notification_Font_Misc")
+            label1:SetTextColor(color_white)
+            label1:SetContentAlignment(5)
+            local label2 = vgui.Create("DLabel", panel)
+            label2:Dock(TOP)
+            label2:SetTall(20)
+            label2:SetText(language.GetPhrase("btb.ps.warn.volume_" .. (level) .. (level)))
+            label2:SetFont("BattleBeats_Notification_Font_Misc")
+            label2:SetTextColor(color_white)
+            label2:SetContentAlignment(5)
+        end)
+    end
+
     local function showConflicts()
+        checkVolume(scrollPanel)
         if not table.IsEmpty(BATTLEBEATS.activeConflicts) then
             createBasePanel(scrollPanel, function(panel)
                 local conflictNames = table.GetKeys(BATTLEBEATS.activeConflicts)
@@ -1911,33 +1975,42 @@ local function openBTBmenu()
             table.insert(orderedPacks, { name = packName, data = data })
         end
 
+        local packOrder = {
+            battlebeats = 1,
+            nombat = 2,
+            amusic = 3,
+            ["16thnote"] = 4,
+            mp3p = 5,
+            sbm = 6,
+            dynamo = 7,
+            ["local"] = 97,
+            na = 98
+        }
+
+        local function getTypeRank(t)
+            return packOrder[t] or 99
+        end
+
         table.sort(orderedPacks, function(a, b)
             local da = a.data or {}
             local db = b.data or {}
 
-            local nameA = tostring(a.name or ""):lower()
-            local nameB = tostring(b.name or ""):lower()
-
-            local debugA = da.debug and true or false
-            local debugB = db.debug and true or false
-
             if GetConVar("battlebeats_debug_mode"):GetBool() then
+                local debugA = da.debug and true or false
+                local debugB = db.debug and true or false
+
                 if debugA ~= debugB then
                     return debugA and not debugB
                 end
-                if debugA and debugB then
-                    return nameA < nameB
-                end
             end
 
-            local typeA = tostring(da.packType or "na")
-            local typeB = tostring(db.packType or "na")
-
-            if typeA ~= typeB then
-                if typeA == "battlebeats" then return true end
-                if typeB == "battlebeats" then return false end
+            local rankA = getTypeRank(da.packType)
+            local rankB = getTypeRank(db.packType)
+            if rankA ~= rankB then
+                return rankA < rankB
             end
-
+            local nameA = tostring(a.name or ""):lower()
+            local nameB = tostring(b.name or ""):lower()
             return nameA < nameB
         end)
 
@@ -2008,7 +2081,7 @@ local function openBTBmenu()
             local targetColor = currentColor
             local customCheckbox = vgui.Create("DPanel", panel)
 
-            /*if currentCategory == categoryMap["local"] or (not debugMode and currentCategory == "Local") then
+            /*if not file.IsDir("sound/btb", "GAME") then
                 timer.Simple(0.01, function()
                     if not IsValid(scrollPanel) then return end
 
@@ -2018,19 +2091,18 @@ local function openBTBmenu()
 
                     local createBtn = vgui.Create("DButton", scrollPanel)
                     scrollPanel.createLocalPackButton = createBtn
-
                     createBtn:Dock(TOP)
                     createBtn:SetTall(80)
-                    createBtn:DockMargin(0, 20, 0, 10)
+                    createBtn:DockMargin(0, 5, 0, 10)
                     createBtn:SetText("")
                     createBtn:SetCursor("hand")
-
                     createBtn.Paint = function(self, w, h)
                         draw.RoundedBox(8, 4, 4, w - 8, h - 8, cHover)
-                        draw.SimpleText("+ CREATE NEW LOCAL PACK", "BattleBeats_Font", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                        draw.SimpleText("+ CREATE LOCAL PACK", "BattleBeats_Font", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
                     end
 
                     createBtn.DoClick = function()
+
                     end
                 end)
             end*/

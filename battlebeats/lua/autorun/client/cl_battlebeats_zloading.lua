@@ -1,13 +1,39 @@
 local autoPopup = CreateClientConVar("battlebeats_autopopup", "1", true, false, "", 0, 1)
 local loadLocalPacks = CreateClientConVar("battlebeats_load_local_packs", "0", true, false, "", 0, 1)
 local loadAMsuspense = CreateClientConVar("battlebeats_load_am_suspense", "0", true, false, "", 0, 1)
+local startMode = CreateClientConVar("battlebeats_start_mode", "0", true, false, "", 0, 2)
 local debugMode = GetConVar("battlebeats_debug_mode")
 local enableAmbient = GetConVar("battlebeats_enable_ambient")
 
 file.CreateDir("battlebeats")
 
+local allowedAudioExtensions = {
+    mp3  = true,
+    wav  = true,
+    aiff = true,
+    ogg  = true,
+    flac = true,
+    m4a  = true,
+    wma  = true
+}
+
 local function debugPrint(...)
     if debugMode:GetBool() then print("[BattleBeats Debug] " .. ...) end
+end
+
+local function extensionErrorPrint(file)
+    local f = string.GetFileFromFilename(file)
+    print("[BattleBeats Client] Unsupported file type: " .. f .. " | Allowed file types: mp3, wav, aiff, ogg, flac, m4a, wma")
+end
+
+local function isAudioFile(file)
+    local ext = string.GetExtensionFromFilename(file)
+    return ext and allowedAudioExtensions[string.lower(ext)] or false
+end
+
+local function trackExists(path)
+    if not path or path == "" then return false end
+    return file.Exists(path, "GAME")
 end
 
 local function recurseListContents(path, addon, direct, pattern)
@@ -59,11 +85,70 @@ local function pathExistsInMusicPacks(path)
     return false
 end
 
-local baseDirs = { "battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus", "gmmp" }
+local baseDirs = {"battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus", "gmmp"}
+local dirHandlers = {
+    nombat = {
+        packType = "nombat",
+        handle = function(file)
+            if file:match("/a.*%.mp3$") then
+                return true, false
+            elseif file:match("/c.*%.mp3$") then
+                return false, true
+            end
+        end
+    },
+    am_music = {
+        packType = "amusic",
+        handle = function(file)
+            if file:find("/background/", 1, true) then
+                return true, false
+            elseif file:find("/battle/", 1, true)
+                or file:find("/battle_intensive/", 1, true) then
+                return false, true
+            elseif loadAMsuspense:GetBool()
+                and file:find("/suspense/", 1, true) then
+                return true, true
+            end
+        end
+    },
+    ayykyu_dynmus = {
+        packType = "dynamo",
+        handle = function(file)
+            if file:find("/ambient/", 1, true) then
+                return true, false
+            elseif file:find("/combat/bosses/", 1, true)
+                or file:find("/combat/soldiers/", 1, true)
+                or file:find("/combat/cops/", 1, true)
+                or file:find("/combat/aliens/", 1, true) then
+                return false, true
+            end
+        end
+    },
+    gmmp = {
+        packType = "mp3p",
+        handle = function()
+            return true, false
+        end
+    },
+    default = {
+        packType = "battlebeats",
+        handle = function(file)
+            if file:find("/ambient/", 1, true) then
+                return true, false
+            elseif file:find("/combat/", 1, true) then
+                return false, true
+            end
+        end
+    }
+}
 
 local function loadGenericMusicPacks()
     local startTime = SysTime()
     local addons = engine.GetAddons()
+
+    local customBaseDirs, customDirHandlers = hook.Run("BattleBeats_PreLoadPacks", baseDirs, dirHandlers)
+    if customBaseDirs then baseDirs = customBaseDirs end
+    if customDirHandlers then dirHandlers = customDirHandlers end
 
     for _, addon in ipairs(addons) do
         if addon.mounted then
@@ -72,57 +157,19 @@ local function loadGenericMusicPacks()
             local packType = nil
 
             for _, dir in ipairs(baseDirs) do
+                local handler = dirHandlers[dir] or dirHandlers.default
                 local matchedFiles = recurseListContents("sound/" .. dir .. "/", title, false)
-                local isNombat = (dir == "nombat")
-                local isSBM = (dir == "battlemusic")
-                local is16th = (dir == "16thnote")
-                local isAM = (dir == "am_music")
-                local isDYNAMO = (dir == "ayykyu_dynmus")
-                local isMP3player = (dir == "gmmp")
 
                 for _, file in ipairs(matchedFiles) do
-                    if isMP3player then
-                        table.insert(ambientFiles, file)
-                        continue
-                    end
-                    if string.EndsWith(file, ".ogg") or string.EndsWith(file, ".mp3") or string.EndsWith(file, ".wav") then
-                        if isNombat then
-                            if file:match("/a.*%.mp3$") then
-                                table.insert(ambientFiles, file)
-                            elseif file:match("/c.*%.mp3$") then
-                                table.insert(combatFiles, file)
-                            end
-                        elseif isAM then
-                            if file:find("/background/", 1, true) then
-                                table.insert(ambientFiles, file)
-                            elseif file:find("/battle/", 1, true) or file:find("/battle_intensive/", 1, true) then
-                                table.insert(combatFiles, file)
-                            end
-                            if loadAMsuspense:GetBool() and file:find("/suspense/", 1, true) then
-                                table.insert(ambientFiles, file)
-                                table.insert(combatFiles, file)
-                            end
-                        elseif isDYNAMO then
-                            if file:find("/ambient/", 1, true) then
-                                table.insert(ambientFiles, file)
-                            elseif file:find("/combat/bosses/", 1, true)
-                                or file:find("/combat/soldiers/", 1, true)
-                                or file:find("/combat/cops/", 1, true)
-                                or file:find("/combat/aliens/", 1, true) then
-                                table.insert(combatFiles, file)
-                            end
-                        else
-                            if file:find("/ambient/", 1, true) then
-                                table.insert(ambientFiles, file)
-                            elseif file:find("/combat/", 1, true) then
-                                table.insert(combatFiles, file)
-                            end
-                        end
-                    end
+                    if not isAudioFile(file) then continue end
+
+                    local addAmbient, addCombat = handler.handle(file)
+                    if addAmbient then table.insert(ambientFiles, file) end
+                    if addCombat then table.insert(combatFiles, file) end
                 end
 
                 if not packType and (#ambientFiles > 0 or #combatFiles > 0) then
-                    packType = isNombat and "nombat" or isSBM and "sbm" or is16th and "16thnote" or isAM and "amusic" or isDYNAMO and "dynamo" or isMP3player and "mp3p" or "battlebeats"
+                    packType = handler.packType
                 end
             end
 
@@ -130,7 +177,6 @@ local function loadGenericMusicPacks()
 
             local hasAmbient = #ambientFiles > 0
             local hasCombat = #combatFiles > 0
-
             if hasAmbient or hasCombat then
                 local packContent = hasAmbient and hasCombat and "both"
                     or hasAmbient and "ambient"
@@ -143,7 +189,6 @@ local function loadGenericMusicPacks()
                     packContent = packContent,
                     wsid = addon.wsid
                 }
-
                 print("[BattleBeats Client] Loaded pack: " .. title)
             end
         end
@@ -160,23 +205,31 @@ local function loadBattleBeatsMusicPacks(isDebug)
     end
 
     local _, packDirs = file.Find("sound/battlebeats/*", "GAME")
-
     for _, packName in ipairs(packDirs) do
         if packName == "ambient" or packName == "combat" then
             if isDebug then
-                BATTLEBEATS.musicPacks[packName .. " (DEBUG)"] = { error = "invalid_pack_name" }
+                BATTLEBEATS.musicPacks[packName .. " (DEBUG)"] = {error = "invalid_pack_name"}
                 debugPrint("[BattleBeats Debug] Invalid pack name: " .. packName .. " (missing pack name folder)")
             end
             continue
         end
 
-        local ambientMp3 = file.Find("sound/battlebeats/" .. packName .. "/ambient/*.mp3", "GAME") or {}
-        local ambientOgg = file.Find("sound/battlebeats/" .. packName .. "/ambient/*.ogg", "GAME") or {}
-        local combatMp3 = file.Find("sound/battlebeats/" .. packName .. "/combat/*.mp3", "GAME") or {}
-        local combatOgg = file.Find("sound/battlebeats/" .. packName .. "/combat/*.ogg", "GAME") or {}
-
-        local ambient = table.Add(ambientMp3, ambientOgg) or ambientMp3
-        local combat = table.Add(combatMp3, combatOgg) or combatMp3
+        local ambient = {}
+        local combat  = {}
+        for _, fileName in ipairs(file.Find("sound/battlebeats/" .. packName .. "/ambient/*.*", "GAME") or {}) do
+            if isAudioFile(fileName) then
+                ambient[#ambient + 1] = fileName
+            else
+                extensionErrorPrint(fileName)
+            end
+        end
+        for _, fileName in ipairs(file.Find("sound/battlebeats/" .. packName .. "/combat/*.*", "GAME") or {}) do
+            if isAudioFile(fileName) then
+                combat[#combat + 1] = fileName
+            else
+                extensionErrorPrint(fileName)
+            end
+        end
 
         local builtAmbient = buildPaths("sound/battlebeats/" .. packName .. "/ambient/", ambient)
         local builtCombat = buildPaths("sound/battlebeats/" .. packName .. "/combat/", combat)
@@ -240,6 +293,46 @@ local function loadBattleBeatsMusicPacks(isDebug)
     end
 end
 
+local function loadBattleBeatsLocal()
+    if not file.IsDir("sound/btb", "GAME") then return end
+    local basePath = "sound/btb/"
+    local rootFiles = file.Find(basePath .. "*", "GAME") or {}
+    local ambientFiles = file.Find(basePath .. "ambient/*", "GAME") or {}
+    local combatFiles = file.Find(basePath .. "combat/*", "GAME") or {}
+
+    local ambient = {}
+    local combat = {}
+    for _, f in ipairs(rootFiles) do
+        if not isAudioFile(f) then extensionErrorPrint(f) continue end
+        table.insert(ambient, basePath .. f)
+    end
+    for _, f in ipairs(ambientFiles) do
+        if not isAudioFile(f) then extensionErrorPrint(f) continue end
+        table.insert(ambient, basePath .. "ambient/" .. f)
+    end
+    for _, f in ipairs(combatFiles) do
+        if not isAudioFile(f) then extensionErrorPrint(f) continue end
+        table.insert(combat, basePath .. "combat/" .. f)
+    end
+
+    local pack = {
+        ambient = ambient,
+        combat  = combat,
+    }
+
+    pack.packType = "local"
+    if #ambient > 0 and #combat > 0 then
+        pack.packContent = "both"
+    elseif #ambient > 0 then
+        pack.packContent = "ambient"
+    elseif #combat > 0 then
+        pack.packContent = "combat"
+    else
+        pack.packContent = "empty"
+    end
+    BATTLEBEATS.musicPacks["#btb.loading.local_pack"] = pack
+end
+
 local function cleanupInvalidTracks(tbl)
     local toRemove = {}
     for trackPath, _ in pairs(tbl) do
@@ -267,25 +360,16 @@ end
 local function loadExcludedTracks()
     BATTLEBEATS.excludedTracks = {}
 
-    local paths = { "battlebeats/battlebeats_excluded_tracks.txt", "battlebeats_excluded_tracks.txt" }
     local jsonData
-    for _, path in ipairs(paths) do
-        if file.Exists(path, "DATA") then
-            jsonData = file.Read(path, "DATA")
-            break
-        end
+    if file.Exists("battlebeats/battlebeats_excluded_tracks.txt", "DATA") then
+        jsonData = file.Read("battlebeats/battlebeats_excluded_tracks.txt", "DATA")
     end
 
     local loadedTracks = util.JSONToTable(jsonData or "") or {}
     for track, _ in pairs(loadedTracks) do
-        for _, packData in pairs(BATTLEBEATS.musicPacks) do
-            if (istable(packData.ambient) and table.HasValue(packData.ambient, track)) or
-                (istable(packData.combat) and table.HasValue(packData.combat, track)) then
-                BATTLEBEATS.excludedTracks[track] = true
-                break
-            end
-        end
+        BATTLEBEATS.excludedTracks[track] = true
     end
+
     --cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
     BATTLEBEATS.SaveExcludedTracks()
 end
@@ -298,26 +382,17 @@ end
 local function loadFavoriteTracks()
     BATTLEBEATS.favoriteTracks = {}
 
-    local paths = { "battlebeats/battlebeats_favorite_tracks.txt", "battlebeats_favorite_tracks.txt" }
     local jsonData
-    for _, path in ipairs(paths) do
-        if file.Exists(path, "DATA") then
-            jsonData = file.Read(path, "DATA")
-            break
-        end
+    if file.Exists("battlebeats/battlebeats_favorite_tracks.txt", "DATA") then
+        jsonData = file.Read("battlebeats/battlebeats_favorite_tracks.txt", "DATA")
     end
 
     local loadedFavorites = util.JSONToTable(jsonData or "") or {}
     for track, _ in pairs(loadedFavorites) do
-        for _, packData in pairs(BATTLEBEATS.musicPacks) do
-            if (istable(packData.ambient) and table.HasValue(packData.ambient, track)) or
-                (istable(packData.combat) and table.HasValue(packData.combat, track)) then
-                BATTLEBEATS.favoriteTracks[track] = true
-                break
-            end
-        end
+        BATTLEBEATS.favoriteTracks[track] = true
     end
-    --cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
+
+    -- cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
     BATTLEBEATS.SaveFavoriteTracks()
 end
 
@@ -395,8 +470,59 @@ local function loadTrackOffsets()
     end
 end
 
+local function _getRandomTrack()
+    return BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
+end
+
+local function getStartingTrack()
+    local mode = startMode:GetInt()
+
+    --random
+    if mode == 0 then
+        return _getRandomTrack()
+    end
+
+    -- random favorite
+    if mode == 1 then
+        if table.IsEmpty(BATTLEBEATS.favoriteTracks) then
+            return _getRandomTrack()
+        end
+
+        local validFavorites = {}
+        for trackPath, _ in pairs(BATTLEBEATS.favoriteTracks) do
+            if trackExists(trackPath) then
+                table.insert(validFavorites, trackPath)
+            end
+        end
+
+        if table.IsEmpty(validFavorites) then
+            return _getRandomTrack()
+        end
+
+        local idx = math.random(1, #validFavorites)
+        return validFavorites[idx]
+    end
+
+    -- user selected
+    if mode == 2 then
+        local selected = cookie.GetString("battlebeats_start_track", "")
+        if selected == "" then
+            return _getRandomTrack()
+        end
+
+        if trackExists(selected) then
+            return selected
+        else
+            return _getRandomTrack()
+        end
+    end
+    return _getRandomTrack()
+end
+
 local function loadSavedPacks()
     local savedPacks = cookie.GetString("battlebeats_selected_packs", "")
+    local override = hook.Run("BattleBeats_PreStartBattleBeats", savedPacks)
+    if override == true then return end
     if savedPacks ~= "" then
         BATTLEBEATS.currentPacks = util.JSONToTable(savedPacks) or {}
         for packName, _ in pairs(BATTLEBEATS.currentPacks) do
@@ -405,7 +531,7 @@ local function loadSavedPacks()
         if not table.IsEmpty(BATTLEBEATS.currentPacks) then
             print("[BattleBeats Client] Loaded selected packs: " ..
             table.concat(table.GetKeys(BATTLEBEATS.currentPacks), ", "))
-            local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
+            local track = getStartingTrack()
             if track and enableAmbient:GetBool() then BATTLEBEATS.PlayNextTrack(track) end
         else
             print("[BattleBeats Client] No saved packs found")
@@ -472,8 +598,8 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added support for 16th Note lyrics"
-            --Color(150, 255, 150), "- You can now add subtitles to your tracks"
+            Color(150, 255, 150), "- Added support for more audio extensions: AIFF, WAV, FLAC, M4A, WMA\n",
+            Color(150, 255, 150), "- Added an option to select the starting track"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
@@ -509,6 +635,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadGenericMusicPacks()
     loadBattleBeatsMusicPacks(true)
     loadBattleBeatsMusicPacks(false)
+    loadBattleBeatsLocal()
     loadExcludedTracks()
     loadFavoriteTracks()
     loadMappedTracks()
@@ -525,7 +652,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             BATTLEBEATS.parse16thNote(songName)
         end
     end
-    --loadPatchNotes()
+    loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
@@ -535,8 +662,9 @@ concommand.Add("battlebeats_reload_packs", function()
     loadGenericMusicPacks()
     loadBattleBeatsMusicPacks(true)
     loadBattleBeatsMusicPacks(false)
+    loadBattleBeatsLocal()
     buildTrackMap()
     BATTLEBEATS.ValidatePacks()
 end)
 
-print("BattleBeats " .. BATTLEBEATS.currentVersion .. "_" .. jit.arch .. " loaded")
+print("BattleBeats version " .. BATTLEBEATS.currentVersion .. "_" .. jit.arch .. " loaded")

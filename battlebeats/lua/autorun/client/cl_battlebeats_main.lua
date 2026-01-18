@@ -49,7 +49,7 @@ BATTLEBEATS.disableNextTrackTimer = false
 BATTLEBEATS.disableCheckingTimer = false
 BATTLEBEATS.volumeOverride = false
 
-BATTLEBEATS.currentVersion = "2.3.5"
+BATTLEBEATS.currentVersion = "2.3.6"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -675,6 +675,11 @@ end)
 local volumeFrameOn = false
 timer.Create("BattleBeats_ClientAliveSoundCheck", 5, 0, function() -- sanity check
     if forceVolume or BATTLEBEATS.volumeOverride then return end
+    if volumeSet:GetInt() > 200 then
+        local time = tonumber(cookie.GetString("battlebeats_high_volume_time", "0")) or 0
+        time = time + 5
+        cookie.Set("battlebeats_high_volume_time", tostring(time))
+    end
     if isAlive and not lastMuteState and (IsValid(currentStation) or IsValid(currentPreviewStation))
         and not timer.Exists("BattleBeats_SmoothFade")
         and not (IsValid(currentStation) and timer.Exists("BattleBeats_Fade_" .. tostring(currentStation)))
@@ -798,8 +803,7 @@ local function SwitchTrack(npcTrack)
                     local samePack = areTracksFromSamePack(lastCombatTrack, lastAmbienceTrack)
                     if not samePack then
                         -- pick a different track from same pack
-                        local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks,
-                            lastAmbienceTrack, true)
+                        local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
                         if track then PlayNextTrack(track) end
                     else
                         -- continue same combat track from calculated offset
@@ -812,12 +816,10 @@ local function SwitchTrack(npcTrack)
                 end
             else
                 if exclusivePlay:GetBool() then
-                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks,
-                        lastAmbienceTrack, true)
+                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
                     if track then PlayNextTrack(track) end
                 else
-                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks,
-                        lastAmbienceTrack)
+                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack)
                     if track then PlayNextTrack(track) end
                 end
             end
@@ -1056,6 +1058,8 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
             warningBox:Close()
         end, true)
     else
+        cookie.Set("battlebeats_high_volume_warn", "0")
+        cookie.Set("battlebeats_high_volume_time", "0")
         applyVolume(newVolume)
     end
 end)
