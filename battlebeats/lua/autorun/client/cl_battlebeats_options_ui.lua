@@ -238,11 +238,6 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
         draw.RoundedBox(4, 0, 0, w, h, color_transparent)
     end
 
-    if helpText then
-        panel:SetTooltip(helpText)
-        panel:SetTooltipPanelOverride("BattleBeatsTooltip")
-    end
-
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
     label:SetFont("DermaDefaultBold")
@@ -261,6 +256,11 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
         local index = math.Clamp(cvarValue + 1, 1, #options)
         local displayText = options[index] or "Unknown"
         draw.SimpleText(displayText, "DermaDefaultBold", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    end
+
+    if helpText then
+        combo:SetTooltip(helpText)
+        combo:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
 
     combo.OnCursorEntered = function(self)
@@ -470,7 +470,7 @@ concommand.Add("battlebeats_options", function()
         end
 
         local versionlabel = vgui.Create("DLabel", panel)
-        versionlabel:SetText(language.GetPhrase("btb.options.version.label") .. BATTLEBEATS.currentVersion .. "_" .. jit.arch)
+        versionlabel:SetText(language.GetPhrase("btb.options.version.label") .. " " .. BATTLEBEATS.currentVersion .. " | " .. jit.arch .. " :: " .. jit.os)
         versionlabel:SetPos((contentPanel:GetWide() - 250) / 2, 440)
         versionlabel:SetSize(250, 20)
         versionlabel:SetTextColor(Color(80, 80, 80, 200))

@@ -587,6 +587,7 @@ local function openBTBmenu()
 
     --MARK:Next/Previous track
     local currentFilteredTracks
+    local allRows = {}
     function BATTLEBEATS.SwitchPreviewTrack(direction)
         if not BATTLEBEATS.currentPreviewTrack or not BATTLEBEATS.musicPacks then return end
 
@@ -634,8 +635,7 @@ local function openBTBmenu()
         trackNameLabel:SetText(trackName)
         playPause:SetText("⏸")
         if IsValid(scrollPanel) then
-            local rows = scrollPanel:GetCanvas():GetChildren()
-            for _, row in ipairs(rows) do
+            for _, row in ipairs(allRows) do
                 if row.trackPath == BATTLEBEATS.currentPreviewTrack then
                     selectedRow = row.trackName
                     scrollPanel:ScrollToChild(row)
@@ -777,6 +777,34 @@ local function openBTBmenu()
     local selectedText = nil
     local ambientGrad = Color(60, 180, 60, 70)
     local combatGrad = Color(255, 80, 40, 80)
+    local texGradient = surface.GetTextureID("gui/gradient")
+    local pWidth = 800
+    local cachedScrollOffset = 0
+    local cachedScrollH = 0
+    local lastCacheTime = 0
+    local lastVisibilityCheck = 0
+    local function isRowVisible(row)
+        if not IsValid(scrollPanel) then return true end
+        local y = row:GetY()
+        local rowBottom = y + 50
+        return rowBottom > cachedScrollOffset - 100 and y < cachedScrollOffset + cachedScrollH + 100
+    end
+    scrollPanel.Think = function(self)
+        local ct = CurTime()
+        if ct - lastCacheTime > 0.1 then
+            cachedScrollOffset = self:GetVBar():GetScroll()
+            cachedScrollH = self:GetTall()
+            lastCacheTime = ct
+        end
+        if ct - lastVisibilityCheck > 0.1 then
+            for _, row in ipairs(allRows) do
+                if IsValid(row) then
+                    row.isVisibleCached = isRowVisible(row)
+                end
+            end
+            lastVisibilityCheck = ct
+        end
+    end
     local function createTrackList(parent, trackType, selectedPack)
         parent:Clear()
         local isAllMode = (trackType == "all")
@@ -793,6 +821,60 @@ local function openBTBmenu()
             row.textX = 10
             row.isScrolling = false
             row.scrollResetTime = 0
+            row.currentColor = cHover
+            row.targetColor = cHover
+            row.initialized = false
+            row.gradientWidth = 0
+            row.targetWidth = 0
+            row.isVisibleCached = false
+
+            row.fadeAlpha = 0
+            row.targetFadeAlpha = 255
+
+            row.Think = function(self)
+                if not self.isVisibleCached then
+                    self.targetFadeAlpha = 0
+                    return
+                end
+                local rowY = self:GetY()
+                local rowCenter = rowY + 25
+                local viewCenter = cachedScrollOffset + (cachedScrollH / 2)
+                local distanceFromCenter = math.abs(rowCenter - viewCenter)
+                local fadeRange = cachedScrollH * 0.4
+                if distanceFromCenter < fadeRange then
+                    self.targetFadeAlpha = 255
+                else
+                    local over = distanceFromCenter - fadeRange
+                    self.targetFadeAlpha = math.max(60, 255 - (over * 1.2))
+                end
+                self.fadeAlpha = Lerp(FrameTime() * 9, self.fadeAlpha, self.targetFadeAlpha)
+
+                local isSelected = (self.trackName == selectedRow)
+                if isSelected then
+                    self.targetColor = c707070200
+                    self.targetWidth = self:GetWide() + 500
+                elseif self:IsHovered() then
+                    self.targetColor = cHover2
+                    self.targetWidth = (self:GetWide() - 350) + 300
+                else
+                    self.targetColor = cHover
+                    self.targetWidth = self:GetWide() - 350
+                end
+
+                if not self.initialized then
+                    self.initialized = true
+                    self.currentColor = self.targetColor
+                    self.gradientWidth = self:GetWide() - 350
+                    return
+                end
+
+                if self.gradientWidth ~= self.targetWidth then
+                    self.gradientWidth = Lerp(FrameTime() * 10, self.gradientWidth, self.targetWidth)
+                end
+                if not colorsEqual(self.currentColor, self.targetColor) then
+                    self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+                end
+            end
 
             if selectedRow == row.trackName then
                 timer.Simple(0.1, function ()
@@ -804,8 +886,6 @@ local function openBTBmenu()
 
             surface.SetFont("BattleBeats_Font")
             local textWidth = surface.GetTextSize(isFavorite and "★ " .. trackName or trackName)
-            local panelWidth = 800
-            local scrollSpeed = 60
             local npcs = BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs
             local count = istable(npcs) and #npcs or 0
             local startTrack = cookie.GetString("battlebeats_start_track", "") == track
@@ -863,10 +943,14 @@ local function openBTBmenu()
             customCheckbox:SetTooltipPanelOverride("BattleBeatsTooltip")
 
             customCheckbox.Paint = function(self, w, h)
+                if not row.isVisibleCached then return end
+                if row.fadeAlpha < 1 then return end
+                surface.SetAlphaMultiplier(row.fadeAlpha / 255)
                 colorLerp = LerpColor(FrameTime() * 10, colorLerp, targetColor)
                 draw.RoundedBox(6, 0, 0, w, h, colorLerp)
                 local text = excluded and "#btb.ps.ts.track_disabled" or "#btb.ps.ts.track_enabled"
                 draw.SimpleTextOutlined(text, "BattleBeats_Checkbox_Font", w / 2, 3, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP, 0.9, c000200)
+                surface.SetAlphaMultiplier(1)
             end
 
             row.OnMousePressed = function(self, keyCode)
@@ -876,62 +960,31 @@ local function openBTBmenu()
             end
 
             row.OnCursorEntered = function(self)
-                self.isScrolling = textWidth > panelWidth
+                self.isScrolling = textWidth > pWidth
             end
             row.OnCursorExited = function(self)
                 self.isScrolling = false
                 self.scrollResetTime = CurTime()
             end
 
-            row.currentColor = cHover
-            row.targetColor = cHover
-            row.initialized = false
-            row.gradientWidth = 0
-            row.targetWidth = 0
-
-            local texGradient = surface.GetTextureID("gui/gradient")
-            row.Think = function(self)
-                local isSelected = (self.trackName == selectedRow)
-
-                if isSelected then
-                    self.targetColor = c707070200
-                    self.targetWidth = self:GetWide() + 500
-                elseif self:IsHovered() then
-                    self.targetColor = cHover2
-                    self.targetWidth = (self:GetWide() - 350) + 300
-                else
-                    self.targetColor = cHover
-                    self.targetWidth = self:GetWide() - 350
-                end
-
-                if not self.initialized then
-                    self.initialized = true
-                    self.currentColor = self.targetColor
-                    self.gradientWidth = self:GetWide() - 350
-                    return
-                end
-
-                self.gradientWidth = Lerp(FrameTime() * 10, self.gradientWidth, self.targetWidth)
-                if not colorsEqual(self.currentColor, self.targetColor) then
-                    self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
-                end
-            end
-
             local gradientCol = nil
+            if row.actualType == "combat" then
+                gradientCol = combatGrad
+            elseif row.actualType == "ambient" then
+                gradientCol = ambientGrad
+            end
             row.Paint = function(self, w, h)
+                if not self.isVisibleCached then return end
+                if self.fadeAlpha < 1 then return end
+                surface.SetAlphaMultiplier(self.fadeAlpha / 255)
                 draw.RoundedBox(4, 0, 0, w, h, self.currentColor)
-                if row.actualType == "combat" then
-                    gradientCol = combatGrad
-                elseif row.actualType == "ambient" then
-                    gradientCol = ambientGrad
-                end
                 surface.SetDrawColor(gradientCol)
                 surface.SetTexture(texGradient)
                 surface.DrawTexturedRect(0, 0, self.gradientWidth, h)
                 local displayName = isFavorite and "★ " .. trackName or trackName
-                if self.isScrolling and textWidth > panelWidth then
-                    self.textX = self.textX - (scrollSpeed * FrameTime())
-                    local maxScroll = -(textWidth - panelWidth)
+                if self.isScrolling and textWidth > pWidth then
+                    self.textX = self.textX - (60 * FrameTime())
+                    local maxScroll = -(textWidth - pWidth)
                     if self.textX < maxScroll then
                         self.textX = maxScroll
                     end
@@ -941,9 +994,10 @@ local function openBTBmenu()
                 end
 
                 local screenX, screenY = self:LocalToScreen(0, 0)
-                render.SetScissorRect(screenX, screenY, screenX + panelWidth, screenY + h, true)
+                render.SetScissorRect(screenX, screenY, screenX + pWidth, screenY + h, true)
                 draw.SimpleTextOutlined(displayName, "BattleBeats_Font", self.textX, h / 2, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, c000200)
                 render.SetScissorRect(0, 0, 0, 0, false)
+                surface.SetAlphaMultiplier(1)
             end
 
             --MARK:Track list player
@@ -1667,6 +1721,7 @@ local function openBTBmenu()
                     table.insert(currentFilteredTracks, data.track)
                 end
             end
+            allRows = scrollPanel:GetCanvas():GetChildren()
         end
 
         includeExcludeCombo.OnSelect = function(_, _, value)
