@@ -161,3 +161,14 @@ function PANEL:BTB_SetFocus()
         if not IsValid(self) then bg:Remove() end
     end
 end
+
+local c202020215 = Color(20, 20, 20, 215)
+local c505050 = Color(50, 50, 50)
+function PANEL:BTB_PaintProperties()
+    self.Paint = function(self, w, h)
+        self:SetFontInternal("ChatFont")
+        self:SetTextColor(color_white)
+        local color = self:IsHovered() and c202020215 or c505050
+        draw.RoundedBox(12, 2, 2, w - 4, h - 4, color)
+    end
+end

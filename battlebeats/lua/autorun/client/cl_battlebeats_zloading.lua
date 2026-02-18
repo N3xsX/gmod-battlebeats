@@ -1,7 +1,7 @@
 local autoPopup = CreateClientConVar("battlebeats_autopopup", "1", true, false, "", 0, 1)
 local loadLocalPacks = CreateClientConVar("battlebeats_load_local_packs", "0", true, false, "", 0, 1)
 local loadAMsuspense = CreateClientConVar("battlebeats_load_am_suspense", "0", true, false, "", 0, 1)
-local startMode = CreateClientConVar("battlebeats_start_mode", "0", true, false, "", 0, 2)
+local startMode = CreateClientConVar("battlebeats_start_mode", "0", true, false, "", 0, 3)
 local debugMode = GetConVar("battlebeats_debug_mode")
 local enableAmbient = GetConVar("battlebeats_enable_ambient")
 
@@ -470,6 +470,82 @@ local function loadTrackOffsets()
     end
 end
 
+function BATTLEBEATS.SaveTrackVolumes()
+    local valid = {}
+
+    if BATTLEBEATS.trackVolume then
+        for track, value in pairs(BATTLEBEATS.trackVolume) do
+            if isnumber(value) then
+                value = math.Clamp(math.floor(value), 0, 200)
+                if value ~= 100 then
+                    valid[track] = value
+                end
+            end
+        end
+    end
+
+    local jsonData = util.TableToJSON(valid, true)
+    file.CreateDir("battlebeats")
+    file.Write("battlebeats/battlebeats_track_volumes.txt", jsonData or "{}")
+end
+
+local function loadTrackVolumes()
+    BATTLEBEATS.trackVolume = {}
+
+    if not file.Exists("battlebeats/battlebeats_track_volumes.txt", "DATA") then
+        return
+    end
+
+    local jsonData = file.Read("battlebeats/battlebeats_track_volumes.txt", "DATA")
+    local loaded = util.JSONToTable(jsonData or "") or {}
+    for track, value in pairs(loaded) do
+        if isnumber(value) then
+            value = math.Clamp(math.floor(value), 0, 200)
+            if value ~= 100 then
+                BATTLEBEATS.trackVolume[track] = value
+            end
+        end
+    end
+end
+
+function BATTLEBEATS.SavePackVolumes()
+    local valid = {}
+
+    if BATTLEBEATS.packVolume then
+        for pack, value in pairs(BATTLEBEATS.packVolume) do
+            if isnumber(value) then
+                value = math.Clamp(math.floor(value), 0, 200)
+                if value ~= 100 then
+                    valid[pack] = value
+                end
+            end
+        end
+    end
+
+    local jsonData = util.TableToJSON(valid, true)
+    file.CreateDir("battlebeats")
+    file.Write("battlebeats/battlebeats_pack_volumes.txt", jsonData or "{}")
+end
+
+local function loadPackVolumes()
+    BATTLEBEATS.packVolume = {}
+
+    if not file.Exists("battlebeats/battlebeats_pack_volumes.txt", "DATA") then
+        return
+    end
+
+    local jsonData = file.Read("battlebeats/battlebeats_pack_volumes.txt", "DATA")
+    local loaded = util.JSONToTable(jsonData or "") or {}
+    for pack, value in pairs(loaded) do
+        if isnumber(value) then
+            value = math.Clamp(math.floor(value), 0, 200)
+            if value ~= 100 then
+                BATTLEBEATS.packVolume[pack] = value
+            end
+        end
+    end
+end
+
 local function _getRandomTrack()
     return BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
 end
@@ -506,6 +582,20 @@ local function getStartingTrack()
     -- user selected
     if mode == 2 then
         local selected = cookie.GetString("battlebeats_start_track", "")
+        if selected == "" then
+            return _getRandomTrack()
+        end
+
+        if trackExists(selected) then
+            return selected
+        else
+            return _getRandomTrack()
+        end
+    end
+
+    -- last track
+    if mode == 3 then
+        local selected = cookie.GetString("battlebeats_last_track", "")
         if selected == "" then
             return _getRandomTrack()
         end
@@ -598,8 +688,8 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added support for more audio extensions: AIFF, WAV, FLAC, M4A, WMA\n",
-            Color(150, 255, 150), "- Added an option to select the starting track"
+            Color(150, 255, 150), "- Added volume controls for packs and individual tracks\n",
+            Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
@@ -640,6 +730,8 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadFavoriteTracks()
     loadMappedTracks()
     loadTrackOffsets()
+    loadTrackVolumes()
+    loadPackVolumes()
     buildTrackMap()
     findConflicts()
     --

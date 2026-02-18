@@ -41,6 +41,8 @@ BATTLEBEATS.npcTrackMappings = {}
 BATTLEBEATS.priorityStates = {}
 BATTLEBEATS.trackOffsets = {}
 BATTLEBEATS.trackToPack = {}
+BATTLEBEATS.packVolume = {}
+BATTLEBEATS.trackVolume = {}
 
 --Dev
 BATTLEBEATS.disableFade = false
@@ -49,7 +51,7 @@ BATTLEBEATS.disableNextTrackTimer = false
 BATTLEBEATS.disableCheckingTimer = false
 BATTLEBEATS.volumeOverride = false
 
-BATTLEBEATS.currentVersion = "2.3.6"
+BATTLEBEATS.currentVersion = "2.4.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -124,6 +126,67 @@ function BATTLEBEATS.ValidatePacks()
     end
 end
 
+function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
+    local volumeType
+    if isPreview and track and track ~= "" then
+        local packName = BATTLEBEATS.trackToPack[track]
+        local packData = packName and BATTLEBEATS.musicPacks and BATTLEBEATS.musicPacks[packName]
+        if packData then
+            if packData.ambient then
+                for _, path in ipairs(packData.ambient) do
+                    if path == track then
+                        volumeType = ambientVolume:GetInt()
+                        break
+                    end
+                end
+            end
+            if not volumeType and packData.combat then
+                for _, path in ipairs(packData.combat) do
+                    if path == track then
+                        volumeType = combatVolume:GetInt()
+                        break
+                    end
+                end
+            end
+        end
+    end
+    if not volumeType then
+        volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
+    end
+    local masterVolume = volumeSet:GetInt() / 100
+    local tgVolume = baseVolume or (volumeType / 100 * masterVolume)
+
+    if not track or track == "" then
+        return math.Round(tgVolume, 2)
+    end
+
+    local finalVol = tgVolume
+    local packName = BATTLEBEATS.trackToPack[track]
+    --print("tg vol " .. finalVol)
+
+    if packName and BATTLEBEATS.packVolume then
+        local packAdj = BATTLEBEATS.packVolume[packName]
+        if packAdj then
+            local packMult = math.Clamp(packAdj / 100, 0, 2)
+            finalVol = finalVol * packMult
+        end
+    end
+    --print("pack vol " .. finalVol)
+
+    if BATTLEBEATS.trackVolume then
+        local trackAdj = BATTLEBEATS.trackVolume[track]
+        if trackAdj then
+            local trackMult = math.Clamp(trackAdj / 100, 0, 2)
+            finalVol = finalVol * trackMult
+        end
+    end
+    --print("pack + track vol " .. finalVol)
+
+    finalVol = math.Clamp(finalVol, 0, 10)
+    --print("final vol " .. finalVol)
+    return math.Round(finalVol, 2)
+end
+
 --MARK:Music Fade
 --------------------------------------------------------------------------------------
 
@@ -135,10 +198,8 @@ end
 local function FadeMusic(station, fadeIn, fadeTime, isPreview)
     if not IsValid(station) then return end
     fadeTime = fadeTime or 2
-    local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-    local masterVolume = volumeSet:GetInt() / 100
-    local tgVolume = muteVolume or ((volumeType / 100) * masterVolume)
-    if isPreview then tgVolume = muteVolume or masterVolume end
+    local sName = IsValid(station) and station:GetFileName() or nil
+    local tgVolume = BATTLEBEATS.adjustVolume(sName, muteVolume, isPreview)
     local override = hook.Run("BattleBeats_PreFade", station, fadeIn, fadeTime, isPreview)
     if override == true then
         forceVolume = true
@@ -421,6 +482,7 @@ local function PlayNextTrack(track, time, noFade, priority)
     -- store last track info based on combat state
     if not isInCombat then
         lastAmbienceTrack = track
+        cookie.Set("battlebeats_last_track", lastAmbienceTrack)
         lastAmbienceLength = 0
     else
         lastCombatTrack = track
@@ -444,13 +506,11 @@ local function PlayNextTrack(track, time, noFade, priority)
             local offset = BATTLEBEATS.trackOffsets[track] or 0
             station:SetTime(time or offset, true)
             hook.Run("BattleBeats_OnTrackStarted", station, track, isInCombat, priority)
-            local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-            local masterVolume = volumeSet:GetInt() / 100
             if not noFade then
                 FadeMusic(station, true)
             else
-                station:SetVolume((volumeType / 100) * masterVolume)
-                --station:SetVolume(volumeSet:GetInt() / 100)
+                local vol = BATTLEBEATS.adjustVolume(track)
+                station:SetVolume(vol)
             end
 
             if enableSubtitles:GetBool() then
@@ -595,11 +655,10 @@ timer.Create("BattleBeats_ClientAliveCheck", 1, 0, function()
     isAlive = ply:Alive()
     if isAlive ~= lastAliveState then
         lastAliveState = isAlive
-        local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-        local masterVolume = volumeSet:GetInt() / 100
         if disableMode:GetInt() == 1 then -- fade volume to 0 when dead, restore when alive
-            --targetVolume = isAlive and volumeSet:GetInt() / 100 or 0
-            targetVolume = isAlive and (volumeType / 100) * masterVolume or 0
+            local sName = IsValid(currentStation) and currentStation:GetFileName() or nil
+            local tgVolume = BATTLEBEATS.adjustVolume(sName)
+            targetVolume = isAlive and tgVolume or 0
             fadeStartTime = CurTime()
             if muteVolume == nil then
                 muteVolume = IsValid(currentStation) and currentStation:GetVolume() or
@@ -607,8 +666,9 @@ timer.Create("BattleBeats_ClientAliveCheck", 1, 0, function()
                 or targetVolume
             end
         elseif disableMode:GetInt() == 2 then -- fade volume to 30% when dead, restore when alive
-            targetVolume = isAlive and (volumeType / 100) * masterVolume or 0.3
-            --targetVolume = isAlive and volumeSet:GetInt() / 100 or 0.3
+            local sName = IsValid(currentStation) and currentStation:GetFileName() or nil
+            local tgVolume = BATTLEBEATS.adjustVolume(sName)
+            targetVolume = isAlive and tgVolume or 0.3
             fadeStartTime = CurTime()
             if muteVolume == nil then
                 muteVolume = IsValid(currentStation) and currentStation:GetVolume() or
@@ -627,10 +687,10 @@ timer.Create("BattleBeats_ClientAliveCheck", 1, 0, function()
         if shouldMute ~= lastMuteState then
             lastMuteState = shouldMute
 
-            local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-            local masterVolume = volumeSet:GetInt() / 100
+            local sName = IsValid(currentStation) and currentStation:GetFileName() or nil
+            local tgVolume = BATTLEBEATS.adjustVolume(sName)
 
-            targetVolume = not shouldMute and (volumeType / 100) * masterVolume or 0.3
+            targetVolume = not shouldMute and tgVolume or 0.3
             fadeStartTime = CurTime()
             if muteVolume == nil then
                 muteVolume = IsValid(currentStation) and currentStation:GetVolume()
@@ -685,10 +745,16 @@ timer.Create("BattleBeats_ClientAliveSoundCheck", 5, 0, function() -- sanity che
         and not (IsValid(currentStation) and timer.Exists("BattleBeats_Fade_" .. tostring(currentStation)))
         and not (IsValid(currentPreviewStation) and timer.Exists("BattleBeats_Fade_" .. tostring(currentPreviewStation))) then
         if volumeFrameOn then return end
-        local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-        local masterVolume = volumeSet:GetInt() / 100
-        if IsValid(currentStation) then currentStation:SetVolume((volumeType / 100) * masterVolume) end
-        if IsValid(currentPreviewStation) then currentPreviewStation:SetVolume(masterVolume) end
+        if IsValid(currentStation) then
+            local sName = currentStation:GetFileName() or nil
+            local tgVolume = BATTLEBEATS.adjustVolume(sName)
+            currentStation:SetVolume(tgVolume)
+        end
+        if IsValid(currentPreviewStation) then
+            local sName = currentPreviewStation:GetFileName() or nil
+            local tgVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
+            currentPreviewStation:SetVolume(tgVolume)
+        end
     end
 end)
 
@@ -970,29 +1036,29 @@ end)
 
 local warningBox
 
-local function applyVolume(vol)
-    local masterVolume = vol / 100
+local function applyVolume()
+    local sName = IsValid(currentStation) and currentStation:GetFileName() or nil
     if IsValid(currentStation) then
-        local volumeType = isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-        targetVolume = (volumeType / 100) * masterVolume
-        currentStation:SetVolume(targetVolume)
+        local tgVolume = BATTLEBEATS.adjustVolume(sName)
+        currentStation:SetVolume(tgVolume)
     end
     if IsValid(currentPreviewStation) then
-        currentPreviewStation:SetVolume(masterVolume)
+        local tgVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
+        currentPreviewStation:SetVolume(tgVolume)
     end
 end
 
 cvars.AddChangeCallback("battlebeats_volume_ambient", function(_, _, newValue)
     local newVolume = tonumber(newValue)
     if not newVolume then return end
-    applyVolume(volumeSet:GetInt())
+    applyVolume()
 end)
 
 
 cvars.AddChangeCallback("battlebeats_volume_combat", function(_, _, newValue)
     local newVolume = tonumber(newValue)
     if not newVolume then return end
-    applyVolume(volumeSet:GetInt())
+    applyVolume()
 end)
 
 cvars.AddChangeCallback("battlebeats_lower_volume_in_menu", function(_, _, newValue)
@@ -1049,7 +1115,7 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
         end
 
         createButton("#btb.main.volume_confirm", 20, 120, function()
-            applyVolume(newVolume)
+            applyVolume()
             warningBox:Close()
         end)
 
@@ -1060,7 +1126,7 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
     else
         cookie.Set("battlebeats_high_volume_warn", "0")
         cookie.Set("battlebeats_high_volume_time", "0")
-        applyVolume(newVolume)
+        applyVolume()
     end
 end)
 

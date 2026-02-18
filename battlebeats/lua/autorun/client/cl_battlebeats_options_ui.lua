@@ -488,7 +488,7 @@ concommand.Add("battlebeats_options", function()
             createCustomCheckbox(panel, contentPanel_2, 180, "#btb.options.snd.enable_combat", "battlebeats_enable_combat")
             createCustomCheckbox(panel, contentPanel_2, 210, "#btb.spawnmenu.general.force_combat", "battlebeats_force_combat", "#btb.spawnmenu.general.force_combat_tip")
             createCustomComboBox(panel, (contentPanel_2 - 100) - 110, 250, "#btb.spawnmenu.general.combo", "battlebeats_disable_mode", { "#btb.spawnmenu.general.combo_1", "#btb.spawnmenu.general.combo_2", "#btb.spawnmenu.general.combo_3" })
-            createCustomComboBox(panel, (contentPanel_2 - 100) + 110, 250, "#btb.options.snd.start_mode", "battlebeats_start_mode", { "#btb.options.snd.start_mode_1", "#btb.options.snd.start_mode_2", "#btb.options.snd.start_mode_3" }, "#btb.options.snd.start_mode_tip")
+            createCustomComboBox(panel, (contentPanel_2 - 100) + 110, 250, "#btb.options.snd.start_mode", "battlebeats_start_mode", { "#btb.options.snd.start_mode_1", "#btb.options.snd.start_mode_2", "#btb.options.snd.start_mode_3", "#btb.options.snd.start_mode_4" }, "#btb.options.snd.start_mode_tip")
         elseif category.name == "#btb.options.cat.notification" then
             createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "#btb.options.noti.enable_noti", "battlebeats_show_notification")
             createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "#btb.options.noti.noti_always_vis", "battlebeats_persistent_notification", "#btb.options.noti.noti_always_vis_tip")
@@ -649,6 +649,7 @@ concommand.Add("battlebeats_clean_cache", function()
     cookie.Delete('BattleBeats_FirstTime')
     cookie.Delete("battlebeats_high_volume_time")
     cookie.Delete("battlebeats_high_volume_warn")
+    cookie.Delete("battlebeats_last_track")
 end)
 
 concommand.Add("battlebeats_delete_data", function()
@@ -666,6 +667,10 @@ concommand.Add("battlebeats_delete_data", function()
     BATTLEBEATS.npcTrackMappings = {}
     file.Delete("battlebeats/battlebeats_track_offsets.txt")
     BATTLEBEATS.trackOffsets = {}
+    file.Delete("battlebeats/battlebeats_track_volumes.txt")
+    BATTLEBEATS.trackVolume = {}
+    file.Delete("battlebeats/battlebeats_pack_volumes.txt")
+    BATTLEBEATS.packVolume = {}
 end)
 
 concommand.Add("battlebeats_clean_unused_tracks", function()
@@ -682,4 +687,8 @@ concommand.Add("battlebeats_clean_unused_tracks", function()
     BATTLEBEATS.SaveTrackOffsets()
     cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
     BATTLEBEATS.SaveNPCMappings()
+    cleanupInvalidTracks(BATTLEBEATS.trackVolume)
+    BATTLEBEATS.SaveTrackVolumes()
+    cleanupInvalidTracks(BATTLEBEATS.packVolume)
+    BATTLEBEATS.SavePackVolumes()
 end)
