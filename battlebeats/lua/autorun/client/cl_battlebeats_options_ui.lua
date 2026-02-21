@@ -1,3 +1,6 @@
+local c2552100 = Color(255, 210, 0)
+local c909090 = Color(90, 90, 90)
+local c230230230 = Color(230, 230, 230)
 local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetTall(20)
@@ -14,9 +17,9 @@ local function createCustomCheckbox(parent, x, y, labelText, cvarName, helpText)
         local enabled = GetConVar(cvarName):GetBool()
         local targetX = enabled and (w - 16 - 2) or 2
         self.KnobX = Lerp(FrameTime() * 10, self.KnobX, targetX)
-        local bgColor = enabled and Color(255, 210, 0) or Color(90, 90, 90)
+        local bgColor = enabled and c2552100 or c909090
         draw.RoundedBox(h / 2, 0, 0, w, h, bgColor)
-        draw.RoundedBox(h, self.KnobX, 2, 16, 16, Color(230, 230, 230))
+        draw.RoundedBox(h, self.KnobX, 2, 16, 16, c230230230)
     end
 
     switch.OnMousePressed = function()
@@ -58,7 +61,7 @@ local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max
     panel:SetSize(300, 40)
     panel:SetPos(x, y)
     panel.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 0))
+        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
     end
 
     if helpText then
@@ -78,9 +81,9 @@ local function createCustomNumSlider(parent, x, y, labelText, cvarName, min, max
     sliderBar:SetSize(300, 12)
     sliderBar:SetPos(0, 25)
     sliderBar.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
+        draw.RoundedBox(4, 0, 0, w, h, c909090)
         local progress = (GetConVar(cvarName):GetInt() - min) / (max - min)
-        draw.RoundedBox(4, 0, 0, w * progress, h, Color(255, 210, 0))
+        draw.RoundedBox(4, 0, 0, w * progress, h, c2552100)
     end
 
     local function updateSlider(bar, x)
@@ -128,7 +131,7 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     panel:SetSize(300, 50)
     panel:SetPos(x, y)
     panel.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 0))
+        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
     end
 
     local label = vgui.Create("DLabel", panel)
@@ -148,9 +151,9 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     sliderBar:SetSize(240, 8)
     sliderBar:SetPos(30, 25)
     sliderBar.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(90, 90, 90))
+        draw.RoundedBox(4, 0, 0, w, h, c909090)
         local progress = (GetConVar(cvarName):GetInt() - min) / (max - min)
-        draw.RoundedBox(4, 0, 0, w * progress, h, Color(255, 210, 0))
+        draw.RoundedBox(4, 0, 0, w * progress, h, c2552100)
     end
 
     local leftBtn = vgui.Create("DButton", panel)
@@ -160,8 +163,7 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     leftBtn:SetSize(20, 20)
     leftBtn:SetPos(0, 18)
     leftBtn.Paint = function(self, w, h)
-        local bgColor = Color(0, 0, 0, 0)
-        draw.RoundedBox(8, 0, 0, w, h, bgColor)
+        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
     end
 
     local rightBtn = vgui.Create("DButton", panel)
@@ -171,8 +173,7 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     rightBtn:SetSize(20, 20)
     rightBtn:SetPos(280, 18)
     rightBtn.Paint = function(self, w, h)
-        local bgColor = Color(0, 0, 0, 0)
-        draw.RoundedBox(8, 0, 0, w, h, bgColor)
+        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
     end
 
     local valueLabel = vgui.Create("DLabel", panel)
@@ -230,12 +231,14 @@ local function createArrowStepper(parent, x, y, labelText, cvarName, min, max, h
     return panel
 end
 
+local c505050 = Color(50, 50, 50)
+local c100100100 = Color(100, 100, 100)
 local function createCustomComboBox(parent, x, y, labelText, cvarName, options, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(200, 200)
     panel:SetPos(x, y)
     panel.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, color_transparent)
+        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
     end
 
     local label = vgui.Create("DLabel", panel)
@@ -250,8 +253,8 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
     combo:SetSize(200, 30)
     combo:SetPos(0, 25)
     combo.Paint = function(self, w, h)
-        draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-        draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(90, 90, 90))
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
+        draw.RoundedBox(8, 2, 2, w - 4, h - 4, c909090)
         local cvarValue = GetConVar(cvarName):GetInt()
         local index = math.Clamp(cvarValue + 1, 1, #options)
         local displayText = options[index] or "Unknown"
@@ -275,7 +278,7 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
     dropdown:SetSize(200, 0)
     dropdown:SetPos(0, 55)
     dropdown.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50))
+        draw.RoundedBox(4, 0, 0, w, h, c505050)
     end
     dropdown:SetVisible(false)
 
@@ -286,7 +289,7 @@ local function createCustomComboBox(parent, x, y, labelText, cvarName, options, 
         btn:SetSize(200, 30)
         btn:SetTextColor(color_white)
         btn.Paint = function(self, w, h)
-            local bgColor = self:IsHovered() and Color(100, 100, 100) or Color(50, 50, 50)
+            local bgColor = self:IsHovered() and c100100100 or c505050
             draw.RoundedBox(4, 0, 0, w, h, bgColor)
         end
         btn.DoClick = function()
@@ -317,8 +320,8 @@ local function createCustomButton(parent, x, y, labelText, cvarName, helpText)
     button:SetFont("DermaDefaultBold")
     button:SetTextColor(color_white)
     button.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and Color(100, 100, 100) or Color(90, 90, 90)
-        draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+        local bgColor = self:IsHovered() and c100100100 or c909090
+        draw.RoundedBox(10, 0, 0, w, h, c2552100)
         draw.RoundedBox(8, 2, 2, w - 4, h - 4, bgColor)
     end
 
@@ -356,7 +359,7 @@ local function warningZone(parent, x, y, w, h)
     inner:Dock(FILL)
     inner:DockMargin(6, 6, 6, 6)
     inner.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, Color(50, 50, 50, 255))
+        draw.RoundedBox(4, 0, 0, w, h, c505050)
     end
 
     return inner
@@ -371,7 +374,20 @@ local function LerpColor(t, from, to)
     )
 end
 
+local catSound = language.GetPhrase("btb.options.cat.sound")
+local catNoti = language.GetPhrase("btb.options.cat.notification")
+local catSub = language.GetPhrase("btb.options.cat.subtitles")
+local catPlayer = language.GetPhrase("btb.options.cat.music_player")
+local catOther = language.GetPhrase("btb.options.cat.misc")
+
+local hoverColor = Color(100, 100, 100, 255)
+local normalColor = Color(50, 50, 50, 255)
+local activeColor = Color(40, 40, 40, 255)
+
+local c000200 = Color(0, 0, 0, 200)
+
 concommand.Add("battlebeats_options", function()
+    if IsValid(BATTLEBEATS.optionsFrame) then BATTLEBEATS.optionsFrame:MakePopup() return end
     local frame = vgui.Create("DFrame")
     frame:SetSize(600, 550)
     frame:Center()
@@ -381,17 +397,10 @@ concommand.Add("battlebeats_options", function()
     frame:SetSizable(false)
     frame:MakePopup()
     frame.Paint = function(self, w, h)
-        draw.RoundedBox(8, 0, 0, w, h, Color(0, 0, 0, 200))
+        draw.RoundedBox(8, 0, 0, w, h, c000200)
     end
     frame:BTB_SetButtons(false)
-    
-    local frameTitle = vgui.Create("DLabel", frame)
-    frameTitle:SetPos(300 - 100, 5)
-    frameTitle:SetSize(200, 20)
-    frameTitle:SetText("#btb.ps.options.title")
-    frameTitle:SetContentAlignment(5)
-    frameTitle:SetFont("DermaDefaultBold")
-    frameTitle:SetTextColor(color_white)
+    frame:BTB_SetTitle("#btb.ps.options.title", true)
 
     BATTLEBEATS.optionsFrame = frame
 
@@ -399,16 +408,15 @@ concommand.Add("battlebeats_options", function()
     tabPanel:SetSize(frame:GetWide() - 20, 40)
     tabPanel:SetPos(10, 30)
     tabPanel.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, Color(0, 0, 0, 0))
+        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
     end
 
-    local testSound = language.GetPhrase("btb.options.cat.sound")
     local categories = {
-        {name = testSound, panel = nil},
-        {name = "#btb.options.cat.notification", panel = nil},
-        {name = "#btb.options.cat.subtitles", panel = nil},
-        {name = "#btb.options.cat.music_player", panel = nil},
-        {name = "#btb.options.cat.misc", panel = nil}
+        {name = catSound, panel = nil},
+        {name = catNoti, panel = nil},
+        {name = catSub, panel = nil},
+        {name = catPlayer, panel = nil},
+        {name = catOther, panel = nil}
     }
 
     local contentPanel = vgui.Create("DPanel", frame)
@@ -427,11 +435,8 @@ concommand.Add("battlebeats_options", function()
         button:SetPos((i - 1) * tabWidth, 0)
         button:SetSize(tabWidth, 40)
         button:SetTextColor(Color(255, 255, 255))
-        local hoverColor = Color(100, 100, 100, 255)
-        local normalColor = Color(50, 50, 50, 255)
-        local activeColor = Color(40, 40, 40, 255)
-        button.currentColor = Color(50, 50, 50, 255)
-        button.targetColor = Color(50, 50, 50, 255)
+        button.currentColor = normalColor
+        button.targetColor = normalColor
         button.Think = function(self)
             if self:IsHovered() then
                 self.targetColor = hoverColor
@@ -453,7 +458,7 @@ concommand.Add("battlebeats_options", function()
         panel:SetSize(contentPanel:GetWide(), contentPanel:GetTall())
         panel:SetPos(0, 0)
         panel.Paint = function(self, w, h)
-            draw.RoundedBoxEx(8, 0, 0, w, h, Color(40, 40, 40, 255), false, false, true, true)
+            draw.RoundedBoxEx(8, 0, 0, w, h, activeColor, false, false, true, true)
         end
         panel:SetVisible(false)
         category.panel = panel
@@ -480,7 +485,7 @@ concommand.Add("battlebeats_options", function()
         local contentPanel_NumSlider = (panel:GetWide() - 300) / 2
         local btbDefault = language.GetPhrase("btb.options.noti.default_pos")
 
-        if category.name == testSound then
+        if category.name == catSound then
             createCustomNumSlider(panel, contentPanel_NumSlider, 10, "#btb.options.snd.master_volume", "battlebeats_volume", 0, 200, "#btb.options.snd.master_volume_tip")
             createCustomNumSlider(panel, contentPanel_NumSlider, 50, "#btb.options.snd.ambient_volume", "battlebeats_volume_ambient", 0, 100)
             createCustomNumSlider(panel, contentPanel_NumSlider, 90, "#btb.options.snd.combat_volume", "battlebeats_volume_combat", 0, 100)
@@ -489,7 +494,7 @@ concommand.Add("battlebeats_options", function()
             createCustomCheckbox(panel, contentPanel_2, 210, "#btb.spawnmenu.general.force_combat", "battlebeats_force_combat", "#btb.spawnmenu.general.force_combat_tip")
             createCustomComboBox(panel, (contentPanel_2 - 100) - 110, 250, "#btb.spawnmenu.general.combo", "battlebeats_disable_mode", { "#btb.spawnmenu.general.combo_1", "#btb.spawnmenu.general.combo_2", "#btb.spawnmenu.general.combo_3" })
             createCustomComboBox(panel, (contentPanel_2 - 100) + 110, 250, "#btb.options.snd.start_mode", "battlebeats_start_mode", { "#btb.options.snd.start_mode_1", "#btb.options.snd.start_mode_2", "#btb.options.snd.start_mode_3", "#btb.options.snd.start_mode_4" }, "#btb.options.snd.start_mode_tip")
-        elseif category.name == "#btb.options.cat.notification" then
+        elseif category.name == catNoti then
             createCustomCheckbox(panel, contentPanel:GetWide() / 4, 10, "#btb.options.noti.enable_noti", "battlebeats_show_notification")
             createCustomCheckbox(panel, contentPanel:GetWide() / 1.4, 10, "#btb.options.noti.noti_always_vis", "battlebeats_persistent_notification", "#btb.options.noti.noti_always_vis_tip")
             createCustomCheckbox(panel, contentPanel:GetWide() / 4, 40, "#btb.options.noti.progress_bar", "battlebeats_show_status_bar", "#btb.options.noti.progress_bar_tip")
@@ -502,12 +507,12 @@ concommand.Add("battlebeats_options", function()
             createArrowStepper(panel, contentPanel_NumSlider, 200, "#btb.options.noti.visualizer_boost", "battlebeats_visualizer_boost", 1, 20, "#btb.options.noti.visualizer_boost_tip")
             createArrowStepper(panel, contentPanel_NumSlider, 250, "#btb.options.noti.x_pos", "battlebeats_notif_x", 0, ScrW(), btbDefault .. tostring(ScrW() - 310))
             createArrowStepper(panel, contentPanel_NumSlider, 300, "#btb.options.noti.y_pos", "battlebeats_notif_y", 0, ScrH(), btbDefault .. tostring(ScrH() / 6))
-        elseif category.name == "#btb.options.cat.subtitles" then
+        elseif category.name == catSub then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.sub.enable_sub", "battlebeats_subtitles_enabled")
             createArrowStepper(panel, contentPanel_NumSlider, 40, "#btb.options.sub.sub_height", "battlebeats_subtitles_y", 0, ScrH(), btbDefault .. tostring(ScrH() - 200))
             createCustomCheckbox(panel, contentPanel_2, 100, "#btb.options.sub.static", "battlebeats_subtitles_static", "#btb.options.sub.static_tip")
             createCustomComboBox(panel, (contentPanel_2 - 100), 130, "#btb.options.sub.combo", "battlebeats_subtitles_mode", {"#btb.options.sub.combo1", "#btb.options.sub.combo2"}, "#btb.options.sub.combo_tip")
-        elseif category.name == "#btb.options.cat.music_player" then
+        elseif category.name == catPlayer then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.mplayer.curr_pack_only", "battlebeats_exclusive_play", "#btb.options.mplayer.curr_pack_only_tip")
             createArrowStepper(panel, contentPanel_NumSlider, 50, "#btb.options.mplayer.a_wait_time", "battlebeats_ambient_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip")
             createArrowStepper(panel, contentPanel_NumSlider, 100, "#btb.options.mplayer.c_wait_time", "battlebeats_combat_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip")
@@ -518,7 +523,7 @@ concommand.Add("battlebeats_options", function()
             createCustomCheckbox(panel, contentPanel_2, 280, "#btb.options.mplayer.switch_to_lower", "battlebeats_switch_on_lower_priority", "#btb.options.mplayer.switch_to_lower_tip")
             createCustomCheckbox(panel, contentPanel_2, 310, "#btb.options.mplayer.disable_fade", "battlebeats_disable_fade", "#btb.options.mplayer.disable_fade_tip")
             createCustomComboBox(panel, (contentPanel_2 - 100), 340, "#btb.options.mplayer.combo", "battlebeats_continue_mode", { "#btb.options.mplayer.combo_1", "#btb.options.mplayer.combo_2" }, "#btb.options.mplayer.combo_tip")
-        elseif category.name == "#btb.options.cat.misc" then
+        elseif category.name == catOther then
             createCustomCheckbox(panel, contentPanel_2, 10, "#btb.options.misc.npc_los", "battlebeats_detection_mode", "#btb.spawnmenu.server.enable_pvp_los_tip")
             createCustomCheckbox(panel, contentPanel_2, 40, "#btb.options.misc.auto_popup", "battlebeats_autopopup", "#btb.options.misc.auto_popup_tip")
             createCustomCheckbox(panel, contentPanel_2, 70, "#btb.options.misc.load_local", "battlebeats_load_local_packs", "#btb.options.misc.load_local_tip")

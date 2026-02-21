@@ -294,14 +294,7 @@ local function openVolumeEditor(track, pack)
         Derma_DrawBackgroundBlur(self, 1)
         draw.RoundedBox(4, 0, 0, w, h, c000200)
     end
-
-    local fframeTitle = vgui.Create("DLabel", frame)
-    fframeTitle:SetPos(10, 5)
-    fframeTitle:SetSize(150, 20)
-    fframeTitle:SetText("Volume Boost")
-    fframeTitle:SetContentAlignment(4)
-    fframeTitle:SetFont("DermaDefaultBold")
-    fframeTitle:SetTextColor(color_white)
+    frame:BTB_SetTitle("Volume Boost", false)
 
     local warning = vgui.Create("DLabel", frame)
     warning:SetFont("DermaDefault")
@@ -535,13 +528,7 @@ local function openBTBmenu()
     frame:BTB_SetButtons(true)
     frame.isMinimalized = false
 
-    local frameTitle = vgui.Create("DLabel", frame)
-    frameTitle:SetPos(500 - 150, 5)
-    frameTitle:SetSize(300, 20)
-    frameTitle:SetText("#btb.ps.title")
-    frameTitle:SetContentAlignment(5)
-    frameTitle:SetFont("DermaDefaultBold")
-    frameTitle:SetTextColor(color_white)
+    local frameTitle = frame:BTB_SetTitle("#btb.ps.title", true)
 
     frame.btnMinim.DoClick = function()
         frame:SetVisible(false)
@@ -1337,14 +1324,7 @@ local function openBTBmenu()
                             Derma_DrawBackgroundBlur(self, 1)
                             draw.RoundedBox(4, 0, 0, w, h, c000200)
                         end
-
-                        local fframeTitle = vgui.Create("DLabel", offsetFrame)
-                        fframeTitle:SetPos(10, 5)
-                        fframeTitle:SetSize(150, 20)
-                        fframeTitle:SetText("#btb.ps.ts.rmb.offset_title")
-                        fframeTitle:SetContentAlignment(4)
-                        fframeTitle:SetFont("DermaDefaultBold")
-                        fframeTitle:SetTextColor(color_white)
+                        offsetFrame:BTB_SetTitle("#btb.ps.ts.rmb.offset_title", false)
 
                         local label = vgui.Create("DLabel", offsetFrame)
                         label:SetPos(10, 30)
@@ -1418,14 +1398,7 @@ local function openBTBmenu()
                             Derma_DrawBackgroundBlur(self, 1)
                             draw.RoundedBox(4, 0, 0, w, h, c000200)
                         end
-
-                        local fframeTitle = vgui.Create("DLabel", frame)
-                        fframeTitle:SetPos(10, 5)
-                        fframeTitle:SetSize(150, 20)
-                        fframeTitle:SetText(title)
-                        fframeTitle:SetContentAlignment(4)
-                        fframeTitle:SetFont("DermaDefaultBold")
-                        fframeTitle:SetTextColor(color_white)
+                        frame:BTB_SetTitle(title, false)
 
                         local classLabel = vgui.Create("DLabel", frame)
                         classLabel:SetPos(10, 25)
@@ -1719,14 +1692,7 @@ local function openBTBmenu()
                                 Derma_DrawBackgroundBlur(self, 1)
                                 draw.RoundedBox(4, 0, 0, w, h, c000200)
                             end
-
-                            local fframeTitle = vgui.Create("DLabel", lframe)
-                            fframeTitle:SetPos(10, 5)
-                            fframeTitle:SetSize(300, 20)
-                            fframeTitle:SetText(title .. trackName)
-                            fframeTitle:SetContentAlignment(4)
-                            fframeTitle:SetFont("DermaDefaultBold")
-                            fframeTitle:SetTextColor(color_white)
+                            lframe:BTB_SetTitle(title .. trackName, false)
 
                             local scroll = vgui.Create("DScrollPanel", lframe)
                             scroll:SetSize(480, 360)
@@ -1824,6 +1790,7 @@ local function openBTBmenu()
             sortCombo:AddChoice("#btb.ps.sort.assigned_only", "assigned", false, "icon16/user.png")
         end
         sortCombo:AddChoice("#btb.ps.sort.offset_only", "offset", false, "icon16/time.png")
+        sortCombo:AddChoice("#btb.ps.sort.volume_only", "volume", false, "icon16/sound.png")
         sortCombo:SetSortItems(false)
         sortCombo:ChooseOptionID(selectedSorting or 1)
         --sortCombo:SetContentAlignment(5)
@@ -1831,6 +1798,21 @@ local function openBTBmenu()
         sortCombo:SetTooltip("#btb.ps.sort.tooltip")
         sortCombo:SetTooltipPanelOverride("BattleBeatsTooltip")
         sortCombo.DropButton:SetVisible(false)
+        sortCombo.OnMenuOpened = function(panel)
+            panel.Menu.Paint = function(self, w, h)
+                draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+                draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+            end
+            for _, child in pairs(panel.Menu:GetChildren()) do
+                if IsValid(child) then
+                    for _, c in pairs(child:GetChildren()) do
+                        if c.SetTextColor then
+                            c:BTB_PaintProperties()
+                        end
+                    end
+                end
+            end
+        end
         sortCombo.Paint = function(self, w, h)
             draw.RoundedBox(6, 0, 0, w, h, c404040)
         end
@@ -1844,6 +1826,21 @@ local function openBTBmenu()
         includeExcludeCombo:SetSortItems(false)
         includeExcludeCombo:SetTextColor(color_white)
         includeExcludeCombo.DropButton:SetVisible(false)
+        includeExcludeCombo.OnMenuOpened = function(panel)
+            panel.Menu.Paint = function(self, w, h)
+                draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+                draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+            end
+            for _, child in pairs(panel.Menu:GetChildren()) do
+                if IsValid(child) then
+                    for _, c in pairs(child:GetChildren()) do
+                        if c.SetTextColor then
+                            c:BTB_PaintProperties()
+                        end
+                    end
+                end
+            end
+        end
         includeExcludeCombo.Paint = function(self, w, h)
             draw.RoundedBox(6, 0, 0, w, h, c404040)
         end
@@ -1911,7 +1908,7 @@ local function openBTBmenu()
                     tracks[i], tracks[j] = tracks[j], tracks[i]
                 end
             else
-                if sortMode == "assigned" or sortMode == "offset" then
+                if sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" then
                     local filtered = {}
                     for _, data in ipairs(tracks) do
                         local hasFeature = false
@@ -1922,6 +1919,8 @@ local function openBTBmenu()
                         elseif sortMode == "offset" then
                             hasFeature = BATTLEBEATS.trackOffsets[data.track] and
                             BATTLEBEATS.trackOffsets[data.track] > 0
+                        elseif sortMode == "volume" then
+                            hasFeature = BATTLEBEATS.trackVolume[data.track]
                         end
 
                         if hasFeature then
@@ -1934,7 +1933,7 @@ local function openBTBmenu()
                     if a.fav and not b.fav then return true end
                     if not a.fav and b.fav then return false end
 
-                    if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" or sortMode == "assigned" or sortMode == "offset" then
+                    if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" or sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" then
                         return a.name < b.name
                     elseif sortMode == "za" then
                         return a.name > b.name

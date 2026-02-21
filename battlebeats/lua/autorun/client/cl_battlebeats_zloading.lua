@@ -142,15 +142,14 @@ local dirHandlers = {
     }
 }
 
+--MARK: Finding packs
 local function loadGenericMusicPacks()
     local startTime = SysTime()
-    local addons = engine.GetAddons()
-
     local customBaseDirs, customDirHandlers = hook.Run("BattleBeats_PreLoadPacks", baseDirs, dirHandlers)
     if customBaseDirs then baseDirs = customBaseDirs end
     if customDirHandlers then dirHandlers = customDirHandlers end
 
-    for _, addon in ipairs(addons) do
+    for _, addon in ipairs(engine.GetAddons()) do
         if addon.mounted then
             local title = addon.title
             local ambientFiles, combatFiles = {}, {}
@@ -346,6 +345,31 @@ local function cleanupInvalidTracks(tbl)
     end
 end
 
+local function loadTableFromFile(path, targetKey, transformFn, saveFn)
+    BATTLEBEATS[targetKey] = {}
+
+    if not file.Exists(path, "DATA") then return end
+
+    local jsonData = file.Read(path, "DATA")
+    local loaded = util.JSONToTable(jsonData) or {}
+
+    for key, value in pairs(loaded) do
+        if transformFn then
+            local newKey, newValue = transformFn(key, value)
+            if newKey ~= nil then
+                BATTLEBEATS[targetKey][newKey] = newValue
+            end
+        else
+            BATTLEBEATS[targetKey][key] = value
+        end
+    end
+
+    if saveFn then
+        saveFn()
+    end
+end
+
+--MARK: Save functions
 function BATTLEBEATS.SaveExcludedTracks()
     local validExcluded = {}
     for track, isExcluded in pairs(BATTLEBEATS.excludedTracks) do
@@ -357,48 +381,8 @@ function BATTLEBEATS.SaveExcludedTracks()
     file.Write("battlebeats/battlebeats_excluded_tracks.txt", jsonData)
 end
 
-local function loadExcludedTracks()
-    BATTLEBEATS.excludedTracks = {}
-
-    local jsonData
-    if file.Exists("battlebeats/battlebeats_excluded_tracks.txt", "DATA") then
-        jsonData = file.Read("battlebeats/battlebeats_excluded_tracks.txt", "DATA")
-    end
-
-    local loadedTracks = util.JSONToTable(jsonData or "") or {}
-    for track, _ in pairs(loadedTracks) do
-        BATTLEBEATS.excludedTracks[track] = true
-    end
-
-    --cleanupInvalidTracks(BATTLEBEATS.excludedTracks)
-    BATTLEBEATS.SaveExcludedTracks()
-end
-
-function BATTLEBEATS.SaveFavoriteTracks()
-    local jsonFavorites = util.TableToJSON(BATTLEBEATS.favoriteTracks)
-    file.Write("battlebeats/battlebeats_favorite_tracks.txt", jsonFavorites)
-end
-
-local function loadFavoriteTracks()
-    BATTLEBEATS.favoriteTracks = {}
-
-    local jsonData
-    if file.Exists("battlebeats/battlebeats_favorite_tracks.txt", "DATA") then
-        jsonData = file.Read("battlebeats/battlebeats_favorite_tracks.txt", "DATA")
-    end
-
-    local loadedFavorites = util.JSONToTable(jsonData or "") or {}
-    for track, _ in pairs(loadedFavorites) do
-        BATTLEBEATS.favoriteTracks[track] = true
-    end
-
-    -- cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
-    BATTLEBEATS.SaveFavoriteTracks()
-end
-
 function BATTLEBEATS.SaveNPCMappings()
     local data = {}
-
     for track, mapping in pairs(BATTLEBEATS.npcTrackMappings or {}) do
         if mapping.npcs then
             data[track] = { npcs = table.Copy(mapping.npcs) }
@@ -406,51 +390,12 @@ function BATTLEBEATS.SaveNPCMappings()
             data[track] = { npcs = { { class = mapping.class, priority = mapping.priority } } }
         end
     end
-
     file.Write("battlebeats/battlebeats_npc_mappings.txt", util.TableToJSON(data, true))
 end
 
-local function loadMappedTracks()
-    BATTLEBEATS.npcTrackMappings = {}
-
-    if not file.Exists("battlebeats/battlebeats_npc_mappings.txt", "DATA") then
-        return
-    end
-
-    local jsonData = file.Read("battlebeats/battlebeats_npc_mappings.txt", "DATA")
-    local loaded = util.JSONToTable(jsonData) or {}
-
-    for track, mapping in pairs(loaded) do
-        if not mapping then continue end
-
-        if mapping.npcs and istable(mapping.npcs) then
-            BATTLEBEATS.npcTrackMappings[track] = { npcs = {} }
-            for _, npc in ipairs(mapping.npcs) do
-                if npc.class and npc.priority then
-                    table.insert(BATTLEBEATS.npcTrackMappings[track].npcs, {
-                        class = tostring(npc.class),
-                        priority = math.Clamp(tonumber(npc.priority) or 1, 1, 5)
-                    })
-                end
-            end
-        elseif mapping.class and mapping.priority then
-            BATTLEBEATS.npcTrackMappings[track] = {
-                npcs = {{
-                    class = tostring(mapping.class),
-                    priority = math.Clamp(tonumber(mapping.priority) or 1, 1, 5)
-                }}
-            }
-        end
-    end
-
-    for track, mapping in pairs(BATTLEBEATS.npcTrackMappings) do
-        if not mapping.npcs or #mapping.npcs == 0 then
-            BATTLEBEATS.npcTrackMappings[track] = nil
-        end
-    end
-
-    cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
-    BATTLEBEATS.SaveNPCMappings()
+function BATTLEBEATS.SaveFavoriteTracks()
+    local jsonFavorites = util.TableToJSON(BATTLEBEATS.favoriteTracks)
+    file.Write("battlebeats/battlebeats_favorite_tracks.txt", jsonFavorites)
 end
 
 function BATTLEBEATS.SaveTrackOffsets()
@@ -458,21 +403,8 @@ function BATTLEBEATS.SaveTrackOffsets()
     file.Write("battlebeats/battlebeats_track_offsets.txt", jsonFavorites)
 end
 
-local function loadTrackOffsets()
-    BATTLEBEATS.trackOffsets = {}
-
-    if file.Exists("battlebeats/battlebeats_track_offsets.txt", "DATA") then
-        local jsonData = file.Read("battlebeats/battlebeats_track_offsets.txt", "DATA")
-        BATTLEBEATS.trackOffsets = util.JSONToTable(jsonData) or {}
-
-        --cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
-        BATTLEBEATS.SaveTrackOffsets()
-    end
-end
-
 function BATTLEBEATS.SaveTrackVolumes()
     local valid = {}
-
     if BATTLEBEATS.trackVolume then
         for track, value in pairs(BATTLEBEATS.trackVolume) do
             if isnumber(value) then
@@ -483,34 +415,13 @@ function BATTLEBEATS.SaveTrackVolumes()
             end
         end
     end
-
     local jsonData = util.TableToJSON(valid, true)
     file.CreateDir("battlebeats")
     file.Write("battlebeats/battlebeats_track_volumes.txt", jsonData or "{}")
 end
 
-local function loadTrackVolumes()
-    BATTLEBEATS.trackVolume = {}
-
-    if not file.Exists("battlebeats/battlebeats_track_volumes.txt", "DATA") then
-        return
-    end
-
-    local jsonData = file.Read("battlebeats/battlebeats_track_volumes.txt", "DATA")
-    local loaded = util.JSONToTable(jsonData or "") or {}
-    for track, value in pairs(loaded) do
-        if isnumber(value) then
-            value = math.Clamp(math.floor(value), 0, 200)
-            if value ~= 100 then
-                BATTLEBEATS.trackVolume[track] = value
-            end
-        end
-    end
-end
-
 function BATTLEBEATS.SavePackVolumes()
     local valid = {}
-
     if BATTLEBEATS.packVolume then
         for pack, value in pairs(BATTLEBEATS.packVolume) do
             if isnumber(value) then
@@ -521,31 +432,68 @@ function BATTLEBEATS.SavePackVolumes()
             end
         end
     end
-
     local jsonData = util.TableToJSON(valid, true)
     file.CreateDir("battlebeats")
     file.Write("battlebeats/battlebeats_pack_volumes.txt", jsonData or "{}")
 end
 
-local function loadPackVolumes()
-    BATTLEBEATS.packVolume = {}
-
-    if not file.Exists("battlebeats/battlebeats_pack_volumes.txt", "DATA") then
-        return
-    end
-
-    local jsonData = file.Read("battlebeats/battlebeats_pack_volumes.txt", "DATA")
-    local loaded = util.JSONToTable(jsonData or "") or {}
-    for pack, value in pairs(loaded) do
-        if isnumber(value) then
-            value = math.Clamp(math.floor(value), 0, 200)
-            if value ~= 100 then
-                BATTLEBEATS.packVolume[pack] = value
-            end
-        end
-    end
+--MARK: Loading functions
+local function loadExcludedTracks()
+    loadTableFromFile("battlebeats/battlebeats_excluded_tracks.txt", "excludedTracks", function(track) return track, true end, BATTLEBEATS.SaveExcludedTracks)
 end
 
+local function loadFavoriteTracks()
+    loadTableFromFile("battlebeats/battlebeats_favorite_tracks.txt", "favoriteTracks", function(track) return track, true end, BATTLEBEATS.SaveFavoriteTracks)
+end
+
+local function npcTransform(track, mapping)
+    if not mapping then return nil end
+    local result = {npcs = {}}
+    if mapping.npcs and istable(mapping.npcs) then
+        for _, npc in ipairs(mapping.npcs) do
+            if npc.class and npc.priority then
+                table.insert(result.npcs, {
+                    class = tostring(npc.class),
+                    priority = math.Clamp(tonumber(npc.priority) or 1, 1, 5)
+                })
+            end
+        end
+    elseif mapping.class and mapping.priority then
+        table.insert(result.npcs, {
+            class = tostring(mapping.class),
+            priority = math.Clamp(tonumber(mapping.priority) or 1, 1, 5)
+        })
+    end
+    if #result.npcs == 0 then
+        return nil
+    end
+    return track, result
+end
+
+local function loadMappedTracks()
+    loadTableFromFile("battlebeats/battlebeats_npc_mappings.txt", "npcTrackMappings", npcTransform, BATTLEBEATS.SaveNPCMappings)
+end
+
+local function loadTrackOffsets()
+    loadTableFromFile("battlebeats/battlebeats_track_offsets.txt", "trackOffsets", nil, BATTLEBEATS.SaveTrackOffsets)
+end
+
+local function volumeTransform(key, value)
+    if not isnumber(value) then return nil end
+    value = math.Clamp(math.floor(value), 0, 200)
+    if value == 100 then return nil end
+    return key, value
+end
+
+local function loadTrackVolumes()
+    loadTableFromFile("battlebeats/battlebeats_track_volumes.txt", "trackVolume", volumeTransform)
+end
+
+local function loadPackVolumes()
+    loadTableFromFile("battlebeats/battlebeats_pack_volumes.txt", "packVolume", volumeTransform)
+end
+
+--MARK: Initialization
 local function _getRandomTrack()
     return BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
 end
@@ -619,8 +567,7 @@ local function loadSavedPacks()
             if not BATTLEBEATS.musicPacks[packName] then BATTLEBEATS.currentPacks[packName] = nil end
         end
         if not table.IsEmpty(BATTLEBEATS.currentPacks) then
-            print("[BattleBeats Client] Loaded selected packs: " ..
-            table.concat(table.GetKeys(BATTLEBEATS.currentPacks), ", "))
+            print("[BattleBeats Client] Loaded selected packs: " .. table.concat(table.GetKeys(BATTLEBEATS.currentPacks), ", "))
             local track = getStartingTrack()
             if track and enableAmbient:GetBool() then BATTLEBEATS.PlayNextTrack(track) end
         else
@@ -744,7 +691,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             BATTLEBEATS.parse16thNote(songName)
         end
     end
-    loadPatchNotes()
+    --loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

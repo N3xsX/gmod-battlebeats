@@ -172,3 +172,18 @@ function PANEL:BTB_PaintProperties()
         draw.RoundedBox(12, 2, 2, w - 4, h - 4, color)
     end
 end
+
+function PANEL:BTB_SetTitle(title, isCentered)
+    local frameTitle = vgui.Create("DLabel", self)
+    if isCentered then
+        frameTitle:SetPos((self:GetWide() / 2) - 150, 5)
+    else
+        frameTitle:SetPos(10, 5)
+    end
+    frameTitle:SetSize(300, 20)
+    frameTitle:SetText(title)
+    frameTitle:SetContentAlignment(isCentered and 5 or 4)
+    frameTitle:SetFont("DermaDefaultBold")
+    frameTitle:SetTextColor(color_white)
+    return frameTitle
+end

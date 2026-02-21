@@ -123,13 +123,7 @@ local function openGuide()
         draw.RoundedBox(4, 0, 0, w, h, c000200)
     end
 
-    local frameTitle = vgui.Create("DLabel", frame)
-    frameTitle:SetPos(320 - 150, 5)
-    frameTitle:SetSize(300, 20)
-    frameTitle:SetText(title)
-    frameTitle:SetContentAlignment(5)
-    frameTitle:SetFont("DermaDefaultBold")
-    frameTitle:SetTextColor(color_white)
+    local frameTitle = frame:BTB_SetTitle(title, true)
 
     local img = vgui.Create("DImage", frame)
     img:SetSize(620, 400)
