@@ -10,6 +10,19 @@ local notificationVisualizerSmooth = CreateClientConVar("battlebeats_visualizer_
 local skipNombat = CreateClientConVar("battlebeats_skip_nombat_names", "1", true, false, "", 0, 1)
 local showBar = CreateClientConVar("battlebeats_show_status_bar", "1", true, false, "", 0, 1)
 
+BATTLEBEATS.packPrefixes = {
+    {prefix = "BattleBeats", type = "battlebeats"},
+    {prefix = "Nombat", type = "nombat"},
+    {prefix = "SBM DLC", type = "sbm"},
+    {prefix = "SBM", type = "sbm"},
+    {prefix = "16th Note", type = "16th"},
+    {prefix = "16thNote", type = "16th"},
+    {prefix = "Action Music", type = "amusic"},
+    {prefix = "Dynamo Pack", type = "dynamo"},
+    {prefix = "Dynamo", type = "dynamo"},
+    {prefix = "MP3 Radio", type = "mp3p"},
+}
+
 function BATTLEBEATS.FormatTime(seconds)
     if not seconds or seconds < 0 then return "0:00" end
     local time = string.ToMinutesSeconds(math.floor(seconds))
@@ -131,22 +144,9 @@ local function expandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDon
     end
 end
 
-local prefixes = {
-    {prefix = "BattleBeats", type = "battlebeats"},
-    {prefix = "Nombat", type = "nombat"},
-    {prefix = "SBM DLC", type = "sbm"},
-    {prefix = "SBM", type = "sbm"},
-    {prefix = "16th Note", type = "16th"},
-    {prefix = "16thNote", type = "16th"},
-    {prefix = "Action Music", type = "amusic"},
-    {prefix = "Dynamo Pack", type = "dynamo"},
-    {prefix = "Dynamo", type = "dynamo"},
-    {prefix = "MP3 Radio", type = "mp3p"},
-}
-
 function BATTLEBEATS.stripPackPrefix(name)
     local original = name
-    for _, data in ipairs(prefixes) do
+    for _, data in ipairs(BATTLEBEATS.packPrefixes) do
         local prefix = data.prefix
         local esc = prefix:gsub("([%(%)%[%]%-%_%.])", "%%%1")
         local pattern = "^%s*[%[%(%<]*%s*" .. esc .. "%s*[%]%)%>]*%s*[%-–—:%|%!]*%s*"

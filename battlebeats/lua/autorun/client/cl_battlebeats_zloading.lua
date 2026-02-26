@@ -398,9 +398,9 @@ function BATTLEBEATS.SaveFavoriteTracks()
     file.Write("battlebeats/battlebeats_favorite_tracks.txt", jsonFavorites)
 end
 
-function BATTLEBEATS.SaveTrackOffsets()
-    local jsonFavorites = util.TableToJSON(BATTLEBEATS.trackOffsets)
-    file.Write("battlebeats/battlebeats_track_offsets.txt", jsonFavorites)
+function BATTLEBEATS.SaveTrackTrim()
+    local json = util.TableToJSON(BATTLEBEATS.trackTrim, true)
+    file.Write("battlebeats/battlebeats_track_trims.txt", json)
 end
 
 function BATTLEBEATS.SaveTrackVolumes()
@@ -474,8 +474,35 @@ local function loadMappedTracks()
     loadTableFromFile("battlebeats/battlebeats_npc_mappings.txt", "npcTrackMappings", npcTransform, BATTLEBEATS.SaveNPCMappings)
 end
 
-local function loadTrackOffsets()
-    loadTableFromFile("battlebeats/battlebeats_track_offsets.txt", "trackOffsets", nil, BATTLEBEATS.SaveTrackOffsets)
+local function loadTrackTrims()
+    BATTLEBEATS.trackTrim = {}
+
+    local trimsPath = "battlebeats/battlebeats_track_trims.txt"
+    local offsetsPath = "battlebeats/battlebeats_track_offsets.txt"
+
+    if file.Exists(trimsPath, "DATA") then
+        local json = file.Read(trimsPath, "DATA")
+        BATTLEBEATS.trackTrim = util.JSONToTable(json) or {}
+        return
+    end
+
+    if file.Exists(offsetsPath, "DATA") then
+        local json = file.Read(offsetsPath, "DATA")
+        local oldOffsets = util.JSONToTable(json) or {}
+
+        for track, offset in pairs(oldOffsets) do
+            if tonumber(offset) and offset > 0 then
+                BATTLEBEATS.trackTrim[track] = {
+                    start = math.floor(offset),
+                    finish = nil
+                }
+            end
+        end
+
+        BATTLEBEATS.SaveTrackTrim()
+        file.Delete(offsetsPath)
+        BATTLEBEATS.trackOffsets = nil
+    end
 end
 
 local function volumeTransform(key, value)
@@ -578,10 +605,6 @@ local function loadSavedPacks()
     end
     if not table.IsEmpty(BATTLEBEATS.musicPacks) and table.IsEmpty(BATTLEBEATS.currentPacks) and autoPopup:GetBool() then
         RunConsoleCommand("battlebeats_menu")
-        /*chat.AddText(
-            Color(255, 255, 0), "[BattleBeats] ",
-            Color(255, 255, 255), "You can disable this popup in battlebeats settings"
-        )*/
     end
 end
 
@@ -635,8 +658,8 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added volume controls for packs and individual tracks\n",
-            Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
+            Color(150, 255, 150), "- Reworked offset system; now you can fully trim tracks and edit their start and end positions"
+            --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
@@ -676,7 +699,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadExcludedTracks()
     loadFavoriteTracks()
     loadMappedTracks()
-    loadTrackOffsets()
+    loadTrackTrims()
     loadTrackVolumes()
     loadPackVolumes()
     buildTrackMap()
@@ -691,7 +714,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             BATTLEBEATS.parse16thNote(songName)
         end
     end
-    --loadPatchNotes()
+    loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

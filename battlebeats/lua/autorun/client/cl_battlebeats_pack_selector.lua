@@ -8,15 +8,14 @@ local isLooping = false
 local skipExcluded = false
 
 BATTLEBEATS.activeConflicts = BATTLEBEATS.activeConflicts or {}
-
-local wsCache = {}
+BATTLEBEATS.wsCache = BATTLEBEATS.wsCache or {}
 
 local volumeSet = GetConVar("battlebeats_volume")
 local persistentNotification = GetConVar("battlebeats_persistent_notification")
 local showPreviewNotification = GetConVar("battlebeats_show_preview_notification")
 local toogleFrame = CreateClientConVar("battlebeats_context_ui_toogle", "0", true, false, "", 0, 1)
 
-local packIcons = {
+BATTLEBEATS.packIcons = {
     ["battlebeats"] = Material("packicons/btb.png"),
     ["nombat"] = Material("packicons/nombat.jpg"),
     ["sbm"] = Material("packicons/sbm.jpg"),
@@ -25,6 +24,31 @@ local packIcons = {
     ["dynamo"] = Material("packicons/dynamo.jpg"),
     ["mp3p"] = Material("packicons/mp3p.jpg"),
     ["na"] = Material("btbna.jpg")
+}
+
+BATTLEBEATS.categoryNames = {
+    debug = "DEBUG",
+    battlebeats = "BattleBeats",
+    nombat = "Nombat",
+    sbm = "SBM",
+    ["16thnote"] = "16th Note",
+    amusic = "Action Music",
+    dynamo = "DYNAMO",
+    mp3p = "MP3 Radio",
+    na = "Uncategorized",
+    ["local"] = "Local"
+}
+
+BATTLEBEATS.packOrder = {
+    battlebeats = 1,
+    nombat = 2,
+    amusic = 3,
+    ["16thnote"] = 4,
+    mp3p = 5,
+    sbm = 6,
+    dynamo = 7,
+    ["local"] = 97,
+    na = 98
 }
 
 surface.CreateFont("BattleBeats_Font", {
@@ -76,98 +100,6 @@ local c2552100 = Color(255, 210, 0)
 local c2001500 = Color(200, 150, 0)
 local c404040 = Color(40, 40, 40)
 
-local function parseSize(sizeStr)
-    local num, unit = sizeStr:match("([%d%.]+)%s*(%a+)")
-    num = tonumber(num) or 0
-    if unit == "KB" then
-        return num / 1024
-    elseif unit == "GB" then
-        return num * 1024
-    else
-        return num
-    end
-end
-
---MARK:Steamworks info
-local function createInfoBoxes(panel, size, date, ownerName)
-    if not IsValid(panel) then return end
-    local buttonWidth, buttonHeight, spacing = 200, 30, 40
-    local panelWidth = panel:GetWide()
-    local totalWidth = buttonWidth * 3 + spacing * 2
-    local startX = (panelWidth - totalWidth) / 2
-    local y = 120
-
-    local sizeColor
-    local numericSize = parseSize(size)
-    if numericSize < 200 then
-        sizeColor = Color(0, 200, 0)
-    elseif numericSize < 600 then
-        sizeColor = Color(255, 140, 0)
-    else
-        sizeColor = Color(200, 0, 0)
-    end
-
-    local function addInfoBox(text, x, textColor)
-        local box = vgui.Create("DPanel", panel)
-        box:SetSize(buttonWidth, buttonHeight)
-        box:SetPos(x, y)
-        box.Paint = function(self, w, h)
-            draw.RoundedBox(10, 0, 0, w, h, c2001500)
-            draw.RoundedBox(8, 2, 2, w - 4, h - 4, c404040)
-        end
-
-        local label = vgui.Create("DLabel", box)
-        label:SetText(text)
-        label:SetFont("DermaDefault")
-        label:SetTextColor(textColor or c200200200)
-        label:SizeToContents()
-        label:Center()
-
-        table.insert(panel.infoPanels, box)
-    end
-
-    local ssize = language.GetPhrase("#btb.ps.info.size")
-    local screated = language.GetPhrase("#btb.ps.info.created")
-    local sauthor = language.GetPhrase("#btb.ps.info.author")
-
-    addInfoBox(ssize .. size, startX, sizeColor)
-    addInfoBox(screated .. date, startX + buttonWidth + spacing)
-    addInfoBox(sauthor .. ownerName, startX + (buttonWidth + spacing) * 2)
-end
-
-local function createInfoPanel(panel, packData)
-    if not IsValid(panel) then return end
-    panel.infoPanels = {}
-
-    local wsid = packData.wsid
-    local function applyInfo(result)
-        local size = result.size and string.NiceSize(result.size) or "N/A"
-        local date = result.created and os.date("%Y-%m-%d", result.created) or "N/A"
-        local ownerName = result.ownername or "N/A"
-        createInfoBoxes(panel, size, date, ownerName)
-    end
-
-    createInfoBoxes(panel, "Loading...", "Loading...", "Loading...")
-
-    if not wsid then
-        createInfoBoxes(panel, "N/A", "N/A", "N/A")
-        return
-    end
-
-    if wsCache[wsid] then
-        applyInfo(wsCache[wsid])
-        return
-    end
-
-    steamworks.FileInfo(wsid, function(result)
-        if not result then
-            result = {size = nil, created = nil, ownername = nil}
-        end
-        wsCache[wsid] = result
-        applyInfo(result)
-    end)
-end
-
 local Lerp = Lerp
 local FrameTime = FrameTime
 local Color = Color
@@ -186,12 +118,22 @@ local function LerpColor(t, from, to)
     )
 end
 
+local function hasAnyDebugPack(packs)
+    if not packs then return false end
+    for _, pack in pairs(packs) do
+        if pack.data and pack.data.debug then
+            return true
+        end
+    end
+    return false
+end
+
 BATTLEBEATS.checking = false
 local checking = false
 local packNames = {}
 local errorCount = 0
 local currentPackIndex = 1
-local function validateTracksInPack(packName)
+local function validateTracksInPack(packName, func)
     local packData = BATTLEBEATS.musicPacks[packName]
     if not packData then return end
     BATTLEBEATS.checking = true
@@ -222,10 +164,8 @@ local function validateTracksInPack(packName)
             packData.verifying = false
             currentPackIndex = currentPackIndex + 1
             if currentPackIndex <= #packNames then
-                validateTracksInPack(packNames[currentPackIndex])
+                validateTracksInPack(packNames[currentPackIndex], func)
             else
-                packNames = {}
-                currentPackIndex = 1
                 if errorCount > 0 then
                     MsgC(
                         Color(255, 255, 0), "[BattleBeats Debug] ",
@@ -249,6 +189,11 @@ local function validateTracksInPack(packName)
                 end
                 errorCount = 0
                 checking = false
+                BATTLEBEATS.checking = false
+                currentPackIndex = 1
+                if isfunction(func) then
+                    func()
+                end
             end
             return
         end
@@ -274,216 +219,9 @@ local function validateTracksInPack(packName)
         end)
 
         trackIndex = trackIndex + 1
-        timer.Simple(0.05, nextTrack)
+        timer.Create("BattleBeats_VerifyTimer", 0.05, 1, function() nextTrack() end)
     end
-
     nextTrack()
-end
-
-local c909090 = Color(90, 90, 90)
-local c000200 = Color(0, 0, 0, 200)
-local function openVolumeEditor(track, pack)
-    local frame = vgui.Create("DFrame")
-    frame:BTB_SetButtons(false)
-    frame:SetSize(360, 120)
-    frame:SetTitle("")
-    frame:Center()
-    frame:BTB_SetFocus()
-    frame:MakePopup()
-    frame.Paint = function(self, w, h)
-        Derma_DrawBackgroundBlur(self, 1)
-        draw.RoundedBox(4, 0, 0, w, h, c000200)
-    end
-    frame:BTB_SetTitle("Volume Boost", false)
-
-    local warning = vgui.Create("DLabel", frame)
-    warning:SetFont("DermaDefault")
-    warning:SetTextColor(Color(255, 200, 120))
-    warning:SetSize(340, 30)
-    warning:SetPos(10, 85)
-    warning:SetWrap(true)
-    warning:SetText("Volume boost multiplies final volume. Raising base volume makes the boost stronger (e.g 2x can become 4x)")
-
-    local current = 100
-    if track then
-        current = BATTLEBEATS.trackVolume[track] or 100
-    elseif pack then
-        current = BATTLEBEATS.packVolume[pack] or 100
-    end
-
-    local bar = vgui.Create("DPanel", frame)
-    bar:SetSize(320, 8)
-    bar:SetPos(20, 65)
-    bar:SetCursor("hand")
-
-    local valueLabel = vgui.Create("DLabel", frame)
-    valueLabel:SetFont("DermaDefaultBold")
-    valueLabel:SetTextColor(color_white)
-    valueLabel:SetSize(200, 20)
-    valueLabel:SetPos(80, 40)
-    valueLabel:SetContentAlignment(5)
-
-    local leftBtn = vgui.Create("DButton", frame)
-    leftBtn:SetText("<")
-    leftBtn:SetFont("CreditsText")
-    leftBtn:SetTextColor(color_white)
-    leftBtn:SetSize(20, 20)
-    leftBtn:SetPos(3, 58)
-    leftBtn.Paint = function(self, w, h)
-        local bgColor = Color(0, 0, 0, 0)
-        draw.RoundedBox(8, 0, 0, w, h, bgColor)
-    end
-
-    local rightBtn = vgui.Create("DButton", frame)
-    rightBtn:SetText(">")
-    rightBtn:SetFont("CreditsText")
-    rightBtn:SetTextColor(color_white)
-    rightBtn:SetSize(20, 20)
-    rightBtn:SetPos(340, 58)
-    rightBtn.Paint = function(self, w, h)
-        local bgColor = Color(0, 0, 0, 0)
-        draw.RoundedBox(8, 0, 0, w, h, bgColor)
-    end
-
-    local value = current
-
-    local function updateLabel()
-        local offset = value - 100
-        if offset == 0 then
-            valueLabel:SetText("0%")
-        elseif offset > 0 then
-            valueLabel:SetText("+" .. offset .. "%")
-        else
-            valueLabel:SetText(offset .. "%")
-        end
-    end
-
-    bar.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, c909090)
-
-        local progress = value / 200
-        local center = w * 0.5
-        local pos = w * progress
-
-        if pos >= center then
-            draw.RoundedBox(0, center, 0, pos - center, h, c2552100)
-        else
-            draw.RoundedBox(0, pos, 0, center - pos, h, c2552100)
-        end
-    end
-    frame.PaintOver = function()
-        surface.SetDrawColor(255, 255, 255, 180)
-        local center = 20 + bar:GetWide() / 2
-        surface.DrawRect(center - 1, bar:GetY() - 1, 2, bar:GetTall() + 2)
-    end
-
-    local dot = vgui.Create("DPanel", frame)
-    dot:SetMouseInputEnabled(false)
-    dot:SetSize(12, 12)
-
-    dot.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, color_white)
-    end
-
-    dot.Think = function(self)
-        local progress = value / 200
-        local x = 20 + bar:GetWide() * progress - 6
-        self:SetPos(x, 65 + bar:GetTall() / 2 - 6)
-    end
-
-    local function applyValue(val)
-        value = math.Clamp(math.floor(val), 0, 200)
-
-        if track then
-            BATTLEBEATS.trackVolume = BATTLEBEATS.trackVolume or {}
-            if value == 100 then
-                BATTLEBEATS.trackVolume[track] = nil
-            else
-                BATTLEBEATS.trackVolume[track] = value
-            end
-            updateLabel()
-            local sName = IsValid(BATTLEBEATS.currentStation) and BATTLEBEATS.currentStation:GetFileName() or nil
-            if not sName then sName = IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetFileName() or nil end
-            if sName == track then
-                if IsValid(BATTLEBEATS.currentStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName)
-                    BATTLEBEATS.currentStation:SetVolume(targetVolume)
-                elseif IsValid(BATTLEBEATS.currentPreviewStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
-                    BATTLEBEATS.currentPreviewStation:SetVolume(targetVolume)
-                end
-            end
-        elseif pack then
-            BATTLEBEATS.packVolume = BATTLEBEATS.packVolume or {}
-            if value == 100 then
-                BATTLEBEATS.packVolume[pack] = nil
-            else
-                BATTLEBEATS.packVolume[pack] = value
-            end
-            updateLabel()
-            local sName = IsValid(BATTLEBEATS.currentStation) and BATTLEBEATS.currentStation:GetFileName() or nil
-            if not sName then sName = IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetFileName() or nil end
-            if pack == BATTLEBEATS.trackToPack[sName] then
-                if IsValid(BATTLEBEATS.currentStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName)
-                    BATTLEBEATS.currentStation:SetVolume(targetVolume)
-                elseif IsValid(BATTLEBEATS.currentPreviewStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
-                    BATTLEBEATS.currentPreviewStation:SetVolume(targetVolume)
-                end
-            end
-        end
-    end
-
-    local function applySnap(val)
-        local offset = val - 100
-        if offset >= -5 and offset <= 5 then
-            return 100
-        end
-        return val
-    end
-
-    local function updateValue(x)
-        local progress = math.Clamp(x / bar:GetWide(), 0, 1)
-        local newValue = progress * 200
-        newValue = applySnap(newValue)
-        applyValue(newValue)
-    end
-
-    leftBtn.DoClick = function()
-        applyValue(value - 1)
-    end
-
-    rightBtn.DoClick = function()
-        applyValue(value + 1)
-    end
-
-    bar.OnMousePressed = function(self, code)
-        if code == MOUSE_LEFT then
-            local x = self:CursorPos()
-            updateValue(x)
-            self.IsDragging = true
-        end
-    end
-
-    bar.Think = function(self)
-        if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
-            local x = self:CursorPos()
-            updateValue(x)
-        elseif self.IsDragging then
-            self.IsDragging = false
-        end
-    end
-
-    frame.OnClose = function()
-        if track then
-            BATTLEBEATS.SaveTrackVolumes()
-        else
-            BATTLEBEATS.SavePackVolumes()
-        end
-    end
-
-    updateLabel()
 end
 
 local cHover = Color(50, 50, 50, 200)
@@ -492,6 +230,8 @@ local cHover2 = Color(65, 65, 65, 200)
 local c707070255 = Color(70, 70, 70, 255)
 local c808080255 = Color(80, 80, 80, 255)
 
+local c909090 = Color(90, 90, 90)
+local c000200 = Color(0, 0, 0, 200)
 local c25500 = Color(255, 0, 0)
 local c3030300 = Color(30, 30, 30, 0)
 local c100100100 = Color(100, 100, 100)
@@ -537,10 +277,10 @@ local function openBTBmenu()
 
     for _, packData in pairs(BATTLEBEATS.musicPacks) do
         local wsid = packData.wsid
-        if wsid and not wsCache[wsid] then
+        if wsid and not BATTLEBEATS.wsCache[wsid] then
             steamworks.FileInfo(wsid, function(result)
                 if result then
-                    wsCache[wsid] = result
+                    BATTLEBEATS.wsCache[wsid] = result
                 end
             end)
         end
@@ -1091,7 +831,7 @@ local function openBTBmenu()
             local iconData = {
                 {check = count == 1, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
                 {check = count >= 2, tooltip = "#btb.ps.ts.icon_assigned_multiple", image = "icon16/group.png"},
-                {check = BATTLEBEATS.trackOffsets[track] ~= nil, tooltip = "#btb.ps.ts.icon_offset", image = "icon16/time.png"},
+                {check = BATTLEBEATS.trackTrim[track] ~= nil, tooltip = "#btb.ps.ts.icon_trim", image = "icon16/time.png"},
                 {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"},
                 {check = startTrack, tooltip = "#btb.ps.ts.icon_start", image = "icon16/door_in.png"},
                 {check = BATTLEBEATS.trackVolume[track] ~= nil, tooltip = "#btb.ps.ts.icon_volume", image = "icon16/sound.png"},
@@ -1262,7 +1002,9 @@ local function openBTBmenu()
                         optionName = "#btb.ps.pack_rmb.set_volume"
                     end
                     local volumeOption = menu:AddOption(optionName, function()
-                        openVolumeEditor(track)
+                        BATTLEBEATS.openVolumeEditor(track, nil, function()
+                            createTrackList(parent, trackType, selectedPack)
+                        end)
                     end)
                     volumeOption:SetImage("icon16/sound.png")
                     volumeOption:BTB_PaintProperties()
@@ -1309,177 +1051,34 @@ local function openBTBmenu()
                         setAsStart:BTB_PaintProperties()
                     end
 
-                    --MARK:RMB offset
-                    local offsetValue = BATTLEBEATS.trackOffsets[track] or 0
-                    local offsetOptionTitle = language.GetPhrase("#btb.ps.ts.rmb.offset_edit")
-                    local offsetOption = menu:AddOption(offsetValue > 0 and offsetOptionTitle .. " (" .. offsetValue .. "s)" or "#btb.ps.ts.rmb.offset_set", function()
-                        local offsetFrame = vgui.Create("DFrame")
-                        offsetFrame:BTB_SetButtons(false)
-                        offsetFrame:SetTitle("")
-                        offsetFrame:SetSize(250, 110)
-                        offsetFrame:Center()
-                        offsetFrame:BTB_SetFocus()
-                        offsetFrame:MakePopup()
-                        offsetFrame.Paint = function(self, w, h)
-                            Derma_DrawBackgroundBlur(self, 1)
-                            draw.RoundedBox(4, 0, 0, w, h, c000200)
-                        end
-                        offsetFrame:BTB_SetTitle("#btb.ps.ts.rmb.offset_title", false)
-
-                        local label = vgui.Create("DLabel", offsetFrame)
-                        label:SetPos(10, 30)
-                        label:SetSize(230, 20)
-                        label:SetText("#btb.ps.ts.rmb.offset_text")
-
-                        local textEntry = vgui.Create("DTextEntry", offsetFrame)
-                        textEntry:SetPos(10, 50)
-                        textEntry:SetSize(230, 20)
-                        textEntry:SetNumeric(true)
-                        textEntry:SetValue(offsetValue)
-
-                        local ssaveButton = vgui.Create("DButton", offsetFrame)
-                        ssaveButton:SetPos(10, 75)
-                        ssaveButton:SetSize(110, 25)
-                        ssaveButton:SetText("#btb.ps.ts.rmb.offset_save")
-                        ssaveButton:SetFont("CreditsText")
-                        ssaveButton:SetTextColor(color_white)
-                        ssaveButton.DoClick = function()
-                            local newOffset = tonumber(textEntry:GetValue()) or 0
-                            if newOffset > 0 then
-                                BATTLEBEATS.trackOffsets[track] = newOffset
-                                notification.AddLegacy("Set offset " .. newOffset .. "s for track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
-                                surface.PlaySound("buttons/button14.wav")
-                                changesMade = true
-                                createTrackList(parent, trackType, selectedPack)
-                            else
-                                BATTLEBEATS.trackOffsets[track] = nil
-                                notification.AddLegacy("Removed offset from track: " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
-                                surface.PlaySound("buttons/button14.wav")
-                                changesMade = true
-                                createTrackList(parent, trackType, selectedPack)
-                            end
-                            BATTLEBEATS.SaveTrackOffsets()
-                            offsetFrame:Close()
-                        end
-                        ssaveButton.Paint = function(self, w, h)
-                            local bgColor = self:IsHovered() and c808080255 or c707070255
-                            draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                        end
-
-                        local cancelButton = vgui.Create("DButton", offsetFrame)
-                        cancelButton:SetPos(130, 75)
-                        cancelButton:SetSize(110, 25)
-                        cancelButton:SetText("#btb.ps.ts.rmb.offset_cancel")
-                        cancelButton:SetFont("CreditsText")
-                        cancelButton:SetTextColor(color_white)
-                        cancelButton.DoClick = function()
-                            offsetFrame:Close()
-                        end
-                        cancelButton.Paint = function(self, w, h)
-                            local bgColor = self:IsHovered() and c808080255 or c707070255
-                            draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                        end
+                    --MARK:RMB offset/trim
+                    local trim = BATTLEBEATS.trackTrim[track]
+                    local trimOptionTitle = language.GetPhrase("#btb.ps.ts.rmb.trim_edit")
+                    local trimText = nil
+                    if trim then
+                        local startVal = trim.start
+                        local endVal = trim.finish
+                        local startText = startVal and BATTLEBEATS.FormatTime(startVal) or "start"
+                        local endText = endVal and BATTLEBEATS.FormatTime(endVal) or "end"
+                        trimText = startText .. " - " .. endText
+                    end
+                    local offsetOption = menu:AddOption(trimText and (trimOptionTitle .. " (" .. trimText .. ")") or "#btb.ps.ts.rmb.trim_set", function()
+                        BATTLEBEATS.openTrimEditor(track, function()
+                            changesMade = true
+                            createTrackList(parent, trackType, selectedPack)
+                        end)
                     end)
                     offsetOption:SetImage("icon16/time.png")
-                    offsetOption:SetTooltip("#btb.ps.ts.rmb.offset_tip")
+                    offsetOption:SetTooltip("#btb.ps.ts.rmb.trim_tip")
                     offsetOption:SetTooltipPanelOverride("BattleBeatsTooltip")
                     offsetOption:BTB_PaintProperties()
 
                     --MARK:RMB npc assign
-                    local function createAssignFrame(title, defaultClass, defaultPriority, onSave)
-                        local frame = vgui.Create("DFrame")
-                        frame:BTB_SetButtons(false)
-                        frame:SetTitle("")
-                        frame:SetSize(400, 110)
-                        frame:Center()
-                        frame:BTB_SetFocus()
-                        frame:MakePopup()
-                        frame.Paint = function(self, w, h)
-                            Derma_DrawBackgroundBlur(self, 1)
-                            draw.RoundedBox(4, 0, 0, w, h, c000200)
-                        end
-                        frame:BTB_SetTitle(title, false)
-
-                        local classLabel = vgui.Create("DLabel", frame)
-                        classLabel:SetPos(10, 25)
-                        classLabel:SetSize(270, 20)
-                        classLabel:SetText("#btb.ps.ts.rmb.assign_class")
-
-                        local textEntry = vgui.Create("DTextEntry", frame)
-                        textEntry:SetPos(10, 45)
-                        textEntry:SetSize(250, 20)
-                        textEntry:SetText(defaultClass or "")
-                        if not defaultClass then
-                            textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
-                        end
-
-                        local helpBtn = vgui.Create("DImage", frame)
-                        helpBtn:SetPos(267.5, 47.5)
-                        helpBtn:SetSize(15, 15)
-                        helpBtn:SetImage("icon16/help.png")
-                        helpBtn:SetMouseInputEnabled(true)
-                        helpBtn:BTB_SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
-
-                        local priorityLabel = vgui.Create("DLabel", frame)
-                        priorityLabel:SetPos(290, 25)
-                        priorityLabel:SetSize(100, 20)
-                        priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
-
-                        local priorityCombo = vgui.Create("DComboBox", frame)
-                        priorityCombo:SetPos(290, 45)
-                        priorityCombo:SetSize(100, 20)
-
-                        local priorityNames = {
-                            [1] = "1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest"),
-                            [2] = "2",
-                            [3] = "3",
-                            [4] = "4",
-                            [5] = "5 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_lowest")
-                        }
-
-                        for i = 1, 5 do
-                            priorityCombo:AddChoice(priorityNames[i], i)
-                        end
-                        priorityCombo:SetValue(priorityNames[defaultPriority or 1])
-
-                        local saveBtn = vgui.Create("DButton", frame)
-                        saveBtn:SetPos(45, 75)
-                        saveBtn:SetSize(150, 25)
-                        saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
-                        saveBtn:SetFont("CreditsText")
-                        saveBtn:SetTextColor(color_white)
-                        saveBtn.Paint = function(self, w, h)
-                            draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
-                        end
-
-                        saveBtn.DoClick = function()
-                            local class = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
-                            local _, prio = priorityCombo:GetSelected()
-                            prio = math.Clamp(prio or defaultPriority or 1, 1, 5)
-
-                            onSave(class, prio, frame)
-                        end
-
-                        local cancelBtn = vgui.Create("DButton", frame)
-                        cancelBtn:SetPos(205, 75)
-                        cancelBtn:SetSize(150, 25)
-                        cancelBtn:SetText("#btb.ps.ts.rmb.offset_cancel")
-                        cancelBtn:SetFont("CreditsText")
-                        cancelBtn:SetTextColor(color_white)
-                        cancelBtn.Paint = function(self, w, h)
-                            draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
-                        end
-                        cancelBtn.DoClick = function() frame:Close() end
-
-                        return frame, textEntry, priorityCombo
-                    end
-
                     if row.actualType == "combat" then
                         local currentNPCs = BATTLEBEATS.npcTrackMappings[track] and
                         BATTLEBEATS.npcTrackMappings[track].npcs or {}
-
                         local assignNPC = menu:AddOption("#btb.ps.ts.rmb.assign_add", function()
-                            createAssignFrame("#btb.ps.ts.rmb.assign_title", nil, 1, function(class, priority, fframe)
+                            BATTLEBEATS.createAssignFrame("#btb.ps.ts.rmb.assign_title", nil, 1, function(class, priority, fframe)
                                 if not class or class == "" then
                                     notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                     surface.PlaySound("buttons/button11.wav")
@@ -1565,7 +1164,7 @@ local function openBTBmenu()
                             end
 
                             local editOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_edit", function()
-                                createAssignFrame(language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class, npcInfo.class, npcInfo.priority, function(newClass, newPrio, fframe)
+                                BATTLEBEATS.createAssignFrame(language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class, npcInfo.class, npcInfo.priority, function(newClass, newPrio, fframe)
                                     if not newClass or newClass == "" then
                                         notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                         surface.PlaySound("buttons/button11.wav")
@@ -1680,47 +1279,7 @@ local function openBTBmenu()
                     local subs = BATTLEBEATS.parsedSubtitles[string.lower(trackName)]
                     if subs and #subs > 0 then
                         local lyricsOption = menu:AddOption("#btb.ps.ts.rmb.show_lyrics", function()
-                            lframe = vgui.Create("DFrame")
-                            lframe:BTB_SetButtons(false)
-                            local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
-                            lframe:SetTitle("")
-                            lframe:SetSize(500, 400)
-                            lframe:Center()
-                            lframe:BTB_SetFocus()
-                            lframe:MakePopup()
-                            lframe.Paint = function(self, w, h)
-                                Derma_DrawBackgroundBlur(self, 1)
-                                draw.RoundedBox(4, 0, 0, w, h, c000200)
-                            end
-                            lframe:BTB_SetTitle(title .. trackName, false)
-
-                            local scroll = vgui.Create("DScrollPanel", lframe)
-                            scroll:SetSize(480, 360)
-                            scroll:SetPos(10, 30)
-
-                            local rich = vgui.Create("RichText", scroll)
-                            rich:SetSize(480, 360)
-                            rich:SetVerticalScrollbarEnabled(true)
-                            rich:SetWrap(true)
-                            rich.PerformLayout = function(self)
-                                if self:GetFont() ~= "ChatFont" then self:SetFontInternal("ChatFont") end
-                                self:SetFGColor(color_white)
-                            end
-
-                            local lastEnd = 0
-                            for _, sub in ipairs(subs) do
-                                if lastEnd > 0 and (sub.start - lastEnd) > 5 then
-                                    rich:AppendText("\n")
-                                end
-                                local m = math.floor(sub.start / 60)
-                                local s = math.floor(sub.start % 60)
-                                local ts = string.format("[%02d:%02d]", m, s)
-                                rich:InsertColorChange(255, 210, 0, 255)
-                                rich:AppendText(ts .. " ")
-                                rich:InsertColorChange(255, 255, 255, 255)
-                                rich:AppendText(sub.text .. "\n")
-                                lastEnd = sub['end']
-                            end
+                            lframe = BATTLEBEATS.openSubtitles(trackName, subs)
                         end)
                         lyricsOption:SetImage("icon16/text_align_left.png")
                         lyricsOption:BTB_PaintProperties()
@@ -1917,8 +1476,9 @@ local function openBTBmenu()
                             hasFeature = BATTLEBEATS.npcTrackMappings[data.track] and
                             #BATTLEBEATS.npcTrackMappings[data.track].npcs > 0
                         elseif sortMode == "offset" then
-                            hasFeature = BATTLEBEATS.trackOffsets[data.track] and
-                            BATTLEBEATS.trackOffsets[data.track] > 0
+                            local trim = BATTLEBEATS.trackTrim[data.track]
+                            hasFeature = trim and trim.start and trim.start > 0 or
+                            (trim and trim.finish and trim.finish > 0)
                         elseif sortMode == "volume" then
                             hasFeature = BATTLEBEATS.trackVolume[data.track]
                         end
@@ -1996,20 +1556,24 @@ local function openBTBmenu()
     local expandedPackName = nil
 
     local c2201200150 = Color(220, 120, 0, 150)
-    local function createBasePanel(parent, call)
+    local function createBasePanel(parent, call, isNotice)
         local panel = vgui.Create("DPanel", parent)
         panel:Dock(TOP)
         panel:DockMargin(0, 5, 0, 0)
         panel:SetTall(41)
         panel.Paint = function(self, w, h)
-            draw.RoundedBox(4, 0, 0, w, h, c2201200150)
+            local bgColor = isNotice and Color(150, 150, 150, 150) or c2201200150
+            draw.RoundedBox(4, 0, 0, w, h, bgColor)
         end
         local icon = vgui.Create("DImage", panel)
         icon:Dock(LEFT)
-        icon:SetWide(30)
+        icon:SetWide(32)
         icon:DockMargin(5, 5, 5, 5)
-        icon:SetImage("btberror.png")
-        icon:SetKeepAspect(true)
+        if isNotice then
+            icon:SetImage("btbinfo.png")
+        else
+            icon:SetImage("btberror.png")
+        end
         if call then
             call(panel)
         end
@@ -2097,10 +1661,12 @@ local function openBTBmenu()
         end
     end
 
+    local verifyButton = nil
     local function showPackList()
         scrollPanel:Clear()
         scrollPanel:SetVisible(true)
         saveButton:SetVisible(true)
+        if IsValid(verifyButton) then verifyButton:SetVisible(true) end
         scrollBar:SetWide(0)
         frameTitle:SetText("#btb.ps.title")
         showConflicts()
@@ -2109,6 +1675,7 @@ local function openBTBmenu()
             scrollPanel:Clear()
             scrollPanel:SetVisible(true)
             saveButton:SetVisible(false)
+            if IsValid(verifyButton) then verifyButton:SetVisible(false) end
             scrollBar:SetWide(10)
             frameTitle:SetText(BATTLEBEATS.stripPackPrefix(packName))
             if IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetState() ~= GMOD_CHANNEL_STOPPED then
@@ -2271,20 +1838,8 @@ local function openBTBmenu()
             table.insert(orderedPacks, { name = packName, data = data })
         end
 
-        local packOrder = {
-            battlebeats = 1,
-            nombat = 2,
-            amusic = 3,
-            ["16thnote"] = 4,
-            mp3p = 5,
-            sbm = 6,
-            dynamo = 7,
-            ["local"] = 97,
-            na = 98
-        }
-
         local function getTypeRank(t)
-            return packOrder[t] or 99
+            return BATTLEBEATS.packOrder[t] or 99
         end
 
         table.sort(orderedPacks, function(a, b)
@@ -2334,19 +1889,19 @@ local function openBTBmenu()
             end
         end
 
-        local categoryMap = {
-            debug = "DEBUG",
-            battlebeats = "BattleBeats",
-            nombat = "Nombat",
-            sbm = "SBM",
-            ["16thnote"] = "16th Note",
-            amusic = "Action Music",
-            dynamo = "DYNAMO",
-            mp3p = "MP3 Radio",
-            na = "Uncategorized",
-            ["local"] = "Local"
-        }
+        if GetConVar("battlebeats_debug_mode"):GetBool() and not hasAnyDebugPack(orderedPacks) then
+            createBasePanel(scrollPanel, function(panel)
+                local label1 = vgui.Create("DLabel", panel)
+                label1:Dock(TOP)
+                label1:SetTall(41)
+                label1:SetText("#btb.ps.info.reload")
+                label1:SetFont("BattleBeats_Notification_Font_Misc")
+                label1:SetTextColor(color_white)
+                label1:SetContentAlignment(5)
+            end, true)
+        end
 
+        packNames = {}
         for _, pack in pairs(orderedPacks) do
             local debugMode = GetConVar("battlebeats_debug_mode"):GetBool()
             local packName = pack.name
@@ -2359,9 +1914,9 @@ local function openBTBmenu()
             end
             local categoryName
             if debugMode and packData.debug then
-                categoryName = categoryMap.debug
+                categoryName = BATTLEBEATS.categoryNames.debug
             else
-                categoryName = categoryMap[packType] or "Uncategorized"
+                categoryName = BATTLEBEATS.categoryNames[packType] or "Uncategorized"
             end
             if currentCategory ~= categoryName then
                 currentCategory = categoryName
@@ -2521,7 +2076,7 @@ local function openBTBmenu()
             packLabel:SetKeyboardInputEnabled(false)
 
             local formattedName, packType = BATTLEBEATS.stripPackPrefix(packName)
-            local iconMat = packIcons[packType] or packIcons["Unknown"]
+            local iconMat = BATTLEBEATS.packIcons[packType] or BATTLEBEATS.packIcons["na"]
 
             packLabel.Paint = function(self, w, h)
                 if packData.verifying then
@@ -2733,7 +2288,7 @@ local function openBTBmenu()
                         optionName = "#btb.ps.pack_rmb.set_volume"
                     end
                     local volumeOption = menu:AddOption(optionName, function()
-                        openVolumeEditor(nil, packName)
+                        BATTLEBEATS.openVolumeEditor(nil, packName)
                     end)
                     volumeOption:SetImage("icon16/sound.png")
                     volumeOption:BTB_PaintProperties()
@@ -2842,14 +2397,14 @@ local function openBTBmenu()
                         panel:SizeTo(-1, 160, 0.15, 0, -1)
                         surface.PlaySound("ui/buttonrollover.wav")
                         createButtons(panel)
-                        createInfoPanel(panel, packData)
+                        BATTLEBEATS.createInfoPanel(panel, packData)
                         expandedPanel = panel
                     end)
                 else
                     panel:SizeTo(-1, 160, 0.15, 0, -1)
                     surface.PlaySound("ui/buttonrollover.wav")
                     createButtons(panel)
-                    createInfoPanel(panel, packData)
+                    BATTLEBEATS.createInfoPanel(panel, packData)
                     expandedPanel = panel
                 end
             end
@@ -2864,22 +2419,54 @@ local function openBTBmenu()
                 timer.Simple(0, function()
                     if IsValid(panel) then
                         createButtons(panel)
-                        createInfoPanel(panel, packData)
+                        BATTLEBEATS.createInfoPanel(panel, packData)
                     end
                 end)
+            end
+        end
+
+        --MARK: Verify button
+        if GetConVar("battlebeats_debug_mode"):GetBool() and hasAnyDebugPack(orderedPacks) then
+            verifyButton = vgui.Create("DButton", frame)
+            verifyButton:SetSize(200, 20)
+            verifyButton:SetPos(650, 5)
+            verifyButton:SetText("Verify Packs")
+            verifyButton:SetFont("CreditsText")
+            verifyButton:SetTextColor(color_white)
+            verifyButton.currentColor = c707070255
+            verifyButton.targetColor = c707070255
+            verifyButton.Think = function(self)
+                if BATTLEBEATS.checking then
+                    self.targetColor = c505050
+                elseif self:IsHovered() then
+                    self.targetColor = c200200200
+                else
+                    self.targetColor = c100100100
+                end
+                self.currentColor = LerpColor(FrameTime() * 10, self.currentColor, self.targetColor)
+            end
+            verifyButton.Paint = function(self, w, h)
+                draw.RoundedBox(8, 0, 0, w, h, self.currentColor)
+            end
+            verifyButton.DoClick = function(self)
+                if #packNames > 0 and not BATTLEBEATS.checking then
+                    MsgC(
+                        Color(255, 255, 0), "[BattleBeats Debug] ",
+                        color_white, "Starting verification...\n"
+                    )
+                    verifyButton:SetCursor("no")
+                    verifyButton:SetText("Verifying...")
+                    verifyButton:InvalidateLayout()
+                    validateTracksInPack(packNames[currentPackIndex], function()
+                        verifyButton:SetCursor("hand")
+                        verifyButton:SetText("Verify Packs")
+                    end)
+                end
             end
         end
     end
 
     showPackList()
-
-    if #packNames > 0 and not BATTLEBEATS.checking then
-        MsgC(
-            Color(255, 255, 0), "[BattleBeats Debug] ",
-            color_white, "Starting verification...\n"
-        )
-        validateTracksInPack(packNames[currentPackIndex])
-    end
 
     saveButton.DoClick = function()
         frame:Close()
@@ -2892,6 +2479,23 @@ local function openBTBmenu()
         self:AlphaTo(0, 0.04, 0, function()
             oldClose(self)
         end)
+        if BATTLEBEATS.checking and timer.Exists("BattleBeats_VerifyTimer") then
+            timer.Remove("BattleBeats_VerifyTimer")
+            MsgC(
+                Color(255, 255, 0), "[BattleBeats Debug] ",
+                color_white, "Pack verification",
+                Color(255, 0, 0), " CANCELED!"
+            )
+            notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.ps.verification.cancel"), NOTIFY_ERROR, 4)
+            surface.PlaySound("buttons/button8.wav")
+            for _, pack in pairs(BATTLEBEATS.musicPacks) do
+                pack.verifying = false
+            end
+            errorCount = 0
+            checking = false
+            BATTLEBEATS.checking = false
+            currentPackIndex = 1
+        end
     end
 
     frame.OnClose = function()

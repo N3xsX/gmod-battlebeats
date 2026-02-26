@@ -36,10 +36,11 @@ BATTLEBEATS.favoriteTracks = BATTLEBEATS.favoriteTracks or {}
 BATTLEBEATS.isInCombat = BATTLEBEATS.isInCombat or false
 BATTLEBEATS.npcTrackMappings = BATTLEBEATS.npcTrackMappings or {}
 BATTLEBEATS.priorityStates = BATTLEBEATS.priorityStates or {}
-BATTLEBEATS.trackOffsets = BATTLEBEATS.trackOffsets or {}
+--BATTLEBEATS.trackOffsets = BATTLEBEATS.trackOffsets or {} -- obsolete
 BATTLEBEATS.trackToPack = BATTLEBEATS.trackToPack or {}
 BATTLEBEATS.packVolume = BATTLEBEATS.packVolume or {}
 BATTLEBEATS.trackVolume = BATTLEBEATS.trackVolume or {}
+BATTLEBEATS.trackTrim = BATTLEBEATS.trackTrim or {}
 
 --Dev
 BATTLEBEATS.disableFade = BATTLEBEATS.disableFade or false
@@ -48,7 +49,7 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.4.1"
+BATTLEBEATS.currentVersion = "2.4.2"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -154,6 +155,7 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
     local tgVolume = baseVolume or (volumeType / 100 * masterVolume)
 
     tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
+    debugPrint("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. track)
 
     if not track or track == "" then
         return math.Round(tgVolume, 2)
@@ -169,6 +171,7 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
             finalVol = finalVol * packMult
         end
     end
+    debugPrint("[adjustVolume] Pack Volume: " .. tostring(finalVol))
 
     if BATTLEBEATS.trackVolume then
         local trackAdj = BATTLEBEATS.trackVolume[track]
@@ -177,9 +180,11 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
             finalVol = finalVol * trackMult
         end
     end
+    debugPrint("[adjustVolume] Pack + Track Volume: " .. tostring(finalVol))
 
     finalVol = hook.Run("BattleBeats_PostAdjustVolume", track, finalVol) or finalVol
     finalVol = math.Clamp(finalVol, 0, 10)
+    debugPrint("[adjustVolume] Final Volume: " .. tostring(finalVol))
     return math.Round(finalVol, 2)
 end
 
@@ -493,7 +498,8 @@ local function PlayNextTrack(track, time, noFade, priority)
             BATTLEBEATS.currentStation = station
             station:SetVolume(0)
             station:Play()
-            local offset = BATTLEBEATS.trackOffsets[track] or 0
+            local trimData = BATTLEBEATS.trackTrim[track]
+            local offset = trimData and trimData.start or 0
             station:SetTime(time or offset, true)
             hook.Run("BattleBeats_OnTrackStarted", station, track, BATTLEBEATS.isInCombat, priority)
             if not noFade then
@@ -512,16 +518,16 @@ local function PlayNextTrack(track, time, noFade, priority)
 
             removeSoundTimers()
 
+            local trackLength = trimData and trimData.finish or station:GetLength()
             if not BATTLEBEATS.isInCombat then
                 lastAmbiencePosition = station:GetTime()
-                lastAmbienceTotalLength = station:GetLength()
+                lastAmbienceTotalLength = trackLength
             else
                 lastCombatPosition = station:GetTime()
-                lastCombatTotalLength = station:GetLength()
+                lastCombatTotalLength = trackLength
             end
 
             local startTime = time or 0
-            local trackLength = station:GetLength()
             local playDuration = math.max(trackLength - startTime - 1, 1)
 
             debugPrint("[PlayNextTrack] Track length: " .. math.Truncate(trackLength or 0, 1) .. " (s) | Will play for: " .. math.Truncate(playDuration or 0, 1) .. " (s)")

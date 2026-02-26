@@ -670,12 +670,12 @@ concommand.Add("battlebeats_delete_data", function()
     BATTLEBEATS.favoriteTracks = {}
     file.Delete("battlebeats/battlebeats_npc_mappings.txt")
     BATTLEBEATS.npcTrackMappings = {}
-    file.Delete("battlebeats/battlebeats_track_offsets.txt")
-    BATTLEBEATS.trackOffsets = {}
     file.Delete("battlebeats/battlebeats_track_volumes.txt")
     BATTLEBEATS.trackVolume = {}
     file.Delete("battlebeats/battlebeats_pack_volumes.txt")
     BATTLEBEATS.packVolume = {}
+    file.Delete("battlebeats/battlebeats_track_trims.txt")
+    BATTLEBEATS.trackTrim = {}
 end)
 
 concommand.Add("battlebeats_clean_unused_tracks", function()
@@ -688,12 +688,12 @@ concommand.Add("battlebeats_clean_unused_tracks", function()
     BATTLEBEATS.SaveExcludedTracks()
     cleanupInvalidTracks(BATTLEBEATS.favoriteTracks)
     BATTLEBEATS.SaveFavoriteTracks()
-    cleanupInvalidTracks(BATTLEBEATS.trackOffsets)
-    BATTLEBEATS.SaveTrackOffsets()
     cleanupInvalidTracks(BATTLEBEATS.npcTrackMappings)
     BATTLEBEATS.SaveNPCMappings()
     cleanupInvalidTracks(BATTLEBEATS.trackVolume)
     BATTLEBEATS.SaveTrackVolumes()
     cleanupInvalidTracks(BATTLEBEATS.packVolume)
     BATTLEBEATS.SavePackVolumes()
+    cleanupInvalidTracks(BATTLEBEATS.trackTrim)
+    BATTLEBEATS.SaveTrackTrim()
 end)
