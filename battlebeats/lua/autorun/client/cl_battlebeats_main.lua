@@ -155,7 +155,7 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
     local tgVolume = baseVolume or (volumeType / 100 * masterVolume)
 
     tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
-    debugPrint("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. track)
+    debugPrint("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. tostring(track))
 
     if not track or track == "" then
         return math.Round(tgVolume, 2)

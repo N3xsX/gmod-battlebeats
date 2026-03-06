@@ -1,3 +1,5 @@
+BATTLEBEATS_server = BATTLEBEATS_server or {}
+
 local lastCombatTime = {}
 local playerCombatTargets = {}
 
@@ -9,6 +11,24 @@ local pvpCombatTime = CreateConVar("battlebeats_pvp_combat_time", "30", { FCVAR_
 local pvpTeam = CreateConVar("battlebeats_pvp_allow_team_combat", "1", { FCVAR_ARCHIVE }, "", 0, 1)
 local pvpRequireLOS = CreateConVar("battlebeats_pvp_lineofsight", "0", { FCVAR_ARCHIVE }, "", 0, 1)
 local maxDistancePVP = CreateConVar("battlebeats_pvp_max_distance", "5000", { FCVAR_ARCHIVE }, "", 100, 10000)
+
+local c2555050220 = Color(255, 50, 50, 220)
+local function debugPVETrigger(ply, ent)
+    if GetConVar("developer"):GetInt() < 1 then return end
+    local plyEye = ply:EyePos()
+    local entHead = ent:GetPos() + Vector(0, 0, ent:OBBMaxs().z + 10)
+    debugoverlay.Line(plyEye, entHead, 1, c2555050220, false)
+    debugoverlay.Box(ent:GetPos(), ent:OBBMins(), ent:OBBMaxs(), 1, c2555050220)
+    local entClass = ent.GetClass and ent:GetClass() or "n/a"
+    local dist = math.Round(ply:GetPos():Distance(ent:GetPos()), 1)
+    debugoverlay.Text(entHead + Vector(0, 0, 30), "[BATTLEBEATS]" .. " " .. entClass .. " -> is triggering PVE | Distance: " .. dist .. " units", 1)
+end
+
+BATTLEBEATS_server.ignoredNPCs = {
+    ["npc_crow"] = true,
+    ["npc_pigeon"] = true,
+    ["npc_seagull"] = true
+}
 
 local function CheckCombatState(ply)
     if not IsValid(ply) then return end
@@ -81,10 +101,14 @@ local function CheckCombatState(ply)
             if (ent:IsNPC() or ent:IsNextBot()) and ent.GetEnemy then
                 local enemy = ent:GetEnemy()
                 if IsValid(enemy) and (enemy == ply or (NPCfightTriggersCombat and (enemy:IsNPC() or enemy:IsNextBot() or enemy:IsPlayer()))) then
-                    if not reqiresLos or ply:IsLineOfSightClear(ent) then
-                        isInCombat = true
-                        lastCombatTime[ply] = curTime
-                        break
+                    local class = ent:GetClass()
+                    if not BATTLEBEATS_server.ignoredNPCs[class] then
+                        if not reqiresLos or ply:IsLineOfSightClear(ent) then
+                            debugPVETrigger(ply, ent)
+                            isInCombat = true
+                            lastCombatTime[ply] = curTime
+                            break
+                        end
                     end
                 end
             end
