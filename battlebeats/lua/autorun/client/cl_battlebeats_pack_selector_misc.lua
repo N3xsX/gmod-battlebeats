@@ -17,82 +17,162 @@ local function parseSize(sizeStr)
     end
 end
 
---MARK:Steamworks info
-local buttonWidth, buttonHeight, spacing = 200, 30, 40
-local function createInfoBoxes(panel, size, date, ownerName)
-    if not IsValid(panel) then return end
-    local panelWidth = panel:GetWide()
-    local totalWidth = buttonWidth * 3 + spacing * 2
-    local startX = (panelWidth - totalWidth) / 2
+function BATTLEBEATS.drawRoundedOutline(radius, x, y, w, h, thickness, col)
+    if radius > math.min(w, h) / 2 then radius = math.min(w, h) / 2 end
+    if thickness < 1 then thickness = 1 end
 
-    local sizeColor
-    local numericSize = parseSize(size)
-    if numericSize < 200 then
-        sizeColor = Color(0, 200, 0)
-    elseif numericSize < 600 then
-        sizeColor = Color(255, 140, 0)
-    else
-        sizeColor = Color(200, 0, 0)
+    local inner_r = math.max(radius - thickness, 0.01)
+    surface.SetDrawColor(col.r or col[1], col.g or col[2], col.b or col[3], col.a or col[4] or 255)
+    surface.DrawRect(x + radius, y, w - radius * 2, thickness)
+    surface.DrawRect(x + radius, y + h - thickness, w - radius * 2, thickness)
+    surface.DrawRect(x, y + radius, thickness, h - radius * 2)
+    surface.DrawRect(x + w - thickness, y + radius, thickness, h - radius * 2)
+    draw.NoTexture()
+
+    local SEG = 12
+    local ang_step = math.rad(90 / SEG)
+
+    local quarter = {}
+    for i = 0, SEG do
+        local a = i * ang_step
+        quarter[i] = { math.cos(a), math.sin(a) }
     end
 
-    local function addInfoBox(text, x, textColor)
-        local box = vgui.Create("DPanel", panel)
-        box:SetSize(buttonWidth, buttonHeight)
-        box:SetPos(x, 120)
-        box.Paint = function(self, w, h)
-            draw.RoundedBox(10, 0, 0, w, h, c2001500)
-            draw.RoundedBox(8, 2, 2, w - 4, h - 4, c404040)
+    local rotations = {
+        { cx = x + radius, cy = y + radius, cx_mul = -1, cy_mul = -1 }, -- TL
+        { cx = x + w - radius, cy = y + radius, cx_mul = 1,  cy_mul = -1 }, -- TR
+        { cx = x + w - radius, cy = y + h - radius, cx_mul = 1,  cy_mul = 1 }, -- BR
+        { cx = x + radius, cy = y + h - radius, cx_mul = -1, cy_mul = 1 }, -- BL
+    }
+
+    local poly = {}
+    for _, r in ipairs(rotations) do
+        local cx, cy = r.cx, r.cy
+        local cxm, cym = r.cx_mul, r.cy_mul
+
+        local reverse_order = (cxm * cym < 0)
+
+        for i = 0, SEG - 1 do
+            local s = quarter[i]
+            local e = quarter[i + 1]
+
+            local sxo = cx + s[1] * cxm * radius
+            local syo = cy + s[2] * cym * radius
+            local exo = cx + e[1] * cxm * radius
+            local eyo = cy + e[2] * cym * radius
+
+            local sxi = cx + s[1] * cxm * inner_r
+            local syi = cy + s[2] * cym * inner_r
+            local exi = cx + e[1] * cxm * inner_r
+            local eyi = cy + e[2] * cym * inner_r
+
+            if reverse_order then
+                poly[1] = { x = sxo, y = syo }
+                poly[2] = { x = sxi, y = syi }
+                poly[3] = { x = exi, y = eyi }
+                poly[4] = { x = exo, y = eyo }
+            else
+                poly[1] = { x = sxo, y = syo }
+                poly[2] = { x = exo, y = eyo }
+                poly[3] = { x = exi, y = eyi }
+                poly[4] = { x = sxi, y = syi }
+            end
+
+            surface.DrawPoly(poly)
         end
-
-        local label = vgui.Create("DLabel", box)
-        label:SetText(text)
-        label:SetFont("DermaDefault")
-        label:SetTextColor(textColor or c200200200)
-        label:SizeToContents()
-        label:Center()
-
-        table.insert(panel.infoPanels, box)
     end
-
-    local ssize = language.GetPhrase("#btb.ps.info.size")
-    local screated = language.GetPhrase("#btb.ps.info.created")
-    local sauthor = language.GetPhrase("#btb.ps.info.author")
-
-    addInfoBox(ssize .. ": " .. size, startX, sizeColor)
-    addInfoBox(screated .. ": " .. date, startX + buttonWidth + spacing)
-    addInfoBox(sauthor .. ": " .. ownerName, startX + (buttonWidth + spacing) * 2)
 end
 
-function BATTLEBEATS.createInfoPanel(panel, packData)
-    if not IsValid(panel) then return end
-    panel.infoPanels = {}
+--MARK:Steamworks info
+local buttonWidth, buttonHeight, spacing = 200, 30, 40
+local panelWidth = 950
+local ssize = language.GetPhrase("#btb.ps.info.size")
+local screated = language.GetPhrase("#btb.ps.info.created")
+local sauthor = language.GetPhrase("#btb.ps.info.author")
+local function getSizeColor(size)
+    local numericSize = parseSize(size)
+    if not numericSize then return c200200200 end
+    if numericSize < 200 then
+        return Color(0, 200, 0)
+    elseif numericSize < 600 then
+        return Color(255, 140, 0)
+    else
+        return Color(200, 0, 0)
+    end
+end
 
-    local wsid = packData.wsid
-    local function applyInfo(result)
-        local size = result.size and string.NiceSize(result.size) or "N/A"
-        local date = result.created and os.date("%Y-%m-%d", result.created) or "N/A"
-        local ownerName = result.ownername or "N/A"
-        createInfoBoxes(panel, size, date, ownerName)
+local function createInfoBox(panel, x)
+    local box = vgui.Create("DPanel", panel)
+    box:SetSize(buttonWidth, buttonHeight)
+    box:SetPos(x, 120)
+    box.Paint = function(self, w, h)
+        draw.RoundedBox(10, 0, 0, w, h, c2001500)
+        draw.RoundedBox(9, 1, 1, w - 2, h - 2, c404040)
+    end
+    local label = vgui.Create("DLabel", box)
+    label:SetFont("DermaDefault")
+    label:SetTextColor(c200200200)
+    label:Center()
+    box.label = label
+    return box
+end
+
+local function updateBox(box, text, color)
+    box.label:SetText(text)
+    box.label:SetTextColor(color or c200200200)
+    box.label:SizeToContents()
+    box.label:Center()
+end
+
+local function createInfoBoxes(panel)
+    local totalWidth = buttonWidth * 3 + spacing * 2
+    local startX = (panelWidth - totalWidth) / 2
+    panel.infoPanels = {
+        createInfoBox(panel, startX),
+        createInfoBox(panel, startX + buttonWidth + spacing),
+        createInfoBox(panel, startX + (buttonWidth + spacing) * 2)
+    }
+    return unpack(panel.infoPanels)
+end
+
+local function applyInfo(panel, result)
+    local size = result.size and string.NiceSize(result.size) or "N/A"
+    local date = result.created and os.date("%Y-%m-%d", result.created) or "N/A"
+    local owner = result.ownername or "N/A"
+    updateBox(panel.infoPanels[1], ssize .. ": " .. size, getSizeColor(size))
+    updateBox(panel.infoPanels[2], screated .. ": " .. date)
+    updateBox(panel.infoPanels[3], sauthor .. ": " .. owner)
+end
+
+function BATTLEBEATS.createInfoPanel(panel, packData, callback)
+    if not IsValid(panel) then return end
+
+    local sizeP, dateP, authorP = createInfoBoxes(panel)
+    updateBox(sizeP, ssize .. ": Loading...")
+    updateBox(dateP, screated .. ": Loading...")
+    updateBox(authorP, sauthor .. ": Loading...")
+
+    if callback then
+        callback(sizeP, dateP, authorP)
     end
 
-    createInfoBoxes(panel, "Loading...", "Loading...", "Loading...")
-
+    local wsid = packData.wsid
     if not wsid then
-        createInfoBoxes(panel, "N/A", "N/A", "N/A")
+        applyInfo(panel, {})
         return
     end
 
     if BATTLEBEATS.wsCache[wsid] then
-        applyInfo(BATTLEBEATS.wsCache[wsid])
+        applyInfo(panel, BATTLEBEATS.wsCache[wsid])
         return
     end
 
     steamworks.FileInfo(wsid, function(result)
-        if not result then
-            result = { size = nil, created = nil, ownername = nil }
-        end
+        result = result or {}
         BATTLEBEATS.wsCache[wsid] = result
-        applyInfo(result)
+        if IsValid(panel) then
+            applyInfo(panel, result)
+        end
     end)
 end
 

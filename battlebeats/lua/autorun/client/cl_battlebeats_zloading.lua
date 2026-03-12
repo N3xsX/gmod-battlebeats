@@ -130,6 +130,16 @@ local dirHandlers = {
             return true, false
         end
     },
+    ["16thnote"] = {
+        packType = "16thnote",
+        handle = function(file)
+            if file:find("/ambient/", 1, true) then
+                return true, false
+            elseif file:find("/combat/", 1, true) then
+                return false, true
+            end
+        end
+    },
     default = {
         packType = "battlebeats",
         handle = function(file)
@@ -689,6 +699,13 @@ hook.Add("InitPostEntity", "BattleBeats_Load16thNoteLyrics", function()
     for _, filename in ipairs(files) do
         include("16thnote_lyric/" .. filename)
     end
+    for songName, data in pairs(BATTLEBEATS.subtitles) do
+        if data.raw then
+            BATTLEBEATS.parseSRT(songName)
+        elseif data.keyframes then
+            BATTLEBEATS.parse16thNote(songName)
+        end
+    end
 end)
 
 hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
@@ -706,7 +723,6 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     findConflicts()
     --
     loadSavedPacks()
-    BATTLEBEATS.ValidatePacks()
     for songName, data in pairs(BATTLEBEATS.subtitles) do
         if data.raw then
             BATTLEBEATS.parseSRT(songName)
@@ -714,7 +730,8 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
             BATTLEBEATS.parse16thNote(songName)
         end
     end
-    loadPatchNotes()
+    BATTLEBEATS.ValidatePacks()
+    --loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

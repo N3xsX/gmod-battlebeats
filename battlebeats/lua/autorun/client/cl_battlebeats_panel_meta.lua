@@ -106,13 +106,15 @@ local c1003030200 = Color(100, 30, 30, 200)
 local c602020200 = Color(60, 20, 20, 200)
 local c707070200 = Color(70, 70, 70, 200)
 local c404040200 = Color(40, 40, 40, 200)
-function PANEL:BTB_SetButtons(showMin)
+function PANEL:BTB_SetButtons(showMin, cX, cY)
+    cX = cX or 0
+    cY = cY or 0
     self.PerformLayout = function(self)
-        self.btnClose:SetPos(self:GetWide() - 31 - 4, 5)
+        self.btnClose:SetPos(self:GetWide() - 31 - 4 + cX, 5 + cY)
         self.btnClose:SetSize(31, 20)
-        self.btnMaxim:SetPos(self:GetWide() - 31 * 2 - 4, 5)
+        self.btnMaxim:SetPos(self:GetWide() - 31 * 2 - 4 + cX, 5 + cY)
         self.btnMaxim:SetSize(31, 20)
-        self.btnMinim:SetPos(self:GetWide() - 31 * 3 - 4, 5)
+        self.btnMinim:SetPos(self:GetWide() - 31 * 3 - 4 + cX, 5 + cY)
         self.btnMinim:SetSize(31, 20)
     end
     if not showMin then
@@ -173,6 +175,138 @@ function PANEL:BTB_PaintProperties()
     end
 end
 
+local function LerpColor(t, from, to)
+    return Color(
+        Lerp(t, from.r, to.r),
+        Lerp(t, from.g, to.g),
+        Lerp(t, from.b, to.b),
+        Lerp(t, from.a or 255, to.a or 255)
+    )
+end
+local hoveringButtons = {}
+hook.Add("Think", "BTB_UniversalButtonHoverLerp", function()
+    local ft = FrameTime() * 12
+    for btn in pairs(hoveringButtons) do
+        if not IsValid(btn) then
+            hoveringButtons[btn] = nil
+            continue
+        end
+        btn.currentColor = LerpColor(ft, btn.currentColor, btn.targetColor)
+        if btn.currentColor == btn.targetColor then
+            hoveringButtons[btn] = nil
+        end
+    end
+end)
+
+function PANEL:BTB_SetButton(outline, normalCol, hoverCol, noHover)
+    self.currentColor = normalCol
+    if not noHover then
+        self.normalColor = normalCol
+        self.hoverColor = hoverCol
+        self.targetColor = normalCol
+        local oldEnter = self.OnCursorEntered
+        local oldExit = self.OnCursorExited
+        self.OnCursorEntered = function(s, ...)
+            s.targetColor = s.hoverColor
+            hoveringButtons[s] = true
+            if oldEnter then
+                oldEnter(s, ...)
+            end
+        end
+        self.OnCursorExited  = function(s, ...)
+            s.targetColor = s.normalColor
+            if oldExit then
+                oldExit(s, ...)
+            end
+        end
+    end
+    self.Paint = function(s, w, h)
+        draw.RoundedBox(10, 0, 0, w, h, outline)
+        draw.RoundedBox(9, 1, 1, w - 2, h - 2, s.currentColor)
+    end
+end
+
+function PANEL:BTB_SetButtonOutline(outline, normalCol, hoverCol, noHover)
+    self.currentColor = normalCol
+    if not noHover then
+        self.normalColor = normalCol
+        self.hoverColor = hoverCol
+        self.targetColor = normalCol
+        local oldEnter = self.OnCursorEntered
+        local oldExit = self.OnCursorExited
+        self.OnCursorEntered = function(s, ...)
+            s.targetColor = s.hoverColor
+            hoveringButtons[s] = true
+            if oldEnter then
+                oldEnter(s, ...)
+            end
+        end
+        self.OnCursorExited  = function(s, ...)
+            s.targetColor = s.normalColor
+            if oldExit then
+                oldExit(s, ...)
+            end
+        end
+    end
+    self.Paint = function(s, w, h)
+        draw.RoundedBox(12, 0, 0, w, h, s.currentColor)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, outline)
+    end
+end
+
+local c2552100 = Color(255, 210, 0)
+local c25500 = Color(255, 0, 0)
+local c303030 = Color(30, 30, 30)
+function PANEL:BTB_UpdatePackButton(btn, state)
+    local col
+
+    if state == "enabled" then
+        col = c2552100
+        btn.packText = "#btb.ps.pack_enabled"
+    elseif state == "disabled" then
+        col = c25500
+        btn.packText = "#btb.ps.pack_disabled"
+    elseif state == "debug" then
+        col = c303030
+        btn.packText = "N/A"
+    end
+
+    if not col then return end
+
+    btn.normalColor = col
+    btn.hoverColor = Color(col.r + 50, col.g + 50, col.b + 50)
+    btn.targetColor = col
+    hoveringButtons[btn] = true
+end
+
+function PANEL:BTB_SetPackButton(normalCol, hoverCol)
+    self.currentColor = normalCol
+    self.normalColor = normalCol
+    self.hoverColor = hoverCol
+    self.targetColor = normalCol
+    local oldEnter = self.OnCursorEntered
+    local oldExit = self.OnCursorExited
+    self.OnCursorEntered = function(s, ...)
+        s.targetColor = s.hoverColor
+        hoveringButtons[s] = true
+        if oldEnter then
+            oldEnter(s, ...)
+        end
+    end
+    self.OnCursorExited  = function(s, ...)
+        s.targetColor = s.normalColor
+        if oldExit then
+            oldExit(s, ...)
+        end
+    end
+    self.Paint = function(s, w, h)
+        draw.RoundedBox(16, 0, 0, w, h, s.currentColor)
+        if s.packText then
+            draw.SimpleTextOutlined(language.GetPhrase(s.packText), "BattleBeats_Checkbox_Font", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, color_black)
+        end
+    end
+end
+
 function PANEL:BTB_SetTitle(title, isCentered)
     local frameTitle = vgui.Create("DLabel", self)
     if isCentered then
@@ -184,6 +318,21 @@ function PANEL:BTB_SetTitle(title, isCentered)
     frameTitle:SetText(title)
     frameTitle:SetContentAlignment(isCentered and 5 or 4)
     frameTitle:SetFont("DermaDefaultBold")
+    frameTitle:SetTextColor(color_white)
+    return frameTitle
+end
+
+function PANEL:BTB_SetTitleBig(title, isCentered)
+    local frameTitle = vgui.Create("DLabel", self)
+    if isCentered then
+        frameTitle:SetPos((self:GetWide() / 2) - 250, 10)
+    else
+        frameTitle:SetPos(10, 10)
+    end
+    frameTitle:SetSize(500, 20)
+    frameTitle:SetText(title)
+    frameTitle:SetContentAlignment(isCentered and 5 or 4)
+    frameTitle:SetFont("Trebuchet24")
     frameTitle:SetTextColor(color_white)
     return frameTitle
 end

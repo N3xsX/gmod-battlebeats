@@ -49,7 +49,7 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.4.2"
+BATTLEBEATS.currentVersion = "2.5.0b"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -544,7 +544,7 @@ local function PlayNextTrack(track, time, noFade, priority)
             end)
 
             timer.Create("BattleBeats_CheckSound", 1, 0, function() -- timer to check if track stops playing unexpectedly
-                if not IsValid(station) or station:GetState() ~= GMOD_CHANNEL_PLAYING then
+                if not IsValid(station) or (station:GetState() ~= GMOD_CHANNEL_PLAYING and station:GetState() ~= GMOD_CHANNEL_STALLED) then
                     if BATTLEBEATS.disableCheckingTimer then return end
                     debugPrint("[PlayNextTrack] Track stopped unexpectedly. Selecting next track")
                     timer.Remove("BattleBeats_CheckSound")
