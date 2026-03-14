@@ -224,6 +224,8 @@ local function validateTracksInPack(packName, func)
     nextTrack()
 end
 
+local btbClickSnd = "btb_button_click.mp3"
+
 local cHover = Color(50, 50, 50, 200)
 local cHover2 = Color(65, 65, 65, 200)
 
@@ -284,7 +286,7 @@ local function openBTBmenu()
         surface.DrawRect(0, 640, w, 1)
         BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, tempC)
     end
-    frame:BTB_SetButtons(true, -5, 5)
+    frame:BTB_SetButtons(true, -5, 5, true)
     frame.isMinimalized = false
 
     local frameTitle = frame:BTB_SetTitleBig("#btb.ps.title", true)
@@ -317,7 +319,7 @@ local function openBTBmenu()
     scrollBar.btnGrip:SetCursor("hand")
     scrollBar.btnGrip.Paint = function(self, w, h)
         draw.RoundedBox(10, 0, 0, w, h, c2552100)
-        draw.RoundedBox(8, 2, 2, w - 4, h - 4, c606060)
+        draw.RoundedBox(9, 1, 1, w - 2, h - 2, c606060)
     end
     scrollBar.AddScroll = function(self, d)
         local animTarget = self:GetScroll() + d * 60
@@ -333,6 +335,7 @@ local function openBTBmenu()
     optionsButton:SetText("")
     optionsButton:BTB_SetButton(c2552100, c707070255, c808080255)
     optionsButton.DoClick = function()
+        surface.PlaySound(btbClickSnd)
         RunConsoleCommand("battlebeats_options")
     end
     optionsButton:SetTooltip("#btb.ps.button.options")
@@ -348,6 +351,7 @@ local function openBTBmenu()
     local volumePanel = vgui.Create("DPanel", frame)
     volumePanel:SetSize(collapsedWidth, 40)
     volumePanel:SetPos(10, 650)
+    volumePanel.progress = volumeSet:GetInt() / 200
     volumePanel.Paint = function(self, w, h)
         draw.RoundedBox(10, 0, 0, w, h, c2552100)
         draw.RoundedBox(9, 1, 1, w - 2, h - 2, c707070255)
@@ -363,9 +367,7 @@ local function openBTBmenu()
     volumeBar:SetCursor("hand")
     volumeBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, c909090)
-        local cvar = volumeSet
-        local progress = cvar:GetInt() / 200
-        draw.RoundedBox(4, 0, 0, w * progress, h, c2552100)
+        draw.RoundedBox(4, 0, 0, w * volumePanel.progress, h, c2552100)
     end
     volumeLabel:SetPos(volumeBar:GetX(), 4)
     volumeLabel:SetVisible(false)
@@ -374,49 +376,44 @@ local function openBTBmenu()
     local volumeIcon = vgui.Create("DImage", volumePanel)
     volumeIcon:SetSize(40, 40)
     volumeIcon:SetPos(7, 0)
-    local pprogress = volumeSet:GetInt() / 200
-    if pprogress < 0.01 then
-        volumeIcon:SetImage("volume/v0.png")
-    elseif pprogress < 0.3 then
-        volumeIcon:SetImage("volume/v1.png")
-    elseif pprogress < 0.75 then
-        volumeIcon:SetImage("volume/v2.png")
-    else
-        volumeIcon:SetImage("volume/v3.png")
+    local currentIcon
+    local function updateIcon(progress)
+        local icon
+        if progress < 0.01 then
+            icon = "volume/v0.png"
+        elseif progress < 0.3 then
+            icon = "volume/v1.png"
+        elseif progress < 0.75 then
+            icon = "volume/v2.png"
+        else
+            icon = "volume/v3.png"
+        end
+        if icon ~= currentIcon then
+            currentIcon = icon
+            volumeIcon:SetImage(icon)
+        end
     end
+    updateIcon(volumePanel.progress)
 
     local dotPanel = vgui.Create("DPanel", volumePanel)
     dotPanel:SetMouseInputEnabled(false)
     dotPanel:SetSize(16, 12)
     dotPanel.Paint = function(self, w, h)
-        local cvar = volumeSet
-        local progress = cvar:GetInt() / 200
-        if progress >= 0 then
+        if volumePanel.progress >= 0 then
             draw.RoundedBox(12, 0, 0, w, h, color_white)
         end
     end
-    dotPanel.Think = function(self)
-        local cvar = volumeSet
-        local progress = cvar:GetInt() / 200
-        if progress > 1 then progress = 1 end
-        local barWidth = volumeBar:GetWide()
-        local dotX = 65 + barWidth * progress - 6
-        local dotY = 22 + volumeBar:GetTall() / 2 - 6
-        self:SetPos(dotX, dotY)
-    end
 
-    local function updateVolume(bar, x)
-        local progress = math.Clamp(x / bar:GetWide(), 0, 1)
-        local newValue = math.floor(progress * 200)
-        if progress < 0.01 then
-            volumeIcon:SetImage("volume/v0.png")
-        elseif progress < 0.3 then
-            volumeIcon:SetImage("volume/v1.png")
-        elseif progress < 0.75 then
-            volumeIcon:SetImage("volume/v2.png")
-        else
-            volumeIcon:SetImage("volume/v3.png")
-        end
+    local function updateDot(progress)
+        local barWidth = volumeBar:GetWide()
+        dotPanel:SetPos(65 + barWidth * progress - 6, 22 + volumeBar:GetTall() / 2 - 6)
+    end
+    updateDot(volumePanel.progress)
+
+    local function updateVolume()
+        local newValue = math.floor(volumePanel.progress * 200)
+        updateDot(volumePanel.progress)
+        updateIcon(volumePanel.progress)
         volumeSet:SetInt(newValue)
     end
 
@@ -432,7 +429,7 @@ local function openBTBmenu()
         end
         local targetWidth = isHovering and expandedWidth or collapsedWidth
         local currentWidth = self:GetWide()
-        local newWidth = Lerp(FrameTime() * 10, currentWidth, targetWidth)
+        local newWidth = Lerp(FrameTime() * 20, currentWidth, targetWidth)
         self:SetWide(newWidth)
         if newWidth > 60 then
             volumeBar:SetVisible(true)
@@ -446,14 +443,16 @@ local function openBTBmenu()
     volumeBar.OnMousePressed = function(self, code)
         if code == MOUSE_LEFT then
             local x, _ = self:CursorPos()
-            updateVolume(self, x)
+            volumePanel.progress = math.Clamp(x / self:GetWide(), 0, 1)
+            updateVolume()
             self.IsDragging = true
         end
     end
     volumeBar.Think = function(self)
         if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
             local x, _ = self:CursorPos()
-            updateVolume(self, x)
+            volumePanel.progress = math.Clamp(x / self:GetWide(), 0, 1)
+            updateVolume()
         elseif self.IsDragging and not input.IsMouseDown(MOUSE_LEFT) then
             self.IsDragging = false
         end
@@ -1197,7 +1196,7 @@ local function openBTBmenu()
                             parentOption:BTB_PaintProperties()
                             subMenu.Paint = function(self, w, h)
                                 draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                                draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+                                draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
                             end
 
                             local editOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_edit", function()
@@ -1324,7 +1323,7 @@ local function openBTBmenu()
                     menu:Open()
                     menu.Paint = function(self, w, h)
                         draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                        draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+                        draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
                     end
                 end
             end
@@ -1335,7 +1334,6 @@ local function openBTBmenu()
         --MARK:Sorting & search
         local nameText = "#btb.ps.ts.header.name"
         local excludeText = "#btb.ps.ts.header.exclude"
-        local listText = trackType == "ambient" and "#btb.ps.ts.header.ambient_list" or "#btb.ps.ts.header.combat_list"
         local searchPanel = vgui.Create("DPanel", parent)
         searchPanel:Dock(TOP)
         searchPanel:SetTall(60)
@@ -1345,11 +1343,8 @@ local function openBTBmenu()
             draw.RoundedBox(9, 1, 1, w - 2, h - 2, c404040)
             surface.SetFont("DermaDefaultBold")
             local excludeW = surface.GetTextSize(excludeText)
-            local listW = surface.GetTextSize(listText)
             draw.SimpleText(nameText, "DermaDefaultBold", 40, 45, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             draw.SimpleText(excludeText, "DermaDefaultBold", w - excludeW - 40, 45, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            if isAllMode then return end
-            draw.SimpleText(listText, "DermaDefaultBold", w / 2 - listW / 2, 45, c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end
 
         searchBox = vgui.Create("DTextEntry", searchPanel)
@@ -1389,7 +1384,7 @@ local function openBTBmenu()
         sortCombo.OnMenuOpened = function(panel)
             panel.Menu.Paint = function(self, w, h)
                 draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+                draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
             end
             for _, child in pairs(panel.Menu:GetChildren()) do
                 if IsValid(child) then
@@ -1417,7 +1412,7 @@ local function openBTBmenu()
         includeExcludeCombo.OnMenuOpened = function(panel)
             panel.Menu.Paint = function(self, w, h)
                 draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+                draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
             end
             for _, child in pairs(panel.Menu:GetChildren()) do
                 if IsValid(child) then
@@ -1735,6 +1730,7 @@ local function openBTBmenu()
             backButton:SetTextColor(color_white)
             backButton:BTB_SetButton(c2552100, c707070255, c808080255)
             backButton.DoClick = function()
+                surface.PlaySound(btbClickSnd)
                 playerPanel:SetVisible(false)
                 scrollPanel:SetSize(980, 580)
                 backButton:Remove()
@@ -1969,6 +1965,7 @@ local function openBTBmenu()
             end
             ambientButton.DoClick = function()
                 if packData.packContent ~= "combat" then
+                    surface.PlaySound(btbClickSnd)
                     createTrackEditor("ambient", packName, scrollPanel, frame)
                 end
             end
@@ -1983,6 +1980,7 @@ local function openBTBmenu()
             allButton:SetTextColor(color_white)
             allButton:BTB_SetButton(c2552100, c606060, c909090)
             allButton.DoClick = function()
+                surface.PlaySound(btbClickSnd)
                 createTrackEditor("all", packName, scrollPanel, frame)
             end
             panel.allButton = allButton
@@ -2007,6 +2005,7 @@ local function openBTBmenu()
             end
             combatButton.DoClick = function()
                 if packData.packContent ~= "ambient" then
+                    surface.PlaySound(btbClickSnd)
                     createTrackEditor("combat", packName, scrollPanel, frame)
                 end
             end
@@ -2106,7 +2105,7 @@ local function openBTBmenu()
                         menu:Open()
                         menu.Paint = function(self, w, h)
                             draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                            draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
                         end
                         return
                     end
@@ -2227,7 +2226,6 @@ local function openBTBmenu()
             local barWidth = 300
             panel.CreateErrorCalled = false
             panel.Paint = function(self, w, h)
-                BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, tempC)
                 if packData.verifying then
                     local offset = (CurTime() * 200 * 5) % (w + 200)
                     local barX = offset - barWidth
@@ -2258,12 +2256,11 @@ local function openBTBmenu()
                     return
                 end
                 draw.RoundedBox(12, 0, 0, w, h, self.currentColor)
+                BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, tempC)
             end
 
             panel.OnCursorEntered = function(self)
-                if not isErrored and not packData.verifying and not (debugMode and not packData.debug) then
-                    self:SetCursor("hand")
-                elseif packData.verifying then
+                if packData.verifying then
                     self:SetCursor("hourglass")
                 elseif isErrored or (debugMode and not packData.debug) then
                     self:SetCursor("no")
@@ -2447,7 +2444,7 @@ local function openBTBmenu()
         if GetConVar("battlebeats_debug_mode"):GetBool() and hasAnyDebugPack(orderedPacks) then
             verifyButton = vgui.Create("DButton", frame)
             verifyButton:SetSize(200, 20)
-            verifyButton:SetPos(650, 5)
+            verifyButton:SetPos(650, 10)
             verifyButton:SetText("Verify Packs")
             verifyButton:SetFont("CreditsText")
             verifyButton:SetTextColor(color_white)

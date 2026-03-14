@@ -155,7 +155,7 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
     local tgVolume = baseVolume or (volumeType / 100 * masterVolume)
 
     tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
-    debugPrint("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. tostring(track))
+    --debugPrint("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. tostring(track))
 
     if not track or track == "" then
         return math.Round(tgVolume, 2)
@@ -171,7 +171,7 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
             finalVol = finalVol * packMult
         end
     end
-    debugPrint("[adjustVolume] Pack Volume: " .. tostring(finalVol))
+    --debugPrint("[adjustVolume] Pack Volume: " .. tostring(finalVol))
 
     if BATTLEBEATS.trackVolume then
         local trackAdj = BATTLEBEATS.trackVolume[track]
@@ -180,11 +180,11 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
             finalVol = finalVol * trackMult
         end
     end
-    debugPrint("[adjustVolume] Pack + Track Volume: " .. tostring(finalVol))
+    --debugPrint("[adjustVolume] Pack + Track Volume: " .. tostring(finalVol))
 
     finalVol = hook.Run("BattleBeats_PostAdjustVolume", track, finalVol) or finalVol
     finalVol = math.Clamp(finalVol, 0, 10)
-    debugPrint("[adjustVolume] Final Volume: " .. tostring(finalVol))
+    --debugPrint("[adjustVolume] Final Volume: " .. tostring(finalVol))
     return math.Round(finalVol, 2)
 end
 

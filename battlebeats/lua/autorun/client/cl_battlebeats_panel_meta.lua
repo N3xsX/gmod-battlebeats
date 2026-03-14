@@ -20,7 +20,7 @@ end
 
 function tooltipPanel:Paint(w, h)
     draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-    draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+    draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
 end
 
 vgui.Register("BattleBeatsTooltip", tooltipPanel, "DTooltip")
@@ -90,7 +90,7 @@ function PANEL:BTB_SetImageTooltip(imagePath, text, width, maxImageHeight)
 
         imgtooltipPanel.Paint = function(self, w, h)
             draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-            draw.RoundedBox(8, 2, 2, w - 4, h - 4, Color(50, 50, 50))
+            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
         end
     end
 
@@ -106,7 +106,7 @@ local c1003030200 = Color(100, 30, 30, 200)
 local c602020200 = Color(60, 20, 20, 200)
 local c707070200 = Color(70, 70, 70, 200)
 local c404040200 = Color(40, 40, 40, 200)
-function PANEL:BTB_SetButtons(showMin, cX, cY)
+function PANEL:BTB_SetButtons(showMin, cX, cY, noSound)
     cX = cX or 0
     cY = cY or 0
     self.PerformLayout = function(self)
@@ -145,6 +145,15 @@ function PANEL:BTB_SetButtons(showMin, cX, cY)
         surface.SetDrawColor(255, 255, 255, 200)
         surface.DrawLine(8, 5, w - 8, h - 5)
         surface.DrawLine(w - 8, 5, 8, h - 5)
+    end
+    local oldDoClick = self.btnClose.DoClick
+    self.btnClose.DoClick = function(s, ...)
+        if not noSound then
+            surface.PlaySound("btb_button_exit.mp3")
+        end
+        if oldDoClick then
+            oldDoClick(s, ...)
+        end
     end
 end
 

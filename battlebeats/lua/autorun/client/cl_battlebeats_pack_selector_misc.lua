@@ -17,6 +17,14 @@ local function parseSize(sizeStr)
     end
 end
 
+local SEG = 6
+local ang_step = math.rad(90 / SEG)
+local quarter = {}
+for i = 0, SEG do
+    local a = i * ang_step
+    quarter[i] = { math.cos(a), math.sin(a) }
+end
+
 function BATTLEBEATS.drawRoundedOutline(radius, x, y, w, h, thickness, col)
     if radius > math.min(w, h) / 2 then radius = math.min(w, h) / 2 end
     if thickness < 1 then thickness = 1 end
@@ -28,15 +36,6 @@ function BATTLEBEATS.drawRoundedOutline(radius, x, y, w, h, thickness, col)
     surface.DrawRect(x, y + radius, thickness, h - radius * 2)
     surface.DrawRect(x + w - thickness, y + radius, thickness, h - radius * 2)
     draw.NoTexture()
-
-    local SEG = 12
-    local ang_step = math.rad(90 / SEG)
-
-    local quarter = {}
-    for i = 0, SEG do
-        local a = i * ang_step
-        quarter[i] = { math.cos(a), math.sin(a) }
-    end
 
     local rotations = {
         { cx = x + radius, cy = y + radius, cx_mul = -1, cy_mul = -1 }, -- TL
