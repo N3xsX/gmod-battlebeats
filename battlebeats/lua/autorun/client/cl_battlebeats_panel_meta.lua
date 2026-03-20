@@ -224,6 +224,7 @@ function PANEL:BTB_SetButton(outline, normalCol, hoverCol, noHover)
         end
         self.OnCursorExited  = function(s, ...)
             s.targetColor = s.normalColor
+            hoveringButtons[s] = true
             if oldExit then
                 oldExit(s, ...)
             end
@@ -252,6 +253,7 @@ function PANEL:BTB_SetButtonOutline(outline, normalCol, hoverCol, noHover)
         end
         self.OnCursorExited  = function(s, ...)
             s.targetColor = s.normalColor
+            hoveringButtons[s] = true
             if oldExit then
                 oldExit(s, ...)
             end
@@ -304,6 +306,7 @@ function PANEL:BTB_SetPackButton(normalCol, hoverCol)
     end
     self.OnCursorExited  = function(s, ...)
         s.targetColor = s.normalColor
+        hoveringButtons[s] = true
         if oldExit then
             oldExit(s, ...)
         end

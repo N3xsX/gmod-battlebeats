@@ -304,6 +304,8 @@ end
 
 local function loadBattleBeatsLocal()
     if not file.IsDir("sound/btb", "GAME") then return end
+    local files, dirs = file.Find("sound/btb/*", "GAME")
+    if (#files == 0) and (#dirs == 0) then return end
     local basePath = "sound/btb/"
     local rootFiles = file.Find(basePath .. "*", "GAME") or {}
     local ambientFiles = file.Find(basePath .. "ambient/*", "GAME") or {}
@@ -447,6 +449,11 @@ function BATTLEBEATS.SavePackVolumes()
     file.Write("battlebeats/battlebeats_pack_volumes.txt", jsonData or "{}")
 end
 
+function BATTLEBEATS.SavePlaylists()
+    local json = util.TableToJSON(BATTLEBEATS.musicPlaylists, true)
+    file.Write("battlebeats/battlebeats_playlists.txt", json)
+end
+
 --MARK: Loading functions
 local function loadExcludedTracks()
     loadTableFromFile("battlebeats/battlebeats_excluded_tracks.txt", "excludedTracks", function(track) return track, true end, BATTLEBEATS.SaveExcludedTracks)
@@ -528,6 +535,20 @@ end
 
 local function loadPackVolumes()
     loadTableFromFile("battlebeats/battlebeats_pack_volumes.txt", "packVolume", volumeTransform)
+end
+
+local function loadPlaylists()
+    loadTableFromFile("battlebeats/battlebeats_playlists.txt", "musicPlaylists",
+        function(name, data)
+            if not isstring(name) or not istable(data) then return nil end
+            local newName, newData = BATTLEBEATS.validateAndTransformPlaylist(name, data)
+            if not newName or not newData then return nil end
+            return newName, newData
+        end,
+        function()
+            BATTLEBEATS.SavePlaylists()
+        end
+    )
 end
 
 --MARK: Initialization
@@ -621,7 +642,7 @@ end
 local function buildTrackMap()
     BATTLEBEATS.trackToPack = {}
     for packName, pack in pairs(BATTLEBEATS.musicPacks) do
-        if not pack then continue end
+        if not pack or pack.packType == "playlist" then continue end
         for _, category in ipairs({ pack.combat or {}, pack.ambient or {} }) do
             for _, track in ipairs(category) do
                 BATTLEBEATS.trackToPack[track] = packName
@@ -668,7 +689,7 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Reworked offset system; now you can fully trim tracks and edit their start and end positions"
+            Color(150, 255, 150), "- Added ability to create your own playlists from other packs"
             --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(
@@ -719,6 +740,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadTrackTrims()
     loadTrackVolumes()
     loadPackVolumes()
+    loadPlaylists()
     buildTrackMap()
     findConflicts()
     --
@@ -731,7 +753,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         end
     end
     BATTLEBEATS.ValidatePacks()
-    --loadPatchNotes()
+    loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
@@ -742,6 +764,7 @@ concommand.Add("battlebeats_reload_packs", function()
     loadBattleBeatsMusicPacks(true)
     loadBattleBeatsMusicPacks(false)
     loadBattleBeatsLocal()
+    loadPlaylists()
     buildTrackMap()
     BATTLEBEATS.ValidatePacks()
 end)

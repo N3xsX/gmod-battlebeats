@@ -23,6 +23,7 @@ BATTLEBEATS.packIcons = {
     ["amusic"] = Material("packicons/amusic.jpg"),
     ["dynamo"] = Material("packicons/dynamo.jpg"),
     ["mp3p"] = Material("packicons/mp3p.jpg"),
+    ["playlist"] = Material("btbplaylist.png"),
     ["na"] = Material("btbna.jpg")
 }
 
@@ -35,6 +36,7 @@ BATTLEBEATS.categoryNames = {
     amusic = "Action Music",
     dynamo = "DYNAMO",
     mp3p = "MP3 Radio",
+    playlist = "Playlist",
     na = "Uncategorized",
     ["local"] = "Local"
 }
@@ -47,8 +49,42 @@ BATTLEBEATS.packOrder = {
     mp3p = 5,
     sbm = 6,
     dynamo = 7,
+    playlist = 20,
     ["local"] = 97,
     na = 98
+}
+
+local packButtons = {
+    {
+        name = "Zenless Zone Zero",
+        image = "promo/btbzzz.jpg",
+        workshop = "3457857973"
+    },
+    {
+        name = "The Witcher 3 Wild Hunt",
+        image = "promo/btbtw3.jpg",
+        workshop = "3483273863"
+    },
+    {
+        name = "Devil May Cry 5",
+        image = "promo/btbdmc.jpg",
+        workshop = "3490225788"
+    },
+    {
+        name = "Far Cry 4",
+        image = "promo/btbfc4.jpg",
+        workshop = "3548098038"
+    },
+    {
+        name = "Cyberpunk 2077",
+        image = "promo/btbcp.jpeg",
+        workshop = "3556630048"
+    },
+    {
+        name = "Resident Evil 4",
+        image = "promo/btbre4.jpg",
+        workshop = "3588540579"
+    }
 }
 
 surface.CreateFont("BattleBeats_Font", {
@@ -224,6 +260,53 @@ local function validateTracksInPack(packName, func)
     nextTrack()
 end
 
+local function isTrackInPlaylist(playlistName, track, trackType)
+    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
+    if not playlist or not playlist[trackType] then return false end
+    for _, v in ipairs(playlist[trackType]) do
+        if v.path == track then
+            return true
+        end
+    end
+    return false
+end
+local function addTrackToPlaylist(playlistName, track, trackType)
+    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
+    local pack = BATTLEBEATS.musicPacks[playlistName]
+    if not playlist or not pack then return end
+
+    playlist[trackType] = playlist[trackType] or {}
+    pack[trackType] = pack[trackType] or {}
+    table.insert(playlist[trackType], {
+        path = track,
+        exists = true
+    })
+    table.insert(pack[trackType], track)
+
+    BATTLEBEATS.SavePlaylists()
+end
+local function removeTrackFromPlaylist(playlistName, track, trackType)
+    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
+    local pack = BATTLEBEATS.musicPacks[playlistName]
+    if not playlist or not playlist[trackType] then return end
+
+    for i, v in ipairs(playlist[trackType]) do
+        if v.path == track then
+            table.remove(playlist[trackType], i)
+            break
+        end
+    end
+    if pack and pack[trackType] then
+        for i, v in ipairs(pack[trackType]) do
+            if v == track then
+                table.remove(pack[trackType], i)
+                break
+            end
+        end
+    end
+    BATTLEBEATS.SavePlaylists()
+end
+
 local btbClickSnd = "btb_button_click.mp3"
 
 local cHover = Color(50, 50, 50, 200)
@@ -241,10 +324,189 @@ local c505050 = Color(50, 50, 50)
 local c255255255200 = Color(255, 255, 255, 200)
 local c202020215 = Color(20, 20, 20, 215)
 local c404040200 = Color(40, 40, 40, 200)
+local c150150150 = Color(150, 150, 150)
+local c120120120150 = Color(120, 120, 120, 150)
 
 local c707070200 = Color(70, 70, 70, 200)
 
+local cpanelerror = Color(70, 50, 50, 200)
+local cdebughover = Color(110, 110, 60, 200)
+local cdebugunselected = Color(100, 100, 60, 200)
+local clocalhover = Color(50, 120, 120, 200)
+local clocalunselected = Color(50, 80, 80, 200)
+local cvererror = Color(150, 50, 0, 60)
+local cver = Color(255, 200, 0, 60)
+local cvertext = Color(255, 255, 255, 100)
+
 local versionConVar = GetConVar("battlebeats_seen_version")
+
+local function createButtons(panel, packName, packData)
+    if not IsValid(panel) then return end
+    if IsValid(panel.ambientButton) then return end
+    local buttonWidth, buttonHeight, spacing = 350, 30, 20
+    local allButtonWidth = buttonWidth / 2
+    local totalWidth = buttonWidth * 2 + allButtonWidth + spacing * 2
+    local startX = (950 - totalWidth) / 2
+    local ambientButton = vgui.Create("DButton", panel)
+    ambientButton:SetVisible(false)
+    ambientButton:SetSize(buttonWidth, buttonHeight)
+    ambientButton:SetPos(startX, 80)
+    ambientButton:SetText("#btb.ps.info.ambient_button")
+    ambientButton:SetFont("DermaDefaultBold")
+    ambientButton:SetTextColor(color_white)
+    local bgOutlineColorA = c2552100
+    if packData.packContent == "combat" or packData.packContent == "empty" then
+        bgOutlineColorA = c2001500
+        ambientButton:SetCursor("no")
+        ambientButton:BTB_SetButton(bgOutlineColorA, c404040, nil, true)
+        ambientButton:SetTooltip("#btb.ps.info.ambient_button_tip")
+        ambientButton:SetTooltipPanelOverride("BattleBeatsTooltip")
+        ambientButton:SetTextColor(c200200200)
+    else
+        ambientButton:BTB_SetButton(bgOutlineColorA, c606060, c909090)
+    end
+    ambientButton.DoClick = function()
+        if packData.packContent == "empty" then return end
+        if packData.packContent ~= "combat" then
+            surface.PlaySound(btbClickSnd)
+            BATTLEBEATS.openTrackList("ambient", packName)
+        end
+    end
+    panel.ambientButton = ambientButton
+
+    local allButton = vgui.Create("DButton", panel)
+    allButton:SetVisible(false)
+    allButton:SetSize(allButtonWidth, buttonHeight)
+    allButton:SetPos(startX + buttonWidth + spacing, 80)
+    allButton:SetText("#btb.ps.info.all_button")
+    allButton:SetFont("DermaDefaultBold")
+    allButton:SetTextColor(color_white)
+    local bgOutlineColorAL = c2552100
+    if packData.packContent == "empty" then
+        bgOutlineColorAL = c2001500
+        allButton:SetCursor("no")
+        allButton:BTB_SetButton(bgOutlineColorAL, c404040, nil, true)
+        allButton:SetTextColor(c200200200)
+    else
+        allButton:BTB_SetButton(bgOutlineColorAL, c606060, c909090)
+    end
+    allButton.DoClick = function()
+        if packData.packContent == "empty" then return end
+        surface.PlaySound(btbClickSnd)
+        BATTLEBEATS.openTrackList("all", packName)
+    end
+    panel.allButton = allButton
+
+    local combatButton = vgui.Create("DButton", panel)
+    combatButton:SetVisible(false)
+    combatButton:SetSize(buttonWidth, buttonHeight)
+    combatButton:SetPos(startX + buttonWidth + spacing + allButtonWidth + spacing, 80)
+    combatButton:SetText("#btb.ps.info.combat_button")
+    combatButton:SetFont("DermaDefaultBold")
+    combatButton:SetTextColor(color_white)
+    local bgOutlineColorC = c2552100
+    if packData.packContent == "ambient" or packData.packContent == "empty" then
+        bgOutlineColorC = c2001500
+        combatButton:SetCursor("no")
+        combatButton:BTB_SetButton(bgOutlineColorC, c404040, nil, true)
+        combatButton:SetTooltip("#btb.ps.info.combat_button_tip")
+        combatButton:SetTooltipPanelOverride("BattleBeatsTooltip")
+        combatButton:SetTextColor(c200200200)
+    else
+        combatButton:BTB_SetButton(bgOutlineColorC, c606060, c909090)
+    end
+    combatButton.DoClick = function()
+        if packData.packContent == "empty" then return end
+        if packData.packContent ~= "ambient" then
+            surface.PlaySound(btbClickSnd)
+            BATTLEBEATS.openTrackList("combat", packName)
+        end
+    end
+    panel.combatButton = combatButton
+end
+
+local c2201200150 = Color(220, 120, 0, 150)
+local function createBasePanel(parent, call, isNotice, margin)
+    local panel = vgui.Create("DPanel", parent)
+    panel:Dock(TOP)
+    panel:DockMargin(0, margin and 0 or 5, 0, margin or 0)
+    panel:SetTall(41)
+    panel.Paint = function(self, w, h)
+        local bgColor = isNotice and Color(150, 150, 150, 150) or c2201200150
+        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+    end
+    local icon = vgui.Create("DImage", panel)
+    icon:Dock(LEFT)
+    icon:SetWide(32)
+    icon:DockMargin(5, 5, 5, 5)
+    if isNotice then
+        icon:SetImage("btbinfo.png")
+    else
+        icon:SetImage("btberror.png")
+    end
+    if call then
+        call(panel)
+    end
+    return panel
+end
+
+local function checkVolume(parent)
+    local time = tonumber(cookie.GetString("battlebeats_high_volume_time", "0")) or 0
+    local level = tonumber(cookie.GetString("battlebeats_high_volume_warn", "0")) or 0
+    local thresholds = {
+        3600, -- 1h
+        14400, -- 4h
+        28800, -- 8h
+        86400 -- 24h
+    }
+    local newLevel = level
+    for i = level + 1, #thresholds do
+        if time >= thresholds[i] then
+            newLevel = i
+        else
+            break
+        end
+    end
+    if newLevel > level then
+        cookie.Set("battlebeats_high_volume_warn", tostring(newLevel))
+        level = newLevel
+    end
+    if level <= 0 then return end
+    createBasePanel(parent, function(panel)
+        local label1 = vgui.Create("DLabel", panel)
+        label1:Dock(TOP)
+        label1:SetTall(20)
+        label1:SetText(language.GetPhrase("btb.ps.warn.volume_" .. (level)))
+        label1:SetFont("BattleBeats_Notification_Font_Misc")
+        label1:SetTextColor(color_white)
+        label1:SetContentAlignment(5)
+        local label2 = vgui.Create("DLabel", panel)
+        label2:Dock(TOP)
+        label2:SetTall(20)
+        label2:SetText(language.GetPhrase("btb.ps.warn.volume_" .. (level) .. (level)))
+        label2:SetFont("BattleBeats_Notification_Font_Misc")
+        label2:SetTextColor(color_white)
+        label2:SetContentAlignment(5)
+    end)
+end
+
+local function styleTabButton(btn, typeName, currentFilter)
+    btn:SetText("")
+    btn.OnCursorEntered = function(self)
+        surface.PlaySound("ui/buttonrollover.wav")
+    end
+    btn.Paint = function(self, w, h)
+        local isActive = (currentFilter == typeName)
+        local txtColor = isActive and color_white or
+        ((self:IsHovered() and self:IsEnabled()) and c200200200 or c150150150)
+        draw.SimpleText(typeName == "packages" and "#btb.ps.tab_packs" or "#btb.ps.tab_playlists", "BattleBeats_Font", w / 2, h / 2 - 5, txtColor, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+        local lineW = isActive and w * 0.6 or ((self:IsHovered() and self:IsEnabled()) and w * 0.4 or w * 0.2)
+        local lineX = (w - lineW) / 2
+        local lineColor = isActive and c2552100 or c120120120150
+        draw.RoundedBox(2, lineX, h - 6, lineW, 3, lineColor)
+    end
+end
 
 local blur = Material("pp/blurscreen")
 local function drawBlur(panel, amount)
@@ -259,7 +521,6 @@ local function drawBlur(panel, amount)
     end
 end
 
-local tempC = c2552100
 --MARK:Main UI
 local function openBTBmenu()
     if IsValid(frame) then return end
@@ -281,10 +542,10 @@ local function openBTBmenu()
     frame.Paint = function(self, w, h)
         drawBlur(self, 3)
         draw.RoundedBox(12, 0, 0, w, h, c202020215)
-        surface.SetDrawColor(tempC)
+        surface.SetDrawColor(c2552100)
         surface.DrawRect(0, 40, w, 1)
         surface.DrawRect(0, 640, w, 1)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, tempC)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
     frame:BTB_SetButtons(true, -5, 5, true)
     frame.isMinimalized = false
@@ -347,9 +608,11 @@ local function openBTBmenu()
 
     --MARK:Volume bar
     local collapsedWidth = 55
-    local expandedWidth = 340
+    local expandedWidth = 330
     local volumePanel = vgui.Create("DPanel", frame)
+    volumePanel.expanded = cookie.GetNumber("battlebeats_vol_expanded", 0) == 1
     volumePanel:SetSize(collapsedWidth, 40)
+    volumePanel:SetWide(volumePanel.expanded and expandedWidth or collapsedWidth)
     volumePanel:SetPos(10, 650)
     volumePanel.progress = volumeSet:GetInt() / 200
     volumePanel.Paint = function(self, w, h)
@@ -376,6 +639,8 @@ local function openBTBmenu()
     local volumeIcon = vgui.Create("DImage", volumePanel)
     volumeIcon:SetSize(40, 40)
     volumeIcon:SetPos(7, 0)
+    volumeIcon:SetCursor("hand")
+    volumeIcon:SetMouseInputEnabled(true)
     local currentIcon
     local function updateIcon(progress)
         local icon
@@ -418,45 +683,45 @@ local function openBTBmenu()
     end
 
     volumePanel.Think = function(self)
-        local hovered = vgui.GetHoveredPanel()
-        local isHovering = false
-        while hovered do
-            if hovered == self then
-                isHovering = true
-                break
-            end
-            hovered = hovered:GetParent()
-        end
-        local targetWidth = isHovering and expandedWidth or collapsedWidth
-        local currentWidth = self:GetWide()
-        local newWidth = Lerp(FrameTime() * 20, currentWidth, targetWidth)
+        local targetWidth = self.expanded and expandedWidth or collapsedWidth
+        local newWidth = math.Approach(self:GetWide(), targetWidth, FrameTime() * 800)
         self:SetWide(newWidth)
-        if newWidth > 60 then
-            volumeBar:SetVisible(true)
-            volumeLabel:SetVisible(true)
+        local visible = newWidth > 120
+        volumeBar:SetVisible(visible)
+        volumeLabel:SetVisible(visible)
+    end
+
+    local function setBarInteractive(enabled)
+        if enabled then
+            volumeBar.OnMousePressed = function(self, code)
+                if code ~= MOUSE_LEFT then return end
+                local x, _ = self:CursorPos()
+                volumePanel.progress = math.Clamp(x / self:GetWide(), 0, 1)
+                updateVolume()
+                self.IsDragging = true
+            end
+            volumeBar.Think = function(self)
+                if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
+                    local x, _ = self:CursorPos()
+                    volumePanel.progress = math.Clamp(x / self:GetWide(), 0, 1)
+                    updateVolume()
+                elseif self.IsDragging and not input.IsMouseDown(MOUSE_LEFT) then
+                    self.IsDragging = false
+                end
+            end
         else
-            volumeBar:SetVisible(false)
-            volumeLabel:SetVisible(false)
+            volumeBar.OnMousePressed = nil
+            volumeBar.Think = nil
+            volumeBar.IsDragging = false
         end
     end
 
-    volumeBar.OnMousePressed = function(self, code)
-        if code == MOUSE_LEFT then
-            local x, _ = self:CursorPos()
-            volumePanel.progress = math.Clamp(x / self:GetWide(), 0, 1)
-            updateVolume()
-            self.IsDragging = true
-        end
+    volumeIcon.OnMousePressed = function()
+        volumePanel.expanded = not volumePanel.expanded
+        cookie.Set("battlebeats_vol_expanded", volumePanel.expanded and 1 or 0)
+        setBarInteractive(volumePanel.expanded)
     end
-    volumeBar.Think = function(self)
-        if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
-            local x, _ = self:CursorPos()
-            volumePanel.progress = math.Clamp(x / self:GetWide(), 0, 1)
-            updateVolume()
-        elseif self.IsDragging and not input.IsMouseDown(MOUSE_LEFT) then
-            self.IsDragging = false
-        end
-    end
+    setBarInteractive(volumePanel.expanded)
 
     --MARK:Save button
     local saveButton = vgui.Create("DButton", frame)
@@ -466,6 +731,243 @@ local function openBTBmenu()
     saveButton:SetFont("CreditsText")
     saveButton:SetTextColor(color_white)
     saveButton:BTB_SetButton(c2552100, c707070255, c808080255)
+
+    --MARK:New playlist button
+    local playlistFrame
+    local importFrame
+    local createPlaylistBtn = vgui.Create("DButton", frame)
+    createPlaylistBtn:SetSize(200, 40)
+    createPlaylistBtn:SetPos(690, 650)
+    createPlaylistBtn:SetText("#btb.ps.button_new")
+    createPlaylistBtn:SetFont("CreditsText")
+    createPlaylistBtn:SetTextColor(color_white)
+    createPlaylistBtn:BTB_SetButton(c2552100, c707070255, c808080255)
+    createPlaylistBtn.DoClick = function()
+        if IsValid(playlistFrame) then return end
+        surface.PlaySound(btbClickSnd)
+        playlistFrame = vgui.Create("DPanel", frame)
+        playlistFrame:SetSize(400, 220)
+        playlistFrame:Center()
+        playlistFrame.Paint = function(self, w, h)
+            drawBlur(self, 3)
+            draw.RoundedBox(12, 0, 0, w, h, c202020215)
+            BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        end
+        local playlistBtn = vgui.Create("DButton", playlistFrame)
+        playlistBtn:SetSize(360, 80)
+        playlistBtn:SetPos(20, 20)
+        playlistBtn:SetText("#btb.ps.button_create")
+        playlistBtn:SetFont("BattleBeats_Font")
+        playlistBtn:SetTextColor(color_white)
+        playlistBtn:BTB_SetButton(c2552100, c707070255, c808080255)
+        playlistBtn.DoClick = function()
+            BATTLEBEATS.openPlaylistEditor(nil, function()
+                RefreshList()
+            end)
+            playlistFrame:Remove()
+        end
+        local importBtn = vgui.Create("DButton", playlistFrame)
+        importBtn:SetSize(360, 80)
+        importBtn:SetPos(20, 120)
+        importBtn:SetText("#btb.ps.button_import")
+        importBtn:SetFont("BattleBeats_Font")
+        importBtn:SetTextColor(color_white)
+        importBtn:BTB_SetButton(c2552100, c707070255, c808080255)
+        importBtn.DoClick = function()
+            playlistFrame:Remove()
+            if IsValid(importFrame) then return end
+            surface.PlaySound(btbClickSnd)
+            importFrame = vgui.Create("DPanel", frame)
+            importFrame:SetSize(500, 230)
+            importFrame:Center()
+            importFrame.Paint = function(self, w, h)
+                drawBlur(self, 3)
+                draw.RoundedBox(12, 0, 0, w, h, c202020215)
+                BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+            end
+            local codeEntry = vgui.Create("DTextEntry", importFrame)
+            codeEntry:SetSize(460, 80)
+            codeEntry:SetPos(20, 20)
+            codeEntry:SetMultiline(true)
+            codeEntry.Paint = function(self, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, c808080255)
+                self:DrawTextEntryText(color_white, color_white, color_white)
+                if self:GetText() == "" and not self:IsEditing() then
+                    draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                end
+            end
+            local nameEntry = vgui.Create("DTextEntry", importFrame)
+            nameEntry:SetSize(460, 30)
+            nameEntry:SetPos(20, 110)
+            nameEntry:SetFont("BattleBeats_Font")
+            nameEntry.Paint = function(self, w, h)
+                draw.RoundedBox(4, 0, 0, w, h, c808080255)
+                self:DrawTextEntryText(color_white, color_white, color_white)
+                if self:GetText() == "" and not self:IsEditing() then
+                    draw.SimpleText("#btb.playlist.create.enter_name", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                end
+            end
+            local infoLabel = vgui.Create("DLabel", importFrame)
+            infoLabel:SetPos(20, 150)
+            infoLabel:SetSize(460, 20)
+            infoLabel:SetTextColor(color_white)
+            infoLabel:SetFont("CenterPrintText")
+            infoLabel:SetContentAlignment(5)
+            infoLabel:SetText("No data loaded")
+            local decodedData = nil
+            local missing = {}
+            local importClean = vgui.Create("DButton", importFrame)
+            local importKeep = vgui.Create("DButton", importFrame)
+            importClean:SetEnabled(false)
+            importKeep:SetEnabled(false)
+            importClean:SetTooltip("#btb.ps.button_import_clean_tip")
+            importClean:SetTooltipPanelOverride("BattleBeatsTooltip")
+            importKeep:SetTooltip("#btb.ps.button_import_keep_tip")
+            importKeep:SetTooltipPanelOverride("BattleBeatsTooltip")
+            importClean:SetTextColor(c100100100)
+            importKeep:SetTextColor(c100100100)
+            importClean:SetCursor("no")
+            importKeep:SetCursor("no")
+            importClean:SetFont("CenterPrintText")
+            importKeep:SetFont("CenterPrintText")
+            codeEntry.OnTextChanged = function(self)
+                timer.Remove("BTB_ImportDecodeTimer")
+                timer.Create("BTB_ImportDecodeTimer", 0.3, 1, function()
+                    if not IsValid(self) then return end
+                    local text = self:GetValue()
+                    decodedData = nil
+                    missing = {}
+                    local data = BATTLEBEATS.importPlaylist(text)
+                    if not data then
+                        infoLabel:SetText("#btb.playlist.import.invalid_code")
+                        importClean:SetEnabled(false)
+                        importKeep:SetEnabled(false)
+                        importClean:SetCursor("no")
+                        importKeep:SetCursor("no")
+                        importClean:SetTextColor(c100100100)
+                        importKeep:SetTextColor(c100100100)
+                        return
+                    end
+                    decodedData = data
+                    local function check(list)
+                        for _, track in ipairs(list or {}) do
+                            if not file.Exists(track.path, "GAME") then
+                                table.insert(missing, track.path)
+                            end
+                        end
+                    end
+                    check(data.ambient)
+                    check(data.combat)
+                    if #missing > 0 then
+                        importClean:SetEnabled(true)
+                        importKeep:SetEnabled(true)
+                        importClean:SetCursor("hand")
+                        importKeep:SetCursor("hand")
+                        importClean:SetTextColor(color_white)
+                        importKeep:SetTextColor(color_white)
+                        infoLabel:SetText(language.GetPhrase("btb.playlist.import.missing_tracks") .. ": " .. table.concat(missing, ", "))
+                    else
+                        importClean:SetEnabled(true)
+                        importKeep:SetEnabled(false)
+                        importClean:SetCursor("hand")
+                        importKeep:SetCursor("no")
+                        importClean:SetTextColor(color_white)
+                        importKeep:SetTextColor(c100100100)
+                        infoLabel:SetText("#btb.playlist.import.all_good")
+                    end
+                end)
+            end
+
+            importClean:SetSize(140, 30)
+            importClean:SetPos(20, 180)
+            importClean:SetText("#btb.ps.button_import_clean")
+            importClean.DoClick = function()
+                if not decodedData then return end
+                local name = nameEntry:GetValue()
+                if name == "" then
+                    notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
+                    surface.PlaySound("buttons/button11.wav")
+                    return
+                end
+                for packName, _ in pairs(BATTLEBEATS.musicPacks or {}) do
+                    if name == packName then
+                        if not isEdit or editedTitle ~= title then
+                            notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
+                            surface.PlaySound("buttons/button11.wav")
+                            return
+                        end
+                    end
+                end
+
+                local function filter(list)
+                    local new = {}
+                    for _, track in ipairs(list or {}) do
+                        if file.Exists(track.path, "GAME") then
+                            table.insert(new, track)
+                        end
+                    end
+                    return new
+                end
+                notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
+                surface.PlaySound("buttons/button3.wav")
+                decodedData.ambient = filter(decodedData.ambient)
+                decodedData.combat = filter(decodedData.combat)
+                BATTLEBEATS.musicPlaylists[name] = decodedData
+                BATTLEBEATS.validateAndTransformPlaylist(name, decodedData)
+                BATTLEBEATS.SavePlaylists()
+                importFrame:Remove()
+                RefreshList()
+            end
+            importClean.Paint = function(self, w, h)
+                draw.RoundedBox(8, 0, 0, w, h, self:IsEnabled() and (self:IsHovered() and c100100100 or c808080255) or c606060)
+            end
+
+            importKeep:SetSize(140, 30)
+            importKeep:SetPos(180, 180)
+            importKeep:SetText("#btb.ps.button_import_keep")
+            importKeep.DoClick = function()
+                if not decodedData then return end
+                local name = nameEntry:GetValue()
+                if name == "" then
+                    notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
+                    surface.PlaySound("buttons/button11.wav")
+                    return
+                end
+                for packName, _ in pairs(BATTLEBEATS.musicPacks or {}) do
+                    if name == packName then
+                        if not isEdit or editedTitle ~= title then
+                            notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
+                            surface.PlaySound("buttons/button11.wav")
+                            return
+                        end
+                    end
+                end
+                notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
+                surface.PlaySound("buttons/button3.wav")
+                BATTLEBEATS.musicPlaylists[name] = decodedData
+                BATTLEBEATS.validateAndTransformPlaylist(name, decodedData)
+                BATTLEBEATS.SavePlaylists()
+                importFrame:Remove()
+                RefreshList()
+            end
+            importKeep.Paint = function(self, w, h)
+                draw.RoundedBox(8, 0, 0, w, h, self:IsEnabled() and (self:IsHovered() and c100100100 or c808080255) or c606060)
+            end
+
+            local cancelBtn = vgui.Create("DButton", importFrame)
+            cancelBtn:SetSize(140, 30)
+            cancelBtn:SetPos(340, 180)
+            cancelBtn:SetText("#btb.main.volume_cancel")
+            cancelBtn:SetTextColor(color_white)
+            cancelBtn:SetFont("CenterPrintText")
+            cancelBtn.DoClick = function()
+                importFrame:Remove()
+            end
+            cancelBtn.Paint = function(self, w, h)
+                draw.RoundedBox(8, 0, 0, w, h, self:IsHovered() and c100100100 or c808080255)
+            end
+        end
+    end
 
     --MARK:Music player panel
     local playerPanel = vgui.Create("DPanel", frame)
@@ -1023,12 +1525,6 @@ local function openBTBmenu()
                     for _ in pairs(BATTLEBEATS.favoriteTracks) do
                         favoriteCount = favoriteCount + 1
                     end
-                    local copy = menu:AddOption("#btb.ps.ts.rmb.copy", function()
-                        SetClipboardText(track)
-                    end)
-                    copy:SetImage("icon16/tag.png")
-                    copy:BTB_PaintProperties()
-
                     local vol = (BATTLEBEATS.trackVolume[track] ~= nil and (BATTLEBEATS.trackVolume[track] - 100)) or 0
                     local optionName
                     if vol ~= 0 then
@@ -1044,6 +1540,63 @@ local function openBTBmenu()
                     end)
                     volumeOption:SetImage("icon16/sound.png")
                     volumeOption:BTB_PaintProperties()
+
+                    local addList = {}
+                    local removeList = {}
+                    for playlistName, _ in pairs(BATTLEBEATS.musicPlaylists) do
+                        local isIn = isTrackInPlaylist(playlistName, track, row.actualType)
+                        if isIn then
+                            table.insert(removeList, playlistName)
+                        else
+                            table.insert(addList, playlistName)
+                        end
+                    end
+
+                    local packData = selectedPack and BATTLEBEATS.musicPacks[selectedPack]
+                    if #addList > 0 and packData and packData.packType ~= "playlist" then
+                        local addSub, menPaint = menu:AddSubMenu(language.GetPhrase("btb.playlist.add_to") .. ":")
+                        menPaint:BTB_PaintProperties()
+                        menPaint:SetImage("icon16/arrow_branch.png")
+                        addSub.Paint = function(self, w, h)
+                            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+                        end
+                        for _, playlistName in ipairs(addList) do
+                            local opt = addSub:AddOption(playlistName, function()
+                                addTrackToPlaylist(playlistName, track, row.actualType)
+                                surface.PlaySound("buttons/button14.wav")
+                            end)
+                            opt:BTB_PaintProperties()
+                        end
+                    end
+
+                    if #removeList > 0 and packData and packData.packType ~= "playlist" then
+                        local removeSub, menPaint = menu:AddSubMenu(language.GetPhrase("btb.playlist.remove_from") .. ":")
+                        menPaint:BTB_PaintProperties()
+                        menPaint:SetImage("icon16/delete.png")
+                        removeSub.Paint = function(self, w, h)
+                            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+                        end
+                        for _, playlistName in ipairs(removeList) do
+                            local opt = removeSub:AddOption(playlistName, function()
+                                removeTrackFromPlaylist(playlistName, track, row.actualType)
+                                surface.PlaySound("buttons/button14.wav")
+                            end)
+                            opt:BTB_PaintProperties()
+                        end
+                    end
+
+                    if packData and packData.packType == "playlist" then
+                        menu:AddSpacer()
+                        local opt = menu:AddOption("#btb.playlist.remove_track", function()
+                            removeTrackFromPlaylist(selectedPack, track, row.actualType)
+                            createTrackList(parent, trackType, selectedPack)
+                            surface.PlaySound("buttons/button14.wav")
+                        end)
+                        opt:SetImage("icon16/delete.png")
+                        opt:BTB_PaintProperties()
+                    end
 
                     --MARK:RMB favorites
                     if isFavorite then
@@ -1320,6 +1873,12 @@ local function openBTBmenu()
                         lyricsOption:SetImage("icon16/text_align_left.png")
                         lyricsOption:BTB_PaintProperties()
                     end
+
+                    local copy = menu:AddOption("#btb.ps.ts.rmb.copy", function()
+                        SetClipboardText(track)
+                    end)
+                    copy:SetImage("icon16/tag.png")
+                    copy:BTB_PaintProperties()
                     menu:Open()
                     menu.Paint = function(self, w, h)
                         draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
@@ -1429,15 +1988,33 @@ local function openBTBmenu()
         end
 
         local packType = BATTLEBEATS.musicPacks[selectedPack].packType
-        if packType ~= "16thnote" and packType ~= "battlebeats" and packType ~= "local" then
-            local inforow = vgui.Create("DPanel", parent)
-            inforow:SetSize(0, 30)
-            inforow:Dock(TOP)
-            inforow:DockMargin(0, 0, 15, 10)
-            inforow.Paint = function(self, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, cHover)
-                draw.SimpleText("#btb.ps.ts.format", "BattleBeats_Notification_Font_Misc", w / 2, h / 2, c255255255200, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            end
+        if packType ~= "16thnote" and packType ~= "battlebeats" and packType ~= "local" and packType ~= "playlist" then
+            createBasePanel(scrollPanel, function(panel)
+                local label1 = vgui.Create("DLabel", panel)
+                label1:Dock(TOP)
+                label1:SetTall(41)
+                label1:SetText("#btb.ps.ts.format")
+                label1:SetFont("BattleBeats_Notification_Font_Misc")
+                label1:SetTextColor(color_white)
+                label1:SetContentAlignment(5)
+            end, true, 10)
+        elseif packType == "playlist" then
+            createBasePanel(parent, function(panel)
+                local label1 = vgui.Create("DLabel", panel)
+                label1:Dock(TOP)
+                label1:SetTall(20)
+                label1:SetText("#btb.ps.ts.playlist_info1")
+                label1:SetFont("BattleBeats_Notification_Font_Misc")
+                label1:SetTextColor(color_white)
+                label1:SetContentAlignment(5)
+                local label2 = vgui.Create("DLabel", panel)
+                label2:Dock(TOP)
+                label2:SetTall(20)
+                label2:SetText("#btb.ps.ts.playlist_info2")
+                label2:SetFont("BattleBeats_Notification_Font_Misc")
+                label2:SetTextColor(color_white)
+                label2:SetContentAlignment(5)
+            end, true, 10)
         end
 
         local divider = vgui.Create("DPanel", parent)
@@ -1575,88 +2152,8 @@ local function openBTBmenu()
 
     --MARK:Main UI list
 
-    local c2201200150 = Color(220, 120, 0, 150)
-    local function createBasePanel(parent, call, isNotice)
-        local panel = vgui.Create("DPanel", parent)
-        panel:Dock(TOP)
-        panel:DockMargin(0, 5, 0, 0)
-        panel:SetTall(41)
-        panel.Paint = function(self, w, h)
-            local bgColor = isNotice and Color(150, 150, 150, 150) or c2201200150
-            draw.RoundedBox(4, 0, 0, w, h, bgColor)
-        end
-        local icon = vgui.Create("DImage", panel)
-        icon:Dock(LEFT)
-        icon:SetWide(32)
-        icon:DockMargin(5, 5, 5, 5)
-        if isNotice then
-            icon:SetImage("btbinfo.png")
-        else
-            icon:SetImage("btberror.png")
-        end
-        if call then
-            call(panel)
-        end
-        return panel
-    end
-
-    local function checkVolume(parent)
-        local time = tonumber(cookie.GetString("battlebeats_high_volume_time", "0")) or 0
-        local level = tonumber(cookie.GetString("battlebeats_high_volume_warn", "0")) or 0
-        local thresholds = {
-            3600, -- 1h
-            14400, -- 4h
-            28800, -- 8h
-            86400 -- 24h
-        }
-        local newLevel = level
-        for i = level + 1, #thresholds do
-            if time >= thresholds[i] then
-                newLevel = i
-            else
-                break
-            end
-        end
-        if newLevel > level then
-            cookie.Set("battlebeats_high_volume_warn", tostring(newLevel))
-            level = newLevel
-        end
-        if level <= 0 then return end
-        createBasePanel(parent, function(panel)
-            local label1 = vgui.Create("DLabel", panel)
-            label1:Dock(TOP)
-            label1:SetTall(20)
-            label1:SetText(language.GetPhrase("btb.ps.warn.volume_" .. (level)))
-            label1:SetFont("BattleBeats_Notification_Font_Misc")
-            label1:SetTextColor(color_white)
-            label1:SetContentAlignment(5)
-            local label2 = vgui.Create("DLabel", panel)
-            label2:Dock(TOP)
-            label2:SetTall(20)
-            label2:SetText(language.GetPhrase("btb.ps.warn.volume_" .. (level) .. (level)))
-            label2:SetFont("BattleBeats_Notification_Font_Misc")
-            label2:SetTextColor(color_white)
-            label2:SetContentAlignment(5)
-        end)
-    end
-
+    local currentFilter = "packages"
     local function showConflicts()
-        createBasePanel(scrollPanel, function(panel)
-            local label1 = vgui.Create("DLabel", panel)
-            label1:Dock(TOP)
-            label1:SetTall(20)
-            label1:SetText("Hey! BattleBeats UI is getting a rework")
-            label1:SetFont("BattleBeats_Notification_Font_Misc")
-            label1:SetTextColor(color_white)
-            label1:SetContentAlignment(5)
-            local label2 = vgui.Create("DLabel", panel)
-            label2:Dock(TOP)
-            label2:SetTall(20)
-            label2:SetText("Things might look a bit odd or not work properly. Sorry in advance! If you encounter any bugs, please report them on Steam page")
-            label2:SetFont("BattleBeats_Notification_Font_Misc")
-            label2:SetTextColor(color_white)
-            label2:SetContentAlignment(5)
-        end, true)
         checkVolume(scrollPanel)
         if not table.IsEmpty(BATTLEBEATS.activeConflicts) then
             createBasePanel(scrollPanel, function(panel)
@@ -1707,6 +2204,40 @@ local function openBTBmenu()
         if IsValid(verifyButton) then verifyButton:SetVisible(true) end
         scrollBar:SetWide(0)
         frameTitle:SetText("#btb.ps.title")
+        createPlaylistBtn:SetVisible(currentFilter == "playlists")
+
+        local debugMode = GetConVar("battlebeats_debug_mode"):GetBool()
+        local btnPanel = vgui.Create("DPanel", scrollPanel)
+        btnPanel:Dock(TOP)
+        btnPanel:SetTall(40)
+        btnPanel.Paint = function () end
+        local packagesBtn = vgui.Create("DButton", btnPanel)
+        packagesBtn:Dock(LEFT)
+        packagesBtn:SetWide(500)
+        packagesBtn:SetText("Packages")
+        local playlistsBtn = vgui.Create("DButton", btnPanel)
+        playlistsBtn:Dock(RIGHT)
+        playlistsBtn:SetWide(500)
+        playlistsBtn:SetText("Playlists")
+        if debugMode then 
+            playlistsBtn:SetEnabled(false)
+            packagesBtn:SetEnabled(false)
+        else
+            playlistsBtn:SetEnabled(true)
+            packagesBtn:SetEnabled(true)
+        end
+        styleTabButton(packagesBtn, "packages", currentFilter)
+        styleTabButton(playlistsBtn, "playlists", currentFilter)
+        packagesBtn.DoClick = function()
+            surface.PlaySound(btbClickSnd)
+            currentFilter = "packages"
+            RefreshList()
+        end
+        playlistsBtn.DoClick = function()
+            surface.PlaySound(btbClickSnd)
+            currentFilter = "playlists"
+            RefreshList()
+        end
         showConflicts()
 
         local function createTrackEditor(trackType, packName, scrollPanel, frame)
@@ -1714,6 +2245,7 @@ local function openBTBmenu()
             scrollPanel:SetVisible(true)
             isTrackSelectorOpen = true
             saveButton:SetVisible(false)
+            createPlaylistBtn:SetVisible(false)
             if IsValid(verifyButton) then verifyButton:SetVisible(false) end
             scrollBar:SetWide(10)
             frameTitle:SetText(BATTLEBEATS.stripPackPrefix(packName))
@@ -1755,45 +2287,10 @@ local function openBTBmenu()
             rbutton:SetSize(75, 30)
             rbutton:SetPos(600, 350)
             rbutton:SetText("")
-            rbutton.Paint = function(self, w, h)
-                draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-            end
+            rbutton.Paint = function() end
             rbutton.DoClick = function()
                 gui.OpenURL("https://steamcommunity.com/workshop/filedetails/discussion/3473911205/624436764983085955/")
             end
-
-            local packButtons = {
-                {
-                    name = "Zenless Zone Zero",
-                    image = "promo/btbzzz.jpg",
-                    workshop = "3457857973"
-                },
-                {
-                    name = "The Witcher 3 Wild Hunt",
-                    image = "promo/btbtw3.jpg",
-                    workshop = "3483273863"
-                },
-                {
-                    name = "Devil May Cry 5",
-                    image = "promo/btbdmc.jpg",
-                    workshop = "3490225788"
-                },
-                {
-                    name = "Far Cry 4",
-                    image = "promo/btbfc4.jpg",
-                    workshop = "3548098038"
-                },
-                {
-                    name = "Cyberpunk 2077",
-                    image = "promo/btbcp.jpeg",
-                    workshop = "3556630048"
-                },
-                {
-                    name = "Resident Evil 4",
-                    image = "promo/btbre4.jpg",
-                    workshop = "3588540579"
-                }
-            }
 
             local selectedPacks = {}
             local tempTable = table.Copy(packButtons)
@@ -1841,18 +2338,6 @@ local function openBTBmenu()
                 end
             end
         end
-
-        local cpanelerror = Color(70, 50, 50, 200)
-
-        local cdebughover = Color(110, 110, 60, 200)
-        local cdebugunselected = Color(100, 100, 60, 200)
-
-        local clocalhover = Color(50, 120, 120, 200)
-        local clocalunselected = Color(50, 80, 80, 200)
-
-        local cvererror = Color(150, 50, 0, 60)
-        local cver = Color(255, 200, 0, 60)
-        local cvertext = Color(255, 255, 255, 100)
 
         --MARK:Packs found
         local orderedPacks = {}
@@ -1938,87 +2423,22 @@ local function openBTBmenu()
             end
         end
 
-        local function createButtons(panel, packName, packData)
-            if not IsValid(panel) then return end
-            if IsValid(panel.ambientButton) then return end
-            local buttonWidth, buttonHeight, spacing = 350, 30, 20
-            local allButtonWidth = buttonWidth / 2
-            local totalWidth = buttonWidth * 2 + allButtonWidth + spacing * 2
-            local startX = (950 - totalWidth) / 2
-            local ambientButton = vgui.Create("DButton", panel)
-            ambientButton:SetVisible(false)
-            ambientButton:SetSize(buttonWidth, buttonHeight)
-            ambientButton:SetPos(startX, 80)
-            ambientButton:SetText("#btb.ps.info.ambient_button")
-            ambientButton:SetFont("DermaDefaultBold")
-            ambientButton:SetTextColor(color_white)
-            local bgOutlineColorA = c2552100
-            if packData.packContent == "combat" then
-                bgOutlineColorA = c2001500
-                ambientButton:SetCursor("no")
-                ambientButton:BTB_SetButton(bgOutlineColorA, c404040, nil, true)
-                ambientButton:SetTooltip("#btb.ps.info.ambient_button_tip")
-                ambientButton:SetTooltipPanelOverride("BattleBeatsTooltip")
-                ambientButton:SetTextColor(c200200200)
-            else
-                ambientButton:BTB_SetButton(bgOutlineColorA, c606060, c909090)
-            end
-            ambientButton.DoClick = function()
-                if packData.packContent ~= "combat" then
-                    surface.PlaySound(btbClickSnd)
-                    createTrackEditor("ambient", packName, scrollPanel, frame)
-                end
-            end
-            panel.ambientButton = ambientButton
-
-            local allButton = vgui.Create("DButton", panel)
-            allButton:SetVisible(false)
-            allButton:SetSize(allButtonWidth, buttonHeight)
-            allButton:SetPos(startX + buttonWidth + spacing, 80)
-            allButton:SetText("#btb.ps.info.all_button")
-            allButton:SetFont("DermaDefaultBold")
-            allButton:SetTextColor(color_white)
-            allButton:BTB_SetButton(c2552100, c606060, c909090)
-            allButton.DoClick = function()
-                surface.PlaySound(btbClickSnd)
-                createTrackEditor("all", packName, scrollPanel, frame)
-            end
-            panel.allButton = allButton
-
-            local combatButton = vgui.Create("DButton", panel)
-            combatButton:SetVisible(false)
-            combatButton:SetSize(buttonWidth, buttonHeight)
-            combatButton:SetPos(startX + buttonWidth + spacing + allButtonWidth + spacing, 80)
-            combatButton:SetText("#btb.ps.info.combat_button")
-            combatButton:SetFont("DermaDefaultBold")
-            combatButton:SetTextColor(color_white)
-            local bgOutlineColorC = c2552100
-            if packData.packContent == "ambient" then
-                bgOutlineColorC = c2001500
-                combatButton:SetCursor("no")
-                combatButton:BTB_SetButton(bgOutlineColorC, c404040, nil, true)
-                combatButton:SetTooltip("#btb.ps.info.combat_button_tip")
-                combatButton:SetTooltipPanelOverride("BattleBeatsTooltip")
-                combatButton:SetTextColor(c200200200)
-            else
-                combatButton:BTB_SetButton(bgOutlineColorC, c606060, c909090)
-            end
-            combatButton.DoClick = function()
-                if packData.packContent ~= "ambient" then
-                    surface.PlaySound(btbClickSnd)
-                    createTrackEditor("combat", packName, scrollPanel, frame)
-                end
-            end
-            panel.combatButton = combatButton
-        end
-
         packNames = {}
         local allPackPanels = {}
+        local visibleCount = 0
         for _, pack in pairs(orderedPacks) do
             local debugMode = GetConVar("battlebeats_debug_mode"):GetBool()
             local packName = pack.name
             local packData = pack.data
             local packType = packData.packType or "na"
+            local isPlaylist = packType == "playlist"
+            if currentFilter == "playlists" and not isPlaylist then
+                continue
+            end
+            if currentFilter == "packages" and isPlaylist then
+                continue
+            end
+            visibleCount = visibleCount + 1
             if not BATTLEBEATS.checking then
                 if packData.debug == true then
                     table.insert(packNames, packName)
@@ -2053,6 +2473,7 @@ local function openBTBmenu()
                     if keyCode == MOUSE_RIGHT then
                         if not packData then return end
                         local menu = DermaMenu()
+                        if not isPlaylist then -- temporary disabled for playlists
                         local vol = (BATTLEBEATS.packVolume[packName] ~= nil and (BATTLEBEATS.packVolume[packName] - 100)) or 0
                         local optionName
                         if vol ~= 0 then
@@ -2066,6 +2487,42 @@ local function openBTBmenu()
                         end)
                         volumeOption:SetImage("icon16/sound.png")
                         volumeOption:BTB_PaintProperties()
+                        end
+                        if isPlaylist then
+                            local editPlaylist = menu:AddOption("#btb.playlist.edit", function()
+                                BATTLEBEATS.openPlaylistEditor(packName, function()
+                                    RefreshList()
+                                end)
+                            end)
+                            editPlaylist:SetImage("icon16/layout_edit.png")
+                            editPlaylist:BTB_PaintProperties()
+                            local deletePlaylist = menu:AddOption("#btb.playlist.delete", function()
+                                Derma_Query("#btb.playlist.delete_conf", "#btb.playlist.delete", "#btb.playlist.delete_button", function()
+                                        BATTLEBEATS.musicPlaylists[packName] = nil
+                                        BATTLEBEATS.musicPacks[packName] = nil
+                                        BATTLEBEATS.packVolume[packName] = nil
+                                        BATTLEBEATS.SavePlaylists()
+                                        RefreshList()
+                                        surface.PlaySound("buttons/button15.wav")
+                                        changesMade = true
+                                    end, "#btb.main.volume_cancel", function()
+                                        surface.PlaySound("buttons/button10.wav")
+                                    end
+                                )
+                            end)
+                            deletePlaylist:SetImage("icon16/layout_delete.png")
+                            deletePlaylist:BTB_PaintProperties()
+                            local exportPlaylist = menu:AddOption("#btb.playlist.export", function()
+                                SetClipboardText(BATTLEBEATS.exportPlaylist(packName))
+                                surface.PlaySound("buttons/button14.wav")
+                                notification.AddLegacy("#btb.playlist.export_noti", NOTIFY_GENERIC, 3)
+                            end)
+                            exportPlaylist:SetImage("icon16/group_go.png")
+                            exportPlaylist:BTB_PaintProperties()
+                            exportPlaylist:SetTooltip("#btb.playlist.export_tip")
+                            exportPlaylist:SetTooltipPanelOverride("BattleBeatsTooltip")
+                        end
+                        if not isPlaylist then
                         local copyOption = menu:AddOption("#btb.ps.pack_rmb.copy", function()
                             local function formatList(tracks)
                                 table.sort(tracks)
@@ -2095,6 +2552,7 @@ local function openBTBmenu()
                         copyOption:SetTooltip("#btb.ps.pack_rmb.copy_tip")
                         copyOption:SetTooltipPanelOverride("BattleBeatsTooltip")
                         copyOption:BTB_PaintProperties()
+                        end
                         if packData.wsid then
                             local wsOption = menu:AddOption("#btb.ps.pack_rmb.open_workshop", function()
                                 steamworks.ViewFile(packData.wsid)
@@ -2126,7 +2584,7 @@ local function openBTBmenu()
                     scrollPanel:ScrollToChild(panel)
                 end
             end
-            if not debugMode and override then
+            if not debugMode and not isPlaylist and override then
                 local ok = true
                 if not IsValid(override) then
                     print("[BattleBeats] Hook returned invalid panel for pack:", packName)
@@ -2153,11 +2611,13 @@ local function openBTBmenu()
             customCheckbox:SetVisible(false)
             customCheckbox.packPanel = panel
             createButtons(panel, packName, packData)
+            if not isPlaylist then
             BATTLEBEATS.createInfoPanel(panel, packData, function(sizeP, dateP, authorP)
                 if IsValid(sizeP) then sizeP.packPanel = panel end
                 if IsValid(dateP) then dateP.packPanel = panel end
                 if IsValid(authorP) then authorP.packPanel = panel end
             end)
+            end
             panel.ambientButton.packPanel = panel
             panel.allButton.packPanel = panel
             panel.combatButton.packPanel = panel
@@ -2183,7 +2643,7 @@ local function openBTBmenu()
                 targetColor = currentColor
             end
 
-            if not debugMode then
+            if not debugMode and not isPlaylist then
                 hook.Run("BattleBeats_ModifyPackPanel", panel, packName, packData)
             end
             panel.currentColor = cHover
@@ -2256,7 +2716,11 @@ local function openBTBmenu()
                     return
                 end
                 draw.RoundedBox(12, 0, 0, w, h, self.currentColor)
-                BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, tempC)
+                if BATTLEBEATS.currentPacks[packName] then
+                    BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+                else
+                    BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c25500)
+                end
             end
 
             panel.OnCursorEntered = function(self)
@@ -2279,6 +2743,7 @@ local function openBTBmenu()
             packLabel:SetKeyboardInputEnabled(false)
 
             local formattedName, packType = BATTLEBEATS.stripPackPrefix(packName)
+            packType = isPlaylist and "playlist" or packType
             local iconMat = BATTLEBEATS.packIcons[packType] or BATTLEBEATS.packIcons["na"]
             formattedName = panel.customTitle or formattedName
             iconMat = panel.customIcon and Material(panel.customIcon) or iconMat
@@ -2350,6 +2815,22 @@ local function openBTBmenu()
             end
         end
 
+        if visibleCount == 0 then
+            local label = scrollPanel:Add("DLabel")
+            label:Dock(TOP)
+            label:SetText("#btb.ps.no_packs")
+            label:SetFont("BattleBeats_Font")
+            label:SetTall(50)
+            label:SetContentAlignment(5)
+            label:DockMargin(0, 55, 0, 0)
+        end
+
+        function RefreshList()
+            if not IsValid(frame) then return end
+            if isTrackSelectorOpen then return end
+            showPackList()
+        end
+
         local debugMode = GetConVar("battlebeats_debug_mode"):GetBool()
         frame.OnMousePressed = function(self)
             local _, screenY = self:LocalToScreen(0, 0)
@@ -2419,7 +2900,11 @@ local function openBTBmenu()
                 local tw, th
 
                 if p == hovered then
-                    tw, th = 950, 165
+                    if p.packData.packType ~= "playlist" then
+                        tw, th = 950, 165
+                    else
+                        tw, th = 950, 130
+                    end
                 elseif hovered then
                     tw, th = 850, 80
                 else
@@ -2525,7 +3010,7 @@ local function openBTBmenu()
             if not persistentNotification:GetBool() then BATTLEBEATS.HideNotification() end
             -- play the previewed track as the main track, resuming from current playback time, no fade
             BATTLEBEATS.PlayNextTrack(BATTLEBEATS.currentPreviewTrack, BATTLEBEATS.currentPreviewStation:GetTime(), true)
-            timer.Simple(0.05, function() -- stop the preview station shortly after to avoid conflicts
+            timer.Simple(0.05, function()
                 BATTLEBEATS.currentPreviewStation:Stop()
             end)
         else

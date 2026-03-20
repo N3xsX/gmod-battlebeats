@@ -41,6 +41,7 @@ BATTLEBEATS.trackToPack = BATTLEBEATS.trackToPack or {}
 BATTLEBEATS.packVolume = BATTLEBEATS.packVolume or {}
 BATTLEBEATS.trackVolume = BATTLEBEATS.trackVolume or {}
 BATTLEBEATS.trackTrim = BATTLEBEATS.trackTrim or {}
+BATTLEBEATS.musicPlaylists = BATTLEBEATS.musicPlaylists or {}
 
 --Dev
 BATTLEBEATS.disableFade = BATTLEBEATS.disableFade or false
@@ -49,7 +50,7 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.5.0b"
+BATTLEBEATS.currentVersion = "2.6.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)

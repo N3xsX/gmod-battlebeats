@@ -65,9 +65,7 @@ local function numSlider(parent, x, y, labelText, cvarName, min, max, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 40)
     panel:SetPos(x, y)
-    panel.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
+    panel.Paint = function() end
 
     if helpText then
         panel:SetTooltip(helpText)
@@ -135,9 +133,7 @@ local function arrowStepper(parent, x, y, labelText, cvarName, min, max, helpTex
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 50)
     panel:SetPos(x, y)
-    panel.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
+    panel.Paint = function() end
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
@@ -167,9 +163,7 @@ local function arrowStepper(parent, x, y, labelText, cvarName, min, max, helpTex
     leftBtn:SetTextColor(color_white)
     leftBtn:SetSize(20, 20)
     leftBtn:SetPos(0, 18)
-    leftBtn.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
+    leftBtn.Paint = function() end
 
     local rightBtn = vgui.Create("DButton", panel)
     rightBtn:SetText(">")
@@ -177,9 +171,7 @@ local function arrowStepper(parent, x, y, labelText, cvarName, min, max, helpTex
     rightBtn:SetTextColor(color_white)
     rightBtn:SetSize(20, 20)
     rightBtn:SetPos(280, 18)
-    rightBtn.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
+    rightBtn.Paint = function() end
 
     local valueLabel = vgui.Create("DLabel", panel)
     valueLabel:SetSize(40, 20)
@@ -242,9 +234,7 @@ local function comboBox(parent, x, y, labelText, cvarName, options, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(200, 200)
     panel:SetPos(x, y)
-    panel.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
+    panel.Paint = function() end
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
@@ -413,9 +403,7 @@ concommand.Add("battlebeats_options", function()
     local tabPanel = vgui.Create("DPanel", frame)
     tabPanel:SetSize(frame:GetWide() - 20, 40)
     tabPanel:SetPos(10, 30)
-    tabPanel.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
+    tabPanel.Paint = function() end
 
     local categories = {
         {name = catSound, panel = nil},
@@ -428,9 +416,7 @@ concommand.Add("battlebeats_options", function()
     local contentPanel = vgui.Create("DPanel", frame)
     contentPanel:SetSize(frame:GetWide() - 20, frame:GetTall() - 80)
     contentPanel:SetPos(10, 70)
-    contentPanel.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, Color(0, 0, 0, 0))
-    end
+    contentPanel.Paint = function() end
 
     local tabWidth = (frame:GetWide() - 20) / #categories
 
@@ -662,6 +648,7 @@ concommand.Add("battlebeats_clean_cache", function()
     cookie.Delete("battlebeats_high_volume_time")
     cookie.Delete("battlebeats_high_volume_warn")
     cookie.Delete("battlebeats_last_track")
+    cookie.Delete("battlebeats_vol_expanded")
 end)
 
 concommand.Add("battlebeats_delete_data", function()
@@ -683,6 +670,8 @@ concommand.Add("battlebeats_delete_data", function()
     BATTLEBEATS.packVolume = {}
     file.Delete("battlebeats/battlebeats_track_trims.txt")
     BATTLEBEATS.trackTrim = {}
+    file.Delete("battlebeats/battlebeats_playlists.txt")
+    BATTLEBEATS.musicPlaylists = {}
 end)
 
 concommand.Add("battlebeats_clean_unused_tracks", function()
