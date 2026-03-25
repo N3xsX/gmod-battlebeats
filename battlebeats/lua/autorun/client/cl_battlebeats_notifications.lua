@@ -11,17 +11,19 @@ local skipNombat = CreateClientConVar("battlebeats_skip_nombat_names", "1", true
 local showBar = CreateClientConVar("battlebeats_show_status_bar", "1", true, false, "", 0, 1)
 
 BATTLEBEATS.packPrefixes = {
-    {prefix = "BattleBeats", type = "battlebeats"},
-    {prefix = "Nombat", type = "nombat"},
-    {prefix = "SBM DLC", type = "sbm"},
-    {prefix = "SBM", type = "sbm"},
-    {prefix = "16th Note", type = "16th"},
-    {prefix = "16thNote", type = "16th"},
-    {prefix = "Action Music", type = "amusic"},
-    {prefix = "Dynamo Pack", type = "dynamo"},
-    {prefix = "Dynamo", type = "dynamo"},
-    {prefix = "MP3 Radio", type = "mp3p"},
+    "BattleBeats",
+    "Nombat",
+    "SBM DLC",
+    "SBM",
+    "16th Note",
+    "16thNote",
+    "Action Music",
+    "Dynamo Pack",
+    "Dynamo",
+    "MP3 Radio",
 }
+
+local stripCache = {}
 
 function BATTLEBEATS.FormatTime(seconds)
     if not seconds or seconds < 0 then return "0:00" end
@@ -145,15 +147,17 @@ local function expandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDon
 end
 
 function BATTLEBEATS.stripPackPrefix(name)
+    if not name then return "" end
+    if stripCache[name] then
+        return stripCache[name]
+    end
     local original = name
-    for _, data in ipairs(BATTLEBEATS.packPrefixes) do
-        local prefix = data.prefix
+    local lname = name:lower()
+    for _, prefix in ipairs(BATTLEBEATS.packPrefixes) do
         local esc = prefix:gsub("([%(%)%[%]%-%_%.])", "%%%1")
-        local pattern = "^%s*[%[%(%<]*%s*" .. esc .. "%s*[%]%)%>]*%s*[%-–—:%|%!]*%s*"
-
-        local lname = name:lower()
-        local lpattern = pattern:lower()
-        local startpos, endpos = lname:find(lpattern)
+        local lprefix = esc:lower()
+        local pattern = "^%s*[%[%(%<]*%s*" .. lprefix .. "%s*[%]%)%>]*%s*[%-–—:%|%!]*%s*"
+        local startpos, endpos = lname:find(pattern)
         if startpos and startpos == 1 then
             local rend = endpos
             local candidate = original:sub(1, endpos):match(pattern)
@@ -163,11 +167,14 @@ function BATTLEBEATS.stripPackPrefix(name)
             local clean = original:sub(rend + 1)
             clean = clean:gsub("^[%s%p]+", ""):gsub("^%s+", ""):Trim()
             if clean ~= "" then
-                return clean, data.type
+                stripCache[name] = clean
+                return clean
             end
         end
     end
-    return original:Trim(), "na"
+    local result = original:Trim()
+    stripCache[name] = result
+    return result
 end
 
 local function getPackName(trackName)

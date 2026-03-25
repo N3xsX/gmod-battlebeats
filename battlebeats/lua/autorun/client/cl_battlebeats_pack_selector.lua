@@ -19,7 +19,7 @@ BATTLEBEATS.packIcons = {
     ["battlebeats"] = Material("packicons/btb.png"),
     ["nombat"] = Material("packicons/nombat.jpg"),
     ["sbm"] = Material("packicons/sbm.jpg"),
-    ["16th"] = Material("packicons/16th.jpg"),
+    ["16thnote"] = Material("packicons/16th.jpg"),
     ["amusic"] = Material("packicons/amusic.jpg"),
     ["dynamo"] = Material("packicons/dynamo.jpg"),
     ["mp3p"] = Material("packicons/mp3p.jpg"),
@@ -86,49 +86,6 @@ local packButtons = {
         workshop = "3588540579"
     }
 }
-
-surface.CreateFont("BattleBeats_Font", {
-    font = "Roboto Bold",
-    size = 30,
-    weight = 800,
-    antialias = true,
-    shadow = true
-})
-
-surface.CreateFont("BattleBeats_Player_Font", {
-    font = "Roboto Bold",
-    size = 46,
-    weight = 800,
-    antialias = true,
-    shadow = true
-})
-
-surface.CreateFont("BattleBeats_Checkbox_Font", {
-    font = "Roboto Regular",
-    size = 18,
-    weight = 200,
-    antialias = true,
-})
-
-surface.CreateFont("BattleBeats_Notification_Font", {
-    font = "Roboto Medium",
-    size = 28,
-    weight = 800,
-    antialias = true,
-})
-
-surface.CreateFont("BattleBeats_Notification_Font_Misc", {
-    font = "Roboto Light",
-    size = 16,
-    weight = 500,
-    antialias = true,
-})
-
-surface.CreateFont("BattleBeats_Subtitles", {
-    font = "CloseCaption_Bold",
-    size = 36,
-    weight = 600
-})
 
 local c606060 = Color(60, 60, 60)
 local c200200200 = Color(200, 200, 200)
@@ -260,54 +217,8 @@ local function validateTracksInPack(packName, func)
     nextTrack()
 end
 
-local function isTrackInPlaylist(playlistName, track, trackType)
-    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
-    if not playlist or not playlist[trackType] then return false end
-    for _, v in ipairs(playlist[trackType]) do
-        if v.path == track then
-            return true
-        end
-    end
-    return false
-end
-local function addTrackToPlaylist(playlistName, track, trackType)
-    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
-    local pack = BATTLEBEATS.musicPacks[playlistName]
-    if not playlist or not pack then return end
-
-    playlist[trackType] = playlist[trackType] or {}
-    pack[trackType] = pack[trackType] or {}
-    table.insert(playlist[trackType], {
-        path = track,
-        exists = true
-    })
-    table.insert(pack[trackType], track)
-
-    BATTLEBEATS.SavePlaylists()
-end
-local function removeTrackFromPlaylist(playlistName, track, trackType)
-    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
-    local pack = BATTLEBEATS.musicPacks[playlistName]
-    if not playlist or not playlist[trackType] then return end
-
-    for i, v in ipairs(playlist[trackType]) do
-        if v.path == track then
-            table.remove(playlist[trackType], i)
-            break
-        end
-    end
-    if pack and pack[trackType] then
-        for i, v in ipairs(pack[trackType]) do
-            if v == track then
-                table.remove(pack[trackType], i)
-                break
-            end
-        end
-    end
-    BATTLEBEATS.SavePlaylists()
-end
-
 local btbClickSnd = "btb_button_click.mp3"
+local texGradient = surface.GetTextureID("gui/gradient")
 
 local cHover = Color(50, 50, 50, 200)
 local cHover2 = Color(65, 65, 65, 200)
@@ -318,10 +229,8 @@ local c808080255 = Color(80, 80, 80, 255)
 local c909090 = Color(90, 90, 90)
 local c000200 = Color(0, 0, 0, 200)
 local c25500 = Color(255, 0, 0)
-local c3030300 = Color(30, 30, 30, 0)
 local c100100100 = Color(100, 100, 100)
 local c505050 = Color(50, 50, 50)
-local c255255255200 = Color(255, 255, 255, 200)
 local c202020215 = Color(20, 20, 20, 215)
 local c404040200 = Color(40, 40, 40, 200)
 local c150150150 = Color(150, 150, 150)
@@ -985,9 +894,7 @@ local function openBTBmenu()
     playPause:SetText("▶")
     playPause:SetFont("DermaLarge")
     playPause:SetTextColor(color_white)
-    playPause.Paint = function(self, w, h)
-        draw.RoundedBox(8, 0, 0, w, h, c3030300)
-    end
+    playPause.Paint = nil
     playPause.Think = function()
         if playPause:GetText() == "▶" then
             playPause:SetPos((playerPanel:GetWide() / 2) - 28, 55)
@@ -1025,9 +932,7 @@ local function openBTBmenu()
     loopBtn:SetText("↻")
     loopBtn:SetFont("DermaLarge")
     loopBtn:SetTextColor(c100100100)
-    loopBtn.Paint = function(self, w, h)
-        draw.RoundedBox(8, 0, 0, w, h, c3030300)
-    end
+    loopBtn.Paint = nil
     loopBtn:SetTooltip("#btb.ps.ts.mp.loop_disabled")
     loopBtn.DoClick = function()
         isLooping = not isLooping
@@ -1047,9 +952,7 @@ local function openBTBmenu()
     skipExcludedBtn:SetText("⇅")
     skipExcludedBtn:SetFont("DermaLarge")
     skipExcludedBtn:SetTextColor(color_white)
-    skipExcludedBtn.Paint = function(self, w, h)
-        draw.RoundedBox(8, 0, 0, w, h, c3030300)
-    end
+    skipExcludedBtn.Paint = nil
     skipExcludedBtn:SetTooltip("#btb.ps.ts.mp.skip_play_all_tip")
     skipExcludedBtn.DoClick = function()
         skipExcluded = not skipExcluded
@@ -1129,9 +1032,7 @@ local function openBTBmenu()
     prevTrackBtn:SetText("⏮")
     prevTrackBtn:SetFont("DermaLarge")
     prevTrackBtn:SetTextColor(color_white)
-    prevTrackBtn.Paint = function(self, w, h)
-        draw.RoundedBox(8, 0, 0, w, h, c3030300)
-    end
+    prevTrackBtn.Paint = nil
     prevTrackBtn.DoClick = function()
         BATTLEBEATS.SwitchPreviewTrack(-1)
     end
@@ -1144,9 +1045,7 @@ local function openBTBmenu()
     nextTrackBtn:SetText("⏭")
     nextTrackBtn:SetFont("DermaLarge")
     nextTrackBtn:SetTextColor(color_white)
-    nextTrackBtn.Paint = function(self, w, h)
-        draw.RoundedBox(8, 0, 0, w, h, c3030300)
-    end
+    nextTrackBtn.Paint = nil
     nextTrackBtn.DoClick = function()
         BATTLEBEATS.SwitchPreviewTrack(1)
     end
@@ -1255,7 +1154,6 @@ local function openBTBmenu()
     local selectedText = nil
     local ambientGrad = Color(60, 180, 60, 70)
     local combatGrad = Color(255, 80, 40, 80)
-    local texGradient = surface.GetTextureID("gui/gradient")
     local pWidth = 800
     local cachedScrollOffset = 0
     local cachedScrollH = 0
@@ -1544,7 +1442,7 @@ local function openBTBmenu()
                     local addList = {}
                     local removeList = {}
                     for playlistName, _ in pairs(BATTLEBEATS.musicPlaylists) do
-                        local isIn = isTrackInPlaylist(playlistName, track, row.actualType)
+                        local isIn = BATTLEBEATS.isTrackInPlaylist(playlistName, track, row.actualType)
                         if isIn then
                             table.insert(removeList, playlistName)
                         else
@@ -1563,7 +1461,7 @@ local function openBTBmenu()
                         end
                         for _, playlistName in ipairs(addList) do
                             local opt = addSub:AddOption(playlistName, function()
-                                addTrackToPlaylist(playlistName, track, row.actualType)
+                                BATTLEBEATS.addTrackToPlaylist(playlistName, track, row.actualType)
                                 surface.PlaySound("buttons/button14.wav")
                             end)
                             opt:BTB_PaintProperties()
@@ -1580,7 +1478,7 @@ local function openBTBmenu()
                         end
                         for _, playlistName in ipairs(removeList) do
                             local opt = removeSub:AddOption(playlistName, function()
-                                removeTrackFromPlaylist(playlistName, track, row.actualType)
+                                BATTLEBEATS.removeTrackFromPlaylist(playlistName, track, row.actualType)
                                 surface.PlaySound("buttons/button14.wav")
                             end)
                             opt:BTB_PaintProperties()
@@ -1590,7 +1488,7 @@ local function openBTBmenu()
                     if packData and packData.packType == "playlist" then
                         menu:AddSpacer()
                         local opt = menu:AddOption("#btb.playlist.remove_track", function()
-                            removeTrackFromPlaylist(selectedPack, track, row.actualType)
+                            BATTLEBEATS.removeTrackFromPlaylist(selectedPack, track, row.actualType)
                             createTrackList(parent, trackType, selectedPack)
                             surface.PlaySound("buttons/button14.wav")
                         end)
@@ -1922,6 +1820,10 @@ local function openBTBmenu()
         sortCombo:SetSize(100, 30)
         sortCombo:SetPos(830, 11)
         sortCombo:SetValue(selectedText or "A → Z")
+        local packData = selectedPack and BATTLEBEATS.musicPacks[selectedPack]
+        if packData and packData.packType == "playlist" then
+            sortCombo:AddChoice("#btb.ps.sort.playlist_order", "playlist", false, "icon16/text_list_numbers.png")
+        end
         sortCombo:AddChoice("A → Z", "az", false, "icon16/arrow_down.png")
         sortCombo:AddChoice("Z → A", "za", false, "icon16/arrow_up.png")
         sortCombo:AddChoice("#btb.ps.sort.random", "rnd", false, "icon16/arrow_switch.png")
@@ -2090,17 +1992,19 @@ local function openBTBmenu()
                     end
                     tracks = filtered
                 end
-                table.sort(tracks, function(a, b)
-                    if a.fav and not b.fav then return true end
-                    if not a.fav and b.fav then return false end
+                if sortMode ~= "playlist" then
+                    table.sort(tracks, function(a, b)
+                        if a.fav and not b.fav then return true end
+                        if not a.fav and b.fav then return false end
 
-                    if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" or sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" then
-                        return a.name < b.name
-                    elseif sortMode == "za" then
-                        return a.name > b.name
-                    end
-                    return false
-                end)
+                        if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" or sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" then
+                            return a.name < b.name
+                        elseif sortMode == "za" then
+                            return a.name > b.name
+                        end
+                        return false
+                    end)
+                end
             end
 
             currentFilteredTracks = {}
@@ -2287,7 +2191,7 @@ local function openBTBmenu()
             rbutton:SetSize(75, 30)
             rbutton:SetPos(600, 350)
             rbutton:SetText("")
-            rbutton.Paint = function() end
+            rbutton.Paint = nil
             rbutton.DoClick = function()
                 gui.OpenURL("https://steamcommunity.com/workshop/filedetails/discussion/3473911205/624436764983085955/")
             end
@@ -2637,7 +2541,7 @@ local function openBTBmenu()
                 errorIcon:SetMouseInputEnabled(true)
                 errorIcon:SetVisible(true)
                 if IsValid(customCheckbox) then
-                    customCheckbox.DoClick = function() end
+                    customCheckbox.DoClick = nil
                 end
                 currentColor = Color(100, 0, 0)
                 targetColor = currentColor
@@ -2742,9 +2646,8 @@ local function openBTBmenu()
             packLabel:SetMouseInputEnabled(false)
             packLabel:SetKeyboardInputEnabled(false)
 
-            local formattedName, packType = BATTLEBEATS.stripPackPrefix(packName)
-            packType = isPlaylist and "playlist" or packType
-            local iconMat = BATTLEBEATS.packIcons[packType] or BATTLEBEATS.packIcons["na"]
+            local formattedName = BATTLEBEATS.stripPackPrefix(packName)
+            local iconMat = BATTLEBEATS.packIcons[packData.packType] or BATTLEBEATS.packIcons["na"]
             formattedName = panel.customTitle or formattedName
             iconMat = panel.customIcon and Material(panel.customIcon) or iconMat
             local cFont = panel.customFont or "BattleBeats_Font"
@@ -2818,7 +2721,11 @@ local function openBTBmenu()
         if visibleCount == 0 then
             local label = scrollPanel:Add("DLabel")
             label:Dock(TOP)
-            label:SetText("#btb.ps.no_packs")
+            if currentFilter == "packages" then
+                label:SetText("#btb.ps.no_packs")
+            else
+                label:SetText("#btb.ps.no_packs_playlist")
+            end
             label:SetFont("BattleBeats_Font")
             label:SetTall(50)
             label:SetContentAlignment(5)

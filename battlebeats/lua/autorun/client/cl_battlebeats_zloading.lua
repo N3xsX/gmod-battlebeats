@@ -140,6 +140,16 @@ local dirHandlers = {
             end
         end
     },
+    battlemusic = {
+        packType = "sbm",
+        handle = function(file)
+            if file:find("/ambient/", 1, true) then
+                return true, false
+            elseif file:find("/combat/", 1, true) then
+                return false, true
+            end
+        end
+    },
     default = {
         packType = "battlebeats",
         handle = function(file)
@@ -689,7 +699,7 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added ability to create your own playlists from other packs"
+            Color(150, 255, 150), "- Improved playlist creator UI"
             --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(

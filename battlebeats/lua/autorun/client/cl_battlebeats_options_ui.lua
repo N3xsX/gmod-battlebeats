@@ -5,7 +5,7 @@ local function checkbox(parent, x, y, labelText, cvarName, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetTall(20)
     panel:SetPos(0, y)
-    panel.Paint = function() end
+    panel.Paint = nil
 
     local switch = vgui.Create("DPanel", panel)
     switch:SetSize(40, 20)
@@ -65,7 +65,7 @@ local function numSlider(parent, x, y, labelText, cvarName, min, max, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 40)
     panel:SetPos(x, y)
-    panel.Paint = function() end
+    panel.Paint = nil
 
     if helpText then
         panel:SetTooltip(helpText)
@@ -133,7 +133,7 @@ local function arrowStepper(parent, x, y, labelText, cvarName, min, max, helpTex
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 50)
     panel:SetPos(x, y)
-    panel.Paint = function() end
+    panel.Paint = nil
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
@@ -163,7 +163,7 @@ local function arrowStepper(parent, x, y, labelText, cvarName, min, max, helpTex
     leftBtn:SetTextColor(color_white)
     leftBtn:SetSize(20, 20)
     leftBtn:SetPos(0, 18)
-    leftBtn.Paint = function() end
+    leftBtn.Paint = nil
 
     local rightBtn = vgui.Create("DButton", panel)
     rightBtn:SetText(">")
@@ -171,7 +171,7 @@ local function arrowStepper(parent, x, y, labelText, cvarName, min, max, helpTex
     rightBtn:SetTextColor(color_white)
     rightBtn:SetSize(20, 20)
     rightBtn:SetPos(280, 18)
-    rightBtn.Paint = function() end
+    rightBtn.Paint = nil
 
     local valueLabel = vgui.Create("DLabel", panel)
     valueLabel:SetSize(40, 20)
@@ -234,7 +234,7 @@ local function comboBox(parent, x, y, labelText, cvarName, options, helpText)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(200, 200)
     panel:SetPos(x, y)
-    panel.Paint = function() end
+    panel.Paint = nil
 
     local label = vgui.Create("DLabel", panel)
     label:SetText(labelText)
@@ -403,7 +403,7 @@ concommand.Add("battlebeats_options", function()
     local tabPanel = vgui.Create("DPanel", frame)
     tabPanel:SetSize(frame:GetWide() - 20, 40)
     tabPanel:SetPos(10, 30)
-    tabPanel.Paint = function() end
+    tabPanel.Paint = nil
 
     local categories = {
         {name = catSound, panel = nil},
@@ -416,7 +416,7 @@ concommand.Add("battlebeats_options", function()
     local contentPanel = vgui.Create("DPanel", frame)
     contentPanel:SetSize(frame:GetWide() - 20, frame:GetTall() - 80)
     contentPanel:SetPos(10, 70)
-    contentPanel.Paint = function() end
+    contentPanel.Paint = nil
 
     local tabWidth = (frame:GetWide() - 20) / #categories
 
