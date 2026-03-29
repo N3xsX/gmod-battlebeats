@@ -4,6 +4,8 @@ local frame
 local assignFrame
 local lframe
 local searchBox
+local plNameBox
+local importBox
 local isLooping = false
 local skipExcluded = false
 
@@ -694,22 +696,23 @@ local function openBTBmenu()
                 draw.RoundedBox(12, 0, 0, w, h, c202020215)
                 BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
             end
-            local codeEntry = vgui.Create("DTextEntry", importFrame)
-            codeEntry:SetSize(460, 80)
-            codeEntry:SetPos(20, 20)
-            codeEntry:SetMultiline(true)
-            codeEntry.Paint = function(self, w, h)
+            importBox = vgui.Create("DTextEntry", importFrame)
+            importBox:SetSize(460, 80)
+            importBox:SetPos(20, 20)
+            importBox:SetMultiline(true)
+            importBox.Paint = function(self, w, h)
                 draw.RoundedBox(4, 0, 0, w, h, c808080255)
                 self:DrawTextEntryText(color_white, color_white, color_white)
                 if self:GetText() == "" and not self:IsEditing() then
                     draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                 end
             end
-            local nameEntry = vgui.Create("DTextEntry", importFrame)
-            nameEntry:SetSize(460, 30)
-            nameEntry:SetPos(20, 110)
-            nameEntry:SetFont("BattleBeats_Font")
-            nameEntry.Paint = function(self, w, h)
+            plNameBox = vgui.Create("DTextEntry", importFrame)
+            plNameBox:SetMaximumCharCount(30)
+            plNameBox:SetSize(460, 30)
+            plNameBox:SetPos(20, 110)
+            plNameBox:SetFont("BattleBeats_Font")
+            plNameBox.Paint = function(self, w, h)
                 draw.RoundedBox(4, 0, 0, w, h, c808080255)
                 self:DrawTextEntryText(color_white, color_white, color_white)
                 if self:GetText() == "" and not self:IsEditing() then
@@ -739,7 +742,7 @@ local function openBTBmenu()
             importKeep:SetCursor("no")
             importClean:SetFont("CenterPrintText")
             importKeep:SetFont("CenterPrintText")
-            codeEntry.OnTextChanged = function(self)
+            importBox.OnTextChanged = function(self)
                 timer.Remove("BTB_ImportDecodeTimer")
                 timer.Create("BTB_ImportDecodeTimer", 0.3, 1, function()
                     if not IsValid(self) then return end
@@ -792,7 +795,7 @@ local function openBTBmenu()
             importClean:SetText("#btb.ps.button_import_clean")
             importClean.DoClick = function()
                 if not decodedData then return end
-                local name = nameEntry:GetValue()
+                local name = plNameBox:GetValue()
                 if name == "" then
                     notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button11.wav")
@@ -836,7 +839,7 @@ local function openBTBmenu()
             importKeep:SetText("#btb.ps.button_import_keep")
             importKeep.DoClick = function()
                 if not decodedData then return end
-                local name = nameEntry:GetValue()
+                local name = plNameBox:GetValue()
                 if name == "" then
                     notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
                     surface.PlaySound("buttons/button11.wav")
@@ -2949,7 +2952,10 @@ hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
 end)
 
 hook.Add("OnContextMenuClose", "BattleBeats_HideUI", function()
-    if IsValid(frame) and not toogleFrame:GetBool() and not (IsValid(searchBox) and searchBox:IsEditing()) then
+    if IsValid(frame) and not toogleFrame:GetBool() 
+    and not (IsValid(searchBox) and searchBox:IsEditing())
+    and not (IsValid(plNameBox) and plNameBox:IsEditing())
+    and not (IsValid(importBox) and importBox:IsEditing()) then
         frame:SetVisible(false)
     end
 end)

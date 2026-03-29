@@ -182,6 +182,8 @@ local cTextC = Color(255, 180, 180)
 
 local showPreviewNotification = GetConVar("battlebeats_show_preview_notification")
 local selectedTrack = nil
+local selectedTracks = {}
+local lastSelectedIndex = nil
 
 local function createPlayer(frame)
     local playerPanel = vgui.Create("DPanel", frame)
@@ -405,6 +407,7 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
     local panelW, _ = availablePanel:GetSize()
     local nameEntry = vgui.Create("DTextEntry", frame)
     nameEntry:SetSize(300, 30)
+    nameEntry:SetMaximumCharCount(30)
     nameEntry:SetPos(panelX + (panelW - 300) / 2, 35)
     nameEntry:SetText(editedTitle)
     nameEntry:SetFont("BattleBeats_Font")
@@ -483,10 +486,15 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
     addBtn.DoClick = function()
         if not selectedTrack or selectedTrack.from ~= "available" then return end
         local currentTracks = tabAmbient and playlist.ambient or playlist.combat
-        table.insert(currentTracks, {
-            path = selectedTrack.path,
-            exists = file.Exists(selectedTrack.path, "GAME")
-        })
+        for _, t in ipairs(selectedTracks) do
+            if t.from == "available" then
+                table.insert(currentTracks, {
+                    path = t.path,
+                    exists = file.Exists(t.path, "GAME")
+                })
+            end
+        end
+        selectedTracks = {}
         selectedTrack = nil
         trackNameLabel:SetText("#btb.ps.ts.mp.no_track")
         RebuildPlaylistSide()
@@ -505,7 +513,15 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
     removeBtn.DoClick = function()
         if not selectedTrack or selectedTrack.from ~= "playlist" then return end
         local currentTracks = tabAmbient and playlist.ambient or playlist.combat
-        table.remove(currentTracks, selectedTrack.index)
+        table.sort(selectedTracks, function(a, b)
+            return a.index > b.index
+        end)
+        for _, t in ipairs(selectedTracks) do
+            if t.from == "playlist" then
+                table.remove(currentTracks, t.index)
+            end
+        end
+        selectedTracks = {}
         selectedTrack = nil
         trackNameLabel:SetText("#btb.ps.ts.mp.no_track")
         RebuildPlaylistSide()
@@ -530,7 +546,9 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
 
     function RebuildAvailableSide()
         availList:Clear()
+        selectedTracks = {}
         selectedTrack = nil
+        lastSelectedIndex = nil
         trackNameLabel:SetText("#btb.ps.ts.mp.no_track")
         local btnHover = tabAmbient and cHoverA or cHoverC
         local btnNormal = tabAmbient and cNormalA or cNormalC
@@ -595,7 +613,7 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
                     end
 
                     if not collapsed[packName] then
-                        for _, track in ipairs(visibleTracks) do
+                        for i, track in ipairs(visibleTracks) do
                             local trackName = BATTLEBEATS.FormatTrackName(track)
                             local row = vgui.Create("DButton", content)
                             row:Dock(TOP)
@@ -603,7 +621,13 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
                             row:SetTextColor(tabAmbient and cTextA or cTextC)
                             row:SetTall(24)
                             row.Paint = function(self, w, h)
-                                local isSelected = selectedTrack and selectedTrack.path == track and selectedTrack.from == "available"
+                                local isSelected = false
+                                for _, v in ipairs(selectedTracks) do
+                                    if v.path == track then
+                                        isSelected = true
+                                        break
+                                    end
+                                end
                                 draw.RoundedBox(0, 0, 0, w, h, isSelected and (tabAmbient and cSelectA or cSelectC) or (self:IsHovered() and btnHover or btnNormal))
                             end
 
@@ -615,10 +639,50 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
                                     BATTLEBEATS.HideNotification()
                                     BATTLEBEATS.currentPreviewTrack = nil
                                 end
-                                selectedTrack = {
-                                    path = track,
-                                    from = "available"
-                                }
+                                local isCtrl = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
+                                local isShift = input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT)
+
+                                if isShift and lastSelectedIndex then
+                                    selectedTracks = {}
+
+                                    local startIdx = math.min(lastSelectedIndex, i)
+                                    local endIdx = math.max(lastSelectedIndex, i)
+
+                                    for idx = startIdx, endIdx do
+                                        local t = visibleTracks[idx]
+                                        table.insert(selectedTracks, {
+                                            path = t,
+                                            index = idx,
+                                            from = "available"
+                                        })
+                                    end
+                                elseif isCtrl then
+                                    local found = false
+                                    for k, v in ipairs(selectedTracks) do
+                                        if v.path == track then
+                                            table.remove(selectedTracks, k)
+                                            found = true
+                                            break
+                                        end
+                                    end
+                                    if not found then
+                                        table.insert(selectedTracks, {
+                                            path = track,
+                                            index = i,
+                                            from = "available"
+                                        })
+                                    end
+                                    lastSelectedIndex = i
+                                else
+                                    selectedTracks = { {
+                                        path = track,
+                                        index = i,
+                                        from = "available"
+                                    } }
+                                    lastSelectedIndex = i
+                                end
+
+                                selectedTrack = selectedTracks[1]
                             end
                             row.DoDoubleClick = function()
                                 table.insert(currentTracks, {
@@ -636,6 +700,7 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
                     content:SizeToChildren(false, true)
                     container:InvalidateLayout(true)
                     container:SizeToChildren(false, true)
+
                 end
             end
         end
@@ -649,7 +714,10 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
     local dropIndex = nil
     function RebuildPlaylistSide()
         plList:Clear()
+        plList:SetTall(560)
+        selectedTracks = {}
         selectedTrack = nil
+        lastSelectedIndex = nil
         trackNameLabel:SetText("#btb.ps.ts.mp.no_track")
         local currentTracks = tabAmbient and playlist.ambient or playlist.combat
         for i, track in ipairs(currentTracks) do
@@ -662,7 +730,13 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
             row:SetTextColor(tabAmbient and cTextA or cTextC)
             row:SetTall(24)
             row.Paint = function(self, w, h)
-                local isSelected = selectedTrack and selectedTrack.path == track.path and selectedTrack.from == "playlist"
+                local isSelected = false
+                for _, v in ipairs(selectedTracks) do
+                    if v.path == track.path then
+                        isSelected = true
+                        break
+                    end
+                end
                 btnHover = track.exists and btnHover or btnHoverError
                 btnNormal = track.exists and btnNormal or btnNormalError
                 draw.RoundedBox(0, 0, 0, w, h, isSelected and (tabAmbient and cSelectA or cSelectC) or (self:IsHovered() and btnHover or btnNormal))
@@ -747,11 +821,49 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
                             BATTLEBEATS.HideNotification()
                             BATTLEBEATS.currentPreviewTrack = nil
                         end
-                        selectedTrack = {
-                            path = track.path,
-                            from = "playlist",
-                            index = i
-                        }
+                        local isCtrl = input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL)
+                        local isShift = input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT)
+
+                        if isShift and lastSelectedIndex then
+                            selectedTracks = {}
+
+                            local startIdx = math.min(lastSelectedIndex, i)
+                            local endIdx = math.max(lastSelectedIndex, i)
+
+                            for idx = startIdx, endIdx do
+                                local t = currentTracks[idx]
+                                table.insert(selectedTracks, {
+                                    path = t.path,
+                                    index = idx,
+                                    from = "playlist"
+                                })
+                            end
+                        elseif isCtrl then
+                            local found = false
+                            for k, v in ipairs(selectedTracks) do
+                                if v.index == i then
+                                    table.remove(selectedTracks, k)
+                                    found = true
+                                    break
+                                end
+                            end
+                            if not found then
+                                table.insert(selectedTracks, {
+                                    path = track.path,
+                                    index = i,
+                                    from = "playlist"
+                                })
+                            end
+                            lastSelectedIndex = i
+                        else
+                            selectedTracks = { {
+                                path = track.path,
+                                index = i,
+                                from = "playlist"
+                            } }
+                            lastSelectedIndex = i
+                        end
+                        selectedTrack = selectedTracks[1]
                     end
                 end
                 draggingTrack = nil
@@ -763,19 +875,29 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
                 end
             end
         end
+        if #currentTracks == 0 then
+            local msg = tabAmbient and "#btb.playlist.create.ambient_empty" or "#btb.playlist.create.combat_empty"
+            local emptyLabel = vgui.Create("DLabel", plList)
+            emptyLabel:Dock(FILL)
+            emptyLabel:SetText("")
+            emptyLabel.Paint = function(self, w, h)
+                draw.SimpleText(msg, "DermaLarge", w / 2, h / 2.2, Color(180, 180, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.playlist.create.list_empty", "DermaLarge", w / 2, h / 1.9, Color(180, 180, 180), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
+        end
     end
 
     plList.PaintOver = function(self, w, h)
         if not isDragging or not dropIndex then return end
         local children = self:GetChildren()
         local target = children[dropIndex]
-        local y
+        local y = h - 24
         if target then
             local _, ty = target:LocalToScreen(0, 0)
             local _, ly = self:ScreenToLocal(0, ty)
-            y = ly
+            y = ly - 24
         else
-            y = h
+            y = h - 24
         end
         surface.SetDrawColor(255, 210, 0)
         surface.DrawRect(0, y - 1, w, 2)
