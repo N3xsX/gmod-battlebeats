@@ -6,6 +6,8 @@ local lframe
 local searchBox
 local plNameBox
 local importBox
+local trackMenu = nil
+local panelMenu = nil
 local isLooping = false
 local skipExcluded = false
 
@@ -28,6 +30,10 @@ BATTLEBEATS.packIcons = {
     ["playlist"] = Material("btbplaylist.png"),
     ["na"] = Material("btbna.jpg")
 }
+
+local verMat = Material("btbver.png")
+local blockMat = Material("btbblock.png")
+local locMat = Material("btblocal.png")
 
 BATTLEBEATS.categoryNames = {
     debug = "DEBUG",
@@ -1170,6 +1176,13 @@ local function openBTBmenu()
     end
     scrollPanel.Think = function(self)
         local ct = CurTime()
+        if trackMenu and IsValid(trackMenu) then
+            local currentScroll = self:GetVBar():GetScroll()
+            if math.abs(currentScroll - cachedScrollOffset) > 2 then
+                trackMenu:Remove()
+                trackMenu = nil
+            end
+        end
         if ct - lastCacheTime > 0.1 then
             cachedScrollOffset = self:GetVBar():GetScroll()
             cachedScrollH = self:GetTall()
@@ -1229,7 +1242,7 @@ local function openBTBmenu()
                 self.fadeAlpha = Lerp(FrameTime() * 9, self.fadeAlpha, self.targetFadeAlpha)
 
                 local isSelected = (self.trackName == selectedRow)
-                if isSelected then
+                if isSelected or self.menuActive then
                     self.targetColor = c707070200
                     self.targetWidth = self:GetWide() + 500
                 elseif self:IsHovered() then
@@ -1394,7 +1407,7 @@ local function openBTBmenu()
                         currentTimeLabel:SetText("0:00")
                         totalTimeLabel:SetText("0:00")
                         trackNameLabel:SetText(trackName)
-                        scrollPanel:ScrollToChild(row)
+                        scrollPanel:ScrollToChild(self)
 
                         BATTLEBEATS.PlayNextTrackPreview(track, nil, false, function()
                             playerPanel:SetVisible(false)
@@ -1422,6 +1435,13 @@ local function openBTBmenu()
                     end
                 elseif keyCode == MOUSE_RIGHT then
                     local menu = DermaMenu()
+                    trackMenu = menu
+                    self.menuActive = true
+                    menu.OnRemove = function()
+                        if IsValid(self) then
+                            self.menuActive = false
+                        end
+                    end
                     local favoriteCount = 0
                     for _ in pairs(BATTLEBEATS.favoriteTracks) do
                         favoriteCount = favoriteCount + 1
@@ -1445,7 +1465,7 @@ local function openBTBmenu()
                     local addList = {}
                     local removeList = {}
                     for playlistName, _ in pairs(BATTLEBEATS.musicPlaylists) do
-                        local isIn = BATTLEBEATS.isTrackInPlaylist(playlistName, track, row.actualType)
+                        local isIn = BATTLEBEATS.isTrackInPlaylist(playlistName, track, self.actualType)
                         if isIn then
                             table.insert(removeList, playlistName)
                         else
@@ -1464,7 +1484,7 @@ local function openBTBmenu()
                         end
                         for _, playlistName in ipairs(addList) do
                             local opt = addSub:AddOption(playlistName, function()
-                                BATTLEBEATS.addTrackToPlaylist(playlistName, track, row.actualType)
+                                BATTLEBEATS.addTrackToPlaylist(playlistName, track, self.actualType)
                                 surface.PlaySound("buttons/button14.wav")
                             end)
                             opt:BTB_PaintProperties()
@@ -1481,7 +1501,7 @@ local function openBTBmenu()
                         end
                         for _, playlistName in ipairs(removeList) do
                             local opt = removeSub:AddOption(playlistName, function()
-                                BATTLEBEATS.removeTrackFromPlaylist(playlistName, track, row.actualType)
+                                BATTLEBEATS.removeTrackFromPlaylist(playlistName, track, self.actualType)
                                 surface.PlaySound("buttons/button14.wav")
                             end)
                             opt:BTB_PaintProperties()
@@ -1491,7 +1511,7 @@ local function openBTBmenu()
                     if packData and packData.packType == "playlist" then
                         menu:AddSpacer()
                         local opt = menu:AddOption("#btb.playlist.remove_track", function()
-                            BATTLEBEATS.removeTrackFromPlaylist(selectedPack, track, row.actualType)
+                            BATTLEBEATS.removeTrackFromPlaylist(selectedPack, track, self.actualType)
                             createTrackList(parent, trackType, selectedPack)
                             surface.PlaySound("buttons/button14.wav")
                         end)
@@ -2380,6 +2400,8 @@ local function openBTBmenu()
                     if keyCode == MOUSE_RIGHT then
                         if not packData then return end
                         local menu = DermaMenu()
+                        panelMenu = menu
+                        menu.packPanel = panel
                         if not isPlaylist then -- temporary disabled for playlists
                         local vol = (BATTLEBEATS.packVolume[packName] ~= nil and (BATTLEBEATS.packVolume[packName] - 100)) or 0
                         local optionName
@@ -2394,6 +2416,7 @@ local function openBTBmenu()
                         end)
                         volumeOption:SetImage("icon16/sound.png")
                         volumeOption:BTB_PaintProperties()
+                        volumeOption.packPanel = panel
                         end
                         if isPlaylist then
                             local editPlaylist = menu:AddOption("#btb.playlist.edit", function()
@@ -2403,6 +2426,7 @@ local function openBTBmenu()
                             end)
                             editPlaylist:SetImage("icon16/layout_edit.png")
                             editPlaylist:BTB_PaintProperties()
+                            editPlaylist.packPanel = panel
                             local deletePlaylist = menu:AddOption("#btb.playlist.delete", function()
                                 Derma_Query("#btb.playlist.delete_conf", "#btb.playlist.delete", "#btb.playlist.delete_button", function()
                                         BATTLEBEATS.musicPlaylists[packName] = nil
@@ -2419,6 +2443,7 @@ local function openBTBmenu()
                             end)
                             deletePlaylist:SetImage("icon16/layout_delete.png")
                             deletePlaylist:BTB_PaintProperties()
+                            deletePlaylist.packPanel = panel
                             local exportPlaylist = menu:AddOption("#btb.playlist.export", function()
                                 SetClipboardText(BATTLEBEATS.exportPlaylist(packName))
                                 surface.PlaySound("buttons/button14.wav")
@@ -2428,6 +2453,7 @@ local function openBTBmenu()
                             exportPlaylist:BTB_PaintProperties()
                             exportPlaylist:SetTooltip("#btb.playlist.export_tip")
                             exportPlaylist:SetTooltipPanelOverride("BattleBeatsTooltip")
+                            exportPlaylist.packPanel = panel
                         end
                         if not isPlaylist then
                         local copyOption = menu:AddOption("#btb.ps.pack_rmb.copy", function()
@@ -2459,6 +2485,7 @@ local function openBTBmenu()
                         copyOption:SetTooltip("#btb.ps.pack_rmb.copy_tip")
                         copyOption:SetTooltipPanelOverride("BattleBeatsTooltip")
                         copyOption:BTB_PaintProperties()
+                        copyOption.packPanel = panel
                         end
                         if packData.wsid then
                             local wsOption = menu:AddOption("#btb.ps.pack_rmb.open_workshop", function()
@@ -2466,6 +2493,7 @@ local function openBTBmenu()
                             end)
                             wsOption:SetIcon("icon16/world_go.png")
                             wsOption:BTB_PaintProperties()
+                            wsOption.packPanel = panel
                         end
                         menu:Open()
                         menu.Paint = function(self, w, h)
@@ -2657,20 +2685,20 @@ local function openBTBmenu()
 
             packLabel.Paint = function()
                 if packData.verifying then
-                    surface.SetMaterial(Material("btbver.png"))
+                    surface.SetMaterial(verMat)
                     surface.SetDrawColor(255, 255, 255, 150)
                     surface.DrawTexturedRect(0, 2, 65, 65)
                     draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 elseif debugMode and not packData.debug then
-                    surface.SetMaterial(Material("btbblock.png"))
+                    surface.SetMaterial(blockMat)
                     surface.SetDrawColor(255, 255, 255, 150)
                     surface.DrawTexturedRect(0, 2, 65, 65)
                     draw.SimpleText(formattedName, "BattleBeats_Font", 80, 35, cvertext, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
                     return
                 end
                 if packData.packType == "local" then
-                    surface.SetMaterial(Material("btblocal.png"))
+                    surface.SetMaterial(locMat)
                 else
                     surface.SetMaterial(iconMat)
                 end
@@ -2778,6 +2806,11 @@ local function openBTBmenu()
 
             if hovered ~= self.lastHovered then
                 self.lastHovered = hovered
+
+                if panelMenu and IsValid(panelMenu) then
+                    panelMenu:Remove()
+                    panelMenu = nil
+                end
 
                 for _, p in ipairs(allPackPanels) do
                     p.isExpanded = (p == hovered)
@@ -2944,6 +2977,7 @@ local function openBTBmenu()
         end
     end
 end
+
 
 hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
     if IsValid(frame) and not frame.isMinimalized then
