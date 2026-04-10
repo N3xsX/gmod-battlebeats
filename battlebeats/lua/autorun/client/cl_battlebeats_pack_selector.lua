@@ -1442,9 +1442,47 @@ local function openBTBmenu()
                             self.menuActive = false
                         end
                     end
-                    local favoriteCount = 0
-                    for _ in pairs(BATTLEBEATS.favoriteTracks) do
-                        favoriteCount = favoriteCount + 1
+                    if LocalPlayer():IsSuperAdmin() then
+                        local adminDivider = menu:AddOption("------ADMIN------")
+                        adminDivider:BTB_PaintProperties()
+                        local enforceSub, enforceBtn = menu:AddSubMenu("#btb.ps.ts.rmb.enforce")
+                        enforceBtn:SetImage("icon16/music.png")
+                        enforceBtn:BTB_PaintProperties()
+                        enforceSub.Paint = function(self, w, h)
+                            draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, c505050)
+                        end
+                        enforceBtn:SetTooltip("#btb.ps.ts.rmb.enforce_tip")
+                        enforceBtn:SetTooltipPanelOverride("BattleBeatsTooltip")
+
+                        local allOpt = enforceSub:AddOption("#btb.ps.ts.rmb.enforce_to_all", function()
+                            net.Start("BTB_SV_Receive_Sound")
+                            net.WritePlayer(NULL)
+                            net.WriteString(track)
+                            net.SendToServer()
+                        end)
+                        allOpt:SetImage("icon16/group.png")
+                        allOpt:BTB_PaintProperties()
+
+                        local playerSub, playerBtn = enforceSub:AddSubMenu(language.GetPhrase("btb.ps.ts.rmb.enforce_to_player") .. ":")
+                        playerBtn:SetImage("icon16/user_orange.png")
+                        playerBtn:BTB_PaintProperties()
+                        playerSub.Paint = function(self, w, h)
+                            draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, c505050)
+                        end
+
+                        for _, ply in ipairs(player.GetAll()) do
+                            local opt = playerSub:AddOption(ply:Nick(), function()
+                                net.Start("BTB_SV_Receive_Sound")
+                                net.WritePlayer(ply)
+                                net.WriteString(track)
+                                net.SendToServer()
+                            end)
+                            opt:BTB_PaintProperties()
+                        end
+                        local clientDivider = menu:AddOption("------CLIENT------")
+                        clientDivider:BTB_PaintProperties()
                     end
                     local vol = (BATTLEBEATS.trackVolume[track] ~= nil and (BATTLEBEATS.trackVolume[track] - 100)) or 0
                     local optionName
@@ -1479,8 +1517,8 @@ local function openBTBmenu()
                         menPaint:BTB_PaintProperties()
                         menPaint:SetImage("icon16/arrow_branch.png")
                         addSub.Paint = function(self, w, h)
-                            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+                            draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, c505050)
                         end
                         for _, playlistName in ipairs(addList) do
                             local opt = addSub:AddOption(playlistName, function()
@@ -1496,8 +1534,8 @@ local function openBTBmenu()
                         menPaint:BTB_PaintProperties()
                         menPaint:SetImage("icon16/delete.png")
                         removeSub.Paint = function(self, w, h)
-                            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+                            draw.RoundedBox(10, 0, 0, w, h, c2552100)
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, c505050)
                         end
                         for _, playlistName in ipairs(removeList) do
                             local opt = removeSub:AddOption(playlistName, function()
@@ -2388,6 +2426,8 @@ local function openBTBmenu()
             wrapper:DockMargin(5, 0, 5, 8)
             wrapper.Paint = function () end
             local panel = wrapper:Add("DPanel")
+            panel:SetAlpha(0)
+            panel:AlphaTo(255, 0.1)
             panel.packPanel = panel
             panel.isPackPanel = true
             panel.packName = packName
@@ -2968,9 +3008,9 @@ local function openBTBmenu()
                 end
             end
             BATTLEBEATS.currentPreviewTrack = nil
-            local jsonPacks = util.TableToJSON(BATTLEBEATS.currentPacks)
-            cookie.Set("battlebeats_selected_packs", jsonPacks)
         end
+        local jsonPacks = util.TableToJSON(BATTLEBEATS.currentPacks)
+        cookie.Set("battlebeats_selected_packs", jsonPacks)
         if table.IsEmpty(BATTLEBEATS.currentPacks) and IsValid(BATTLEBEATS.currentStation) then
             BATTLEBEATS.FadeMusic(BATTLEBEATS.currentStation)
             BATTLEBEATS.HideNotification()

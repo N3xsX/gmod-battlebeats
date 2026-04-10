@@ -1,5 +1,5 @@
-function BATTLEBEATS.isTrackInPlaylist(playlistName, track, trackType)
-    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
+function BATTLEBEATS.isTrackInPlaylist(title, track, trackType)
+    local playlist = BATTLEBEATS.musicPlaylists[title]
     if not playlist or not playlist[trackType] then return false end
     for _, v in ipairs(playlist[trackType]) do
         if v.path == track then
@@ -9,9 +9,9 @@ function BATTLEBEATS.isTrackInPlaylist(playlistName, track, trackType)
     return false
 end
 
-function BATTLEBEATS.addTrackToPlaylist(playlistName, track, trackType)
-    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
-    local pack = BATTLEBEATS.musicPacks[playlistName]
+function BATTLEBEATS.addTrackToPlaylist(title, track, trackType)
+    local playlist = BATTLEBEATS.musicPlaylists[title]
+    local pack = BATTLEBEATS.musicPacks[title]
     if not playlist or not pack then return end
     playlist[trackType] = playlist[trackType] or {}
     pack[trackType] = pack[trackType] or {}
@@ -23,9 +23,9 @@ function BATTLEBEATS.addTrackToPlaylist(playlistName, track, trackType)
     BATTLEBEATS.SavePlaylists()
 end
 
-function BATTLEBEATS.removeTrackFromPlaylist(playlistName, track, trackType)
-    local playlist = BATTLEBEATS.musicPlaylists[playlistName]
-    local pack = BATTLEBEATS.musicPacks[playlistName]
+function BATTLEBEATS.removeTrackFromPlaylist(title, track, trackType)
+    local playlist = BATTLEBEATS.musicPlaylists[title]
+    local pack = BATTLEBEATS.musicPacks[title]
     if not playlist or not playlist[trackType] then return end
     for i, v in ipairs(playlist[trackType]) do
         if v.path == track then

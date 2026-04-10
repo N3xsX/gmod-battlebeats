@@ -50,11 +50,13 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.6.4"
+BATTLEBEATS.currentVersion = "2.6.5"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
 CreateClientConVar("battlebeats_npc_combat", "0", true, true, "", 0, 1)
+
+CreateClientConVar("battlebeats_allow_server", "1", true, false, "", 0, 1)
 
 local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", { FCVAR_ARCHIVE, FCVAR_REPLICATED }, "", 100, 10000)
 

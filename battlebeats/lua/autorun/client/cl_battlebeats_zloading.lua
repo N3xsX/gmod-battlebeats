@@ -699,7 +699,7 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Improved playlist creator UI"
+            Color(150, 255, 150), "- Added server-side track enforcement (beta)\nFor more information on how to use it, check the addon change notes"
             --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(
