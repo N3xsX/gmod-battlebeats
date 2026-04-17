@@ -36,7 +36,6 @@ BATTLEBEATS.favoriteTracks = BATTLEBEATS.favoriteTracks or {}
 BATTLEBEATS.isInCombat = BATTLEBEATS.isInCombat or false
 BATTLEBEATS.npcTrackMappings = BATTLEBEATS.npcTrackMappings or {}
 BATTLEBEATS.priorityStates = BATTLEBEATS.priorityStates or {}
---BATTLEBEATS.trackOffsets = BATTLEBEATS.trackOffsets or {} -- obsolete
 BATTLEBEATS.trackToPack = BATTLEBEATS.trackToPack or {}
 BATTLEBEATS.packVolume = BATTLEBEATS.packVolume or {}
 BATTLEBEATS.trackVolume = BATTLEBEATS.trackVolume or {}
@@ -50,7 +49,7 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.6.5"
+BATTLEBEATS.currentVersion = "2.6.7"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -199,7 +198,7 @@ local function removeSoundTimers()
     if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
 end
 
-local function FadeMusic(station, fadeIn, fadeTime, isPreview)
+function BATTLEBEATS.FadeMusic(station, fadeIn, fadeTime, isPreview)
     if not IsValid(station) then return end
     fadeTime = fadeTime or 2
     local sName = IsValid(station) and station:GetFileName() or nil
@@ -218,12 +217,13 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
             tgVolume = math.Clamp(override.volume, 0, 2)
         end
     end
-    if disableFade:GetBool() or BATTLEBEATS.disableFade then
+    if disableFade:GetBool() or BATTLEBEATS.disableFade or fadeTime == 0 then
         if fadeIn then
             station:SetVolume(tgVolume)
         else
             station:SetVolume(0)
         end
+        hook.Run("BattleBeats_PostFade", station, fadeIn)
         return
     end
 
@@ -268,10 +268,6 @@ local function FadeMusic(station, fadeIn, fadeTime, isPreview)
     end)
 end
 
-function BATTLEBEATS.FadeMusic(station, fadeIn, fadeTime, isPreview)
-    FadeMusic(station, fadeIn, fadeTime, isPreview)
-end
-
 --MARK:Random track
 --------------------------------------------------------------------------------------
 
@@ -279,10 +275,10 @@ local function areTracksFromSamePack(trackA, trackB)
     local packA = BATTLEBEATS.trackToPack[trackA]
     local packB = BATTLEBEATS.trackToPack[trackB]
     debugPrint("[AreTracksFromSamePack] packA: " .. packA .. " | packB:" .. packB)
-    return packA ~= nil and packA == packB, packA, packB
+    return packA ~= nil and packA == packB
 end
 
-local function GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
+function BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
     if not packs or table.IsEmpty(packs) then
         debugPrint("[GetRandomTrack] No packs provided")
         return nil
@@ -367,10 +363,6 @@ local function GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusiv
     return nil
 end
 
-function BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
-    return GetRandomTrack(packs, isCombat, excluded, previousTrack, exclusivePlayOnly)
-end
-
 local function printStationError(track, errCode, errStr)
     notification.AddLegacy("#btb.main.soundfail", NOTIFY_ERROR, 4)
     MsgC(
@@ -387,13 +379,13 @@ end
 --MARK:Music Player
 --------------------------------------------------------------------------------------
 
-local function PlayNextTrackPreview(track, time, isLooped, errCallback)
+function BATTLEBEATS.PlayNextTrackPreview(track, time, isLooped, errCallback)
     removeSoundTimers()
     if BATTLEBEATS.currentStation and IsValid(BATTLEBEATS.currentStation) then
-        FadeMusic(BATTLEBEATS.currentStation, false)
+        BATTLEBEATS.FadeMusic(BATTLEBEATS.currentStation, false)
     end
     if BATTLEBEATS.currentPreviewStation and IsValid(BATTLEBEATS.currentPreviewStation) then
-        FadeMusic(BATTLEBEATS.currentPreviewStation, false)
+        BATTLEBEATS.FadeMusic(BATTLEBEATS.currentPreviewStation, false)
     end
     if showPreviewNotification:GetBool() and not isLooped then BATTLEBEATS.ShowTrackNotification(track, false, true) end
     sound.PlayFile(track, "noplay", function(station, errCode, errStr)
@@ -404,7 +396,7 @@ local function PlayNextTrackPreview(track, time, isLooped, errCallback)
             station:SetVolume(0)
             station:Play()
             station:SetTime(time or 0, true)
-            FadeMusic(station, true, 2, true)
+            BATTLEBEATS.FadeMusic(station, true, 2, true)
         else
             timer.Simple(2, function ()
                 BATTLEBEATS.HideNotification()
@@ -415,10 +407,6 @@ local function PlayNextTrackPreview(track, time, isLooped, errCallback)
             end
         end
     end)
-end
-
-function BATTLEBEATS.PlayNextTrackPreview(track, time, isLooped, errCallback)
-    PlayNextTrackPreview(track, time, isLooped, errCallback)
 end
 
 local function handleTrackEnd(track, reason, priority)
@@ -434,28 +422,35 @@ local function handleTrackEnd(track, reason, priority)
     end
 
     if istable(override) then
-        BATTLEBEATS.PlayNextTrack(override.track or track, override.time or 0, override.noFade, override.priority or priority)
+        BATTLEBEATS.PlayNextTrack(override.track or track, override.time or 0, override.noFade, override.cFadeIn or nil, override.cFadeOut or nil, override.priority or priority)
         return
     end
 
     -- default behavior
     if priority then
-        BATTLEBEATS.PlayNextTrack(track, 0, false, priority) -- looping assigned tracks
+        BATTLEBEATS.PlayNextTrack(track, 0, nil, nil, priority) -- looping assigned tracks
         local state = BATTLEBEATS.priorityStates[priority] or {}
         state.length = 0
         BATTLEBEATS.priorityStates[priority] = state
     else
-        local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+        local nextTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
         if nextTrack then BATTLEBEATS.PlayNextTrack(nextTrack) end
     end
 end
 
-local function PlayNextTrack(track, time, noFade, priority)
+BATTLEBEATS.errorCount = 0
+function BATTLEBEATS.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority)
     if not track or track == "" then
         debugPrint("[PlayNextTrack] Attempted to play nil/empty track! Aborting...")
         return
     end
-    local override = hook.Run("BattleBeats_PrePlayTrack", track, time, noFade, priority)
+    if BATTLEBEATS.errorCount > 3 then
+        ErrorNoHalt("\n[BattleBeats] Multiple track errors occurred or the audio system failed (BASS)! Stopping playback...\n          Verify or change your packs and type 'battlebeats_restart' to resume playback\n")
+        surface.PlaySound("buttons/button8.wav")
+        removeSoundTimers()
+        return
+    end
+    local override = hook.Run("BattleBeats_PrePlayTrack", track, time, cFadeIn, cFadeOut, priority)
     if override == true then
         debugPrint("[PlayNextTrack] Playback cancelled by hook")
         return
@@ -465,17 +460,17 @@ local function PlayNextTrack(track, time, noFade, priority)
             track = override.track
         end
         time = isnumber(override.time) and override.time or time
-        if isbool(override.noFade) then
-            noFade = override.noFade
-        end
+        cFadeIn = isnumber(override.cFadeIn) and override.cFadeIn or cFadeIn
+        cFadeOut = isnumber(override.cFadeOut) and override.cFadeOut or cFadeOut
         if isnumber(override.priority) or isstring(override.priority) then
             priority = override.priority
         end
     end
     debugPrint("[PlayNextTrack] Starting playback for track: " .. tostring(track))
-    debugPrint("[PlayNextTrack] Start time: " .. tostring(math.Truncate(time or 0, 1)) .. " (s) | No fade: " .. tostring(tobool(noFade)))
+    debugPrint("[PlayNextTrack] Start time: " .. tostring(math.Truncate(time or 0, 1)) .. " (s)")
     if BATTLEBEATS.currentStation and IsValid(BATTLEBEATS.currentStation) then
-        FadeMusic(BATTLEBEATS.currentStation, false)
+        cFadeOut = cFadeOut and math.Clamp(cFadeOut, 0, 10) or nil
+        BATTLEBEATS.FadeMusic(BATTLEBEATS.currentStation, false, cFadeOut)
     end
 
     -- store last track info based on combat state
@@ -496,6 +491,7 @@ local function PlayNextTrack(track, time, noFade, priority)
 
     sound.PlayFile(track, "noplay", function(station, errCode, errStr)
         if IsValid(station) then
+            BATTLEBEATS.errorCount = 0
             isPreviewing = false
             forceVolume = false
             BATTLEBEATS.currentStation = station
@@ -505,12 +501,8 @@ local function PlayNextTrack(track, time, noFade, priority)
             local offset = trimData and trimData.start or 0
             station:SetTime(time or offset, true)
             hook.Run("BattleBeats_OnTrackStarted", station, track, BATTLEBEATS.isInCombat, priority)
-            if not noFade then
-                FadeMusic(station, true)
-            else
-                local vol = BATTLEBEATS.adjustVolume(track)
-                station:SetVolume(vol)
-            end
+            cFadeIn = cFadeIn and math.Clamp(cFadeIn, 0, 10) or nil
+            BATTLEBEATS.FadeMusic(station, true, cFadeIn)
 
             if enableSubtitles:GetBool() then
                 local subtitleTrack = BATTLEBEATS.FormatTrackName(track)
@@ -584,23 +576,19 @@ local function PlayNextTrack(track, time, noFade, priority)
                 end
             end)
         else
+            BATTLEBEATS.errorCount = BATTLEBEATS.errorCount + 1
             printStationError(track, errCode, errStr)
             hook.Run("BattleBeats_OnTrackEnded", track, "error", priority)
             local _override = hook.Run("BattleBeats_OnTrackError", track, errCode, errStr, BATTLEBEATS.isInCombat, priority)
             if _override == true then return end
-            printStationError(track, errCode, errStr)
             if isstring(_override) then
-                PlayNextTrack(_override)
+                BATTLEBEATS.PlayNextTrack(_override)
                 return
             end
-            local nextTrack = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
-            if nextTrack then PlayNextTrack(nextTrack) end
+            local nextTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+            if nextTrack then BATTLEBEATS.PlayNextTrack(nextTrack) end
         end
     end)
-end
-
-function BATTLEBEATS.PlayNextTrack(track, time, noFade, priority)
-    PlayNextTrack(track, time, noFade, priority)
 end
 
 local cleanupTrack = nil
@@ -615,10 +603,10 @@ end)
 hook.Add("PostCleanupMap", "BattleBeats_ResumeMusic", function()
     if not isPreviewing then
         if not cleanupTrack then return end
-        PlayNextTrack(cleanupTrack, cleanupTime)
+        BATTLEBEATS.PlayNextTrack(cleanupTrack, cleanupTime)
     else
         if not BATTLEBEATS.currentPreviewTrack then return end
-        PlayNextTrackPreview(BATTLEBEATS.currentPreviewTrack, BATTLEBEATS.currentPreviewPosition)
+        BATTLEBEATS.PlayNextTrackPreview(BATTLEBEATS.currentPreviewTrack, BATTLEBEATS.currentPreviewPosition)
     end
 end)
 
@@ -770,10 +758,10 @@ end
 
 local function tryPlayTrackWithOffset(track, offset, fallbackTrackRef, exclusiveOnly, priority) -- plays track with offset, or falls back to a random track if not possible
     if offset then
-        PlayNextTrack(track, offset, false, priority)
+        BATTLEBEATS.PlayNextTrack(track, offset, nil, nil, priority)
     else
-        local fallbackTrack = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, fallbackTrackRef, exclusiveOnly)
-        if fallbackTrack then PlayNextTrack(fallbackTrack) end
+        local fallbackTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, fallbackTrackRef, exclusiveOnly)
+        if fallbackTrack then BATTLEBEATS.PlayNextTrack(fallbackTrack) end
     end
 end
 
@@ -839,7 +827,7 @@ local function getTrackPriority(track)
     return minPrio
 end
 
-local function SwitchTrack(npcTrack)
+local function switchTrack(npcTrack)
     if IsValid(BATTLEBEATS.currentPreviewStation) then return end
     if not GetConVar("battlebeats_persistent_notification"):GetBool() then
         BATTLEBEATS.HideNotification()
@@ -854,7 +842,7 @@ local function SwitchTrack(npcTrack)
                 local offset = getOffset(npcState.position, lastAmbienceLength, npcState.totalLength)
                 tryPlayTrackWithOffset(npcState.track, offset, lastAmbienceTrack, false, priority)
             else
-                PlayNextTrack(npcTrack, nil, false, priority)
+                BATTLEBEATS.PlayNextTrack(npcTrack, nil, nil, nil, priority)
             end
             lastCombatTrackPriority = priority
         else
@@ -864,8 +852,8 @@ local function SwitchTrack(npcTrack)
                     local samePack = areTracksFromSamePack(lastCombatTrack, lastAmbienceTrack)
                     if not samePack then
                         -- pick a different track from same pack
-                        local track = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
-                        if track then PlayNextTrack(track) end
+                        local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
+                        if track then BATTLEBEATS.PlayNextTrack(track) end
                     else
                         -- continue same combat track from calculated offset
                         local offset = getOffset(lastCombatPosition, lastAmbienceLength, lastCombatTotalLength)
@@ -877,18 +865,18 @@ local function SwitchTrack(npcTrack)
                 end
             else
                 if exclusivePlay:GetBool() then
-                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
-                    if track then PlayNextTrack(track) end
+                    local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack, true)
+                    if track then BATTLEBEATS.PlayNextTrack(track) end
                 else
-                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack)
-                    if track then PlayNextTrack(track) end
+                    local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastAmbienceTrack)
+                    if track then BATTLEBEATS.PlayNextTrack(track) end
                 end
             end
             lastCombatTrackPriority = 0
         end
     else
         if not enableAmbient:GetBool() then
-            if BATTLEBEATS.currentStation and IsValid(BATTLEBEATS.currentStation) then FadeMusic(BATTLEBEATS.currentStation, false) end
+            if BATTLEBEATS.currentStation and IsValid(BATTLEBEATS.currentStation) then BATTLEBEATS.FadeMusic(BATTLEBEATS.currentStation, false) end
             BATTLEBEATS.HideNotification()
             return
         end
@@ -896,8 +884,8 @@ local function SwitchTrack(npcTrack)
             if exclusivePlay:GetBool() and lastCombatTrack then
                 local samePack = areTracksFromSamePack(lastAmbienceTrack, lastCombatTrack)
                 if not samePack then
-                    local track = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastCombatTrack, true)
-                    if track then PlayNextTrack(track) end
+                    local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastCombatTrack, true)
+                    if track then BATTLEBEATS.PlayNextTrack(track) end
                 else
                     local offset = getOffset(lastAmbiencePosition, lastCombatLength, lastAmbienceTotalLength)
                     tryPlayTrackWithOffset(lastAmbienceTrack, offset, lastCombatTrack, true)
@@ -907,8 +895,8 @@ local function SwitchTrack(npcTrack)
                 tryPlayTrackWithOffset(lastAmbienceTrack, offset, lastCombatTrack)
             end
         else
-            local track = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastCombatTrack)
-            if track then PlayNextTrack(track) end
+            local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks, lastCombatTrack)
+            if track then BATTLEBEATS.PlayNextTrack(track) end
         end
     end
 end
@@ -916,7 +904,7 @@ end
 local pendingSwitch = nil
 local pendingTrack = nil
 
-timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
+timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
@@ -934,13 +922,13 @@ timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
         if BATTLEBEATS.isInCombat then
             combatStartTime = CurTime()
             local npcTrack = getNPCMatchingTrack()
-            local success, err = pcall(SwitchTrack, npcTrack)
+            local success, err = pcall(switchTrack, npcTrack)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
             end
         else
             ambienceStartTime = CurTime()
-            local success, err = pcall(SwitchTrack, nil)
+            local success, err = pcall(switchTrack, nil)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
             end
@@ -975,7 +963,7 @@ timer.Create("BattleBeats_ClientCombatCheck", 1, 0, function()
         end
 
         if pendingSwitch and CurTime() >= pendingSwitch.time then
-            local success, err = pcall(SwitchTrack, pendingSwitch.track)
+            local success, err = pcall(switchTrack, pendingSwitch.track)
             if not success then
                 print("[BattleBeats Client] NPC track switch error: " .. tostring(err))
             end
@@ -990,13 +978,13 @@ end)
 
 cvars.AddChangeCallback("battlebeats_enable_ambient", function(_, _, newValue)
     if tonumber(newValue) == 0 and not BATTLEBEATS.isInCombat then
-        if BATTLEBEATS.currentStation and IsValid(BATTLEBEATS.currentStation) then FadeMusic(BATTLEBEATS.currentStation, false) end
+        if BATTLEBEATS.currentStation and IsValid(BATTLEBEATS.currentStation) then BATTLEBEATS.FadeMusic(BATTLEBEATS.currentStation, false) end
         removeSoundTimers()
         BATTLEBEATS.HideNotification()
     else
         if not BATTLEBEATS.isInCombat then
-            local track = GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
-            if track then PlayNextTrack(track) end
+            local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
+            if track then BATTLEBEATS.PlayNextTrack(track) end
         end
     end
 end)
@@ -1125,12 +1113,20 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
     end
 end)
 
+concommand.Add("battlebeats_restart", function()
+    BATTLEBEATS.errorCount = 0
+    if not table.IsEmpty(BATTLEBEATS.currentPacks) then
+        local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+        if track then BATTLEBEATS.PlayNextTrack(track) end
+    end
+end)
+
 concommand.Add("battlebeats_force_next_track", function()
     if IsValid(BATTLEBEATS.currentPreviewStation) then
         BATTLEBEATS.SwitchPreviewTrack(1)
     elseif not table.IsEmpty(BATTLEBEATS.currentPacks) then
-        local track = GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
-        if track then PlayNextTrack(track) end
+        local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+        if track then BATTLEBEATS.PlayNextTrack(track) end
     end
 end)
 

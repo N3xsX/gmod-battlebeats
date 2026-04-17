@@ -763,7 +763,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         end
     end
     BATTLEBEATS.ValidatePacks()
-    loadPatchNotes()
+    --loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

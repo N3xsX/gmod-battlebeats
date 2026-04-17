@@ -1,7 +1,10 @@
 BATTLEBEATS_server = BATTLEBEATS_server or {}
 
+resource.AddWorkshop("3473911205")
+
 local lastCombatTime = {}
 local playerCombatTargets = {}
+local incomingShots = {}
 
 local combatCooldown = CreateConVar("battlebeats_server_combat_cooldown", "5", { FCVAR_ARCHIVE }, "", 3, 30)
 local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", { FCVAR_ARCHIVE, FCVAR_REPLICATED }, "", 100, 10000)
@@ -11,6 +14,7 @@ local pvpCombatTime = CreateConVar("battlebeats_pvp_combat_time", "30", { FCVAR_
 local pvpTeam = CreateConVar("battlebeats_pvp_allow_team_combat", "1", { FCVAR_ARCHIVE }, "", 0, 1)
 local pvpRequireLOS = CreateConVar("battlebeats_pvp_lineofsight", "0", { FCVAR_ARCHIVE }, "", 0, 1)
 local maxDistancePVP = CreateConVar("battlebeats_pvp_max_distance", "5000", { FCVAR_ARCHIVE }, "", 100, 10000)
+local shotsNearTrigger = CreateConVar("battlebeats_pvp_near_shots_trigger_combat", "1", { FCVAR_ARCHIVE }, "", 0, 1)
 
 local c2555050220 = Color(255, 50, 50, 220)
 local function debugPVETrigger(ply, ent)
@@ -49,6 +53,16 @@ local function CheckCombatState(ply)
 
     if not isSinglePlayer and pvpEnabled:GetBool() then
         local mode = pvpMode:GetInt()
+        /*local shotTime = incomingShots[ply]
+        if shotTime then
+            if (curTime - shotTime) <= 2 then
+                isInCombat = true
+                lastCombatTime[ply] = curTime
+                goto skipCombat
+            else
+                incomingShots[ply] = nil
+            end
+        end*/
         if mode == 0 then -- until death
             if playerCombatTargets[ply] then
                 for enemy, _ in pairs(playerCombatTargets[ply]) do
@@ -89,6 +103,7 @@ local function CheckCombatState(ply)
                 end
             end
         end
+        --::skipCombat::
     end
 
     if not isInCombat then
@@ -153,6 +168,37 @@ hook.Add("PlayerHurt", "BattleBeats_PVPCombat", function(victim, attacker)
     lastCombatTime[attacker] = curTime
 end)
 
+--WIP
+/*hook.Add("EntityFireBullets", "BattleBeats_PVPIncoming", function(attacker, bullet)
+    if not pvpEnabled:GetBool() or game.SinglePlayer() then return end
+    if not shotsNearTrigger:GetBool() then return end
+    if pvpMode:GetInt() == 2 and not pvpRequireLOS:GetBool() then return end
+    if not IsValid(attacker) or not attacker:IsPlayer() then return end
+
+    local start = bullet.Src
+    local dir = bullet.Dir:GetNormalized()
+    local maxDist = maxDistancePVP:GetInt()
+    local maxDistSqr = maxDist * maxDist
+    local cosThreshold = math.cos(math.rad(45))
+
+    for _, ply in ipairs(player.GetAll()) do
+        if ply == attacker then continue end
+        if not IsValid(ply) or not ply:Alive() then continue end
+        if ply:Team() == attacker:Team() and not pvpTeam:GetBool() then continue end
+
+        local toPly = ply:GetPos() - start
+        local distSqr = toPly:LengthSqr()
+        if distSqr > maxDistSqr then continue end
+
+        local dirToPly = toPly:GetNormalized()
+        local dot = dir:Dot(dirToPly)
+
+        if dot > cosThreshold then
+            incomingShots[ply] = CurTime()
+        end
+    end
+end)*/
+
 hook.Add("PlayerDeath", "BattleBeats_EndCombatOnDeath", function(victim)
     if game.SinglePlayer() then return end
     if not IsValid(victim) or not victim:IsPlayer() then return end
@@ -165,6 +211,8 @@ hook.Add("PlayerDeath", "BattleBeats_EndCombatOnDeath", function(victim)
         end
         playerCombatTargets[victim] = nil
     end
+
+    incomingShots[victim] = nil
 end)
 
 hook.Add("PlayerDisconnected", "BattleBeats_CleanCombatState", function(ply)
@@ -177,11 +225,12 @@ hook.Add("PlayerDisconnected", "BattleBeats_CleanCombatState", function(ply)
         playerCombatTargets[ply] = nil
     end
 
+    incomingShots[ply] = nil
     lastCombatTime[ply] = nil
 end)
 
-timer.Create("BattleBeats_CombatCheck", 1, 0, function()
-    for _, ply in pairs(player.GetAll()) do
+timer.Create("BattleBeats_CombatCheck", 0.5, 0, function()
+    for _, ply in ipairs(player.GetAll()) do
         local success, err = pcall(function() CheckCombatState(ply) end)
         if not success then
             print("[BattleBeats] BattleBeats_CombatCheck error: " .. tostring(err))

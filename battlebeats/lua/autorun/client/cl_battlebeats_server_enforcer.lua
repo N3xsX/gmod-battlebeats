@@ -14,5 +14,5 @@ net.Receive("BTB_Send_Sound", function()
         BATTLEBEATS.FadeMusic(BATTLEBEATS.currentPreviewStation, nil, 0.5)
     end
     print("[BattleBeats Client] Enforcing sound: " .. tostring(sound))
-    BATTLEBEATS.PlayNextTrack(sound)
+    BATTLEBEATS.PlayNextTrack(sound, nil, 1, 1)
 end)

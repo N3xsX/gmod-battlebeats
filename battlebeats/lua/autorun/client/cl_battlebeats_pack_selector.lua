@@ -6,6 +6,7 @@ local lframe
 local searchBox
 local plNameBox
 local importBox
+local volumePanel
 local trackMenu = nil
 local panelMenu = nil
 local isLooping = false
@@ -151,11 +152,7 @@ local function validateTracksInPack(packName, func)
         end
     end
 
-    MsgC(
-        Color(255, 255, 0), "[BattleBeats Debug] ",
-        color_white, "Verifying pack: ",
-        Color(0, 255, 255), packName .. "\n"
-    )
+    MsgC(Color(255, 255, 0), "[BattleBeats Debug] ", color_white, "Verifying pack: ", Color(0, 255, 255), packName .. "\n")
 
     local trackIndex = 1
     packData.verifying = true
@@ -343,28 +340,63 @@ local function createButtons(panel, packName, packData)
 end
 
 local c2201200150 = Color(220, 120, 0, 150)
-local function createBasePanel(parent, call, isNotice, margin)
+local gradMat = Material("gui/center_gradient")
+local function createBasePanel(parent, height, type, margin, call, duration)
+    duration = duration or nil
+    local startTime = CurTime()
+    local iicon
+    local bgColor
+    local text
     local panel = vgui.Create("DPanel", parent)
+    if type == 1 then
+        iicon = "btbinfo.png"
+        bgColor = Color(150, 150, 150, 150)
+        text = "Information"
+    elseif type == 2 then
+        iicon = "btbcriticalerror.png"
+        panel.Think = function()
+            local pulse = math.abs(math.sin(CurTime() * 3)) * 50
+            bgColor = Color(200 + pulse, 50, 0, 150)
+        end
+        text = "Critical Error"
+    else
+        iicon = "btberror.png"
+        bgColor = c2201200150
+        text = "Warning"
+    end
     panel:Dock(TOP)
     panel:DockMargin(0, margin and 0 or 5, 0, margin or 0)
-    panel:SetTall(41)
+    panel:SetTall(duration and (height + 4) or height)
     panel.Paint = function(self, w, h)
-        local bgColor = isNotice and Color(150, 150, 150, 150) or c2201200150
-        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+        draw.RoundedBox(20, 0, 0, w, h, bgColor)
+        if duration then
+            local timeLeft = math.Clamp((startTime + duration - CurTime()) / duration, 0, 1)
+            local barWidth = w * timeLeft
+            local x = (w - barWidth) / 2
+            surface.SetMaterial(gradMat)
+            surface.SetDrawColor(255, 255, 255, 160)
+            surface.DrawTexturedRect(x, h - 4, barWidth, h)
+        end
+    end
+    if duration then
+        timer.Simple(duration, function()
+            if IsValid(panel) then
+                panel:SizeTo(-1, 0, 0.5, 0, 0.5, function()
+                    if IsValid(panel) then
+                        panel:Remove()
+                    end
+                end)
+            end
+        end)
     end
     local icon = vgui.Create("DImage", panel)
-    icon:Dock(LEFT)
-    icon:SetWide(32)
-    icon:DockMargin(5, 5, 5, 5)
-    if isNotice then
-        icon:SetImage("btbinfo.png")
-    else
-        icon:SetImage("btberror.png")
-    end
-    if call then
-        call(panel)
-    end
-    return panel
+    icon:SetSize(36, 36)
+    icon:SetPos(5, panel:GetTall() / 2 - 18)
+    icon:SetImage(iicon)
+    icon:SetMouseInputEnabled(true)
+    icon:SetTooltip(text)
+    icon:SetTooltipPanelOverride("BattleBeatsTooltip")
+    call(panel)
 end
 
 local function checkVolume(parent)
@@ -389,7 +421,7 @@ local function checkVolume(parent)
         level = newLevel
     end
     if level <= 0 then return end
-    createBasePanel(parent, function(panel)
+    createBasePanel(parent, 40, nil, nil, function(panel)
         local label1 = vgui.Create("DLabel", panel)
         label1:Dock(TOP)
         label1:SetTall(20)
@@ -526,7 +558,7 @@ local function openBTBmenu()
     --MARK:Volume bar
     local collapsedWidth = 55
     local expandedWidth = 330
-    local volumePanel = vgui.Create("DPanel", frame)
+    volumePanel = vgui.Create("DPanel", frame)
     volumePanel.expanded = cookie.GetNumber("battlebeats_vol_expanded", 0) == 1
     volumePanel:SetSize(collapsedWidth, 40)
     volumePanel:SetWide(volumePanel.expanded and expandedWidth or collapsedWidth)
@@ -586,15 +618,15 @@ local function openBTBmenu()
         end
     end
 
-    local function updateDot(progress)
+    function UpdateDot(progress)
         local barWidth = volumeBar:GetWide()
         dotPanel:SetPos(65 + barWidth * progress - 6, 22 + volumeBar:GetTall() / 2 - 6)
     end
-    updateDot(volumePanel.progress)
+    UpdateDot(volumePanel.progress)
 
     local function updateVolume()
         local newValue = math.floor(volumePanel.progress * 200)
-        updateDot(volumePanel.progress)
+        UpdateDot(volumePanel.progress)
         updateIcon(volumePanel.progress)
         volumeSet:SetInt(newValue)
     end
@@ -1952,7 +1984,7 @@ local function openBTBmenu()
 
         local packType = BATTLEBEATS.musicPacks[selectedPack].packType
         if packType ~= "16thnote" and packType ~= "battlebeats" and packType ~= "local" and packType ~= "playlist" then
-            createBasePanel(scrollPanel, function(panel)
+            createBasePanel(scrollPanel, 40, 1, 10, function(panel)
                 local label1 = vgui.Create("DLabel", panel)
                 label1:Dock(TOP)
                 label1:SetTall(41)
@@ -1960,9 +1992,9 @@ local function openBTBmenu()
                 label1:SetFont("BattleBeats_Notification_Font_Misc")
                 label1:SetTextColor(color_white)
                 label1:SetContentAlignment(5)
-            end, true, 10)
+            end)
         elseif packType == "playlist" then
-            createBasePanel(parent, function(panel)
+            createBasePanel(parent, 40, 1, 10, function(panel)
                 local label1 = vgui.Create("DLabel", panel)
                 label1:Dock(TOP)
                 label1:SetTall(20)
@@ -1977,7 +2009,7 @@ local function openBTBmenu()
                 label2:SetFont("BattleBeats_Notification_Font_Misc")
                 label2:SetTextColor(color_white)
                 label2:SetContentAlignment(5)
-            end, true, 10)
+            end)
         end
 
         local divider = vgui.Create("DPanel", parent)
@@ -2120,8 +2152,26 @@ local function openBTBmenu()
     local currentFilter = "packages"
     local function showConflicts()
         checkVolume(scrollPanel)
+        if BATTLEBEATS.errorCount > 3 then
+            createBasePanel(scrollPanel, 40, 2, nil, function(panel)
+                local label1 = vgui.Create("DLabel", panel)
+                label1:Dock(TOP)
+                label1:SetTall(20)
+                label1:SetText("Multiple track errors occurred or the audio system failed (BASS)")
+                label1:SetFont("BattleBeats_Notification_Font_Misc")
+                label1:SetTextColor(color_white)
+                label1:SetContentAlignment(5)
+                local label2 = vgui.Create("DLabel", panel)
+                label2:Dock(TOP)
+                label2:SetTall(20)
+                label2:SetText("Verify or change your packs and type 'battlebeats_restart' in console to resume playback")
+                label2:SetFont("BattleBeats_Notification_Font_Misc")
+                label2:SetTextColor(color_white)
+                label2:SetContentAlignment(5)
+            end)
+        end
         if not table.IsEmpty(BATTLEBEATS.activeConflicts) then
-            createBasePanel(scrollPanel, function(panel)
+            createBasePanel(scrollPanel, 40, nil, nil, function(panel)
                 local conflictNames = table.GetKeys(BATTLEBEATS.activeConflicts)
                 local label1 = vgui.Create("DLabel", panel)
                 label1:Dock(TOP)
@@ -2140,7 +2190,7 @@ local function openBTBmenu()
             end)
         end
         if GetConVar("battlebeats_debug_mode"):GetBool() then
-            createBasePanel(scrollPanel, function(panel)
+            createBasePanel(scrollPanel, 40, nil, nil, function(panel)
                 local label1 = vgui.Create("DLabel", panel)
                 label1:Dock(TOP)
                 label1:SetTall(20)
@@ -2366,15 +2416,15 @@ local function openBTBmenu()
         end
 
         if GetConVar("battlebeats_debug_mode"):GetBool() and not hasAnyDebugPack(orderedPacks) then
-            createBasePanel(scrollPanel, function(panel)
+            createBasePanel(scrollPanel, 40, 1, nil, function(panel)
                 local label1 = vgui.Create("DLabel", panel)
                 label1:Dock(TOP)
-                label1:SetTall(41)
+                label1:SetTall(40)
                 label1:SetText("#btb.ps.info.reload")
                 label1:SetFont("BattleBeats_Notification_Font_Misc")
                 label1:SetTextColor(color_white)
                 label1:SetContentAlignment(5)
-            end, true)
+            end)
         end
 
         function BATTLEBEATS.openTrackList(type, packName)
@@ -2933,10 +2983,7 @@ local function openBTBmenu()
             end
             verifyButton.DoClick = function(self)
                 if #packNames > 0 and not BATTLEBEATS.checking then
-                    MsgC(
-                        Color(255, 255, 0), "[BattleBeats Debug] ",
-                        color_white, "Starting verification...\n"
-                    )
+                    MsgC(Color(255, 255, 0), "[BattleBeats Debug] ", color_white, "Starting verification...\n")
                     verifyButton:SetCursor("no")
                     verifyButton:SetText("Verifying...")
                     verifyButton:InvalidateLayout()
@@ -2964,11 +3011,7 @@ local function openBTBmenu()
         end)
         if BATTLEBEATS.checking and timer.Exists("BattleBeats_VerifyTimer") then
             timer.Remove("BattleBeats_VerifyTimer")
-            MsgC(
-                Color(255, 255, 0), "[BattleBeats Debug] ",
-                color_white, "Pack verification",
-                Color(255, 0, 0), " CANCELED!"
-            )
+            MsgC(Color(255, 255, 0), "[BattleBeats Debug] ", color_white, "Pack verification", Color(255, 0, 0), " CANCELED!")
             notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.ps.verification.cancel"), NOTIFY_ERROR, 4)
             surface.PlaySound("buttons/button8.wav")
             for _, pack in pairs(BATTLEBEATS.musicPacks) do
@@ -2992,7 +3035,7 @@ local function openBTBmenu()
         if BATTLEBEATS.currentPreviewStation and IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetState() == GMOD_CHANNEL_PLAYING then
             if not persistentNotification:GetBool() then BATTLEBEATS.HideNotification() end
             -- play the previewed track as the main track, resuming from current playback time, no fade
-            BATTLEBEATS.PlayNextTrack(BATTLEBEATS.currentPreviewTrack, BATTLEBEATS.currentPreviewStation:GetTime(), true)
+            BATTLEBEATS.PlayNextTrack(BATTLEBEATS.currentPreviewTrack, BATTLEBEATS.currentPreviewStation:GetTime(), 0)
             timer.Simple(0.05, function()
                 BATTLEBEATS.currentPreviewStation:Stop()
             end)
@@ -3018,6 +3061,12 @@ local function openBTBmenu()
     end
 end
 
+cvars.AddChangeCallback("battlebeats_volume", function(_, _, newValue)
+    if IsValid(volumePanel) then
+        volumePanel.progress = tonumber(newValue) / 200
+        UpdateDot(volumePanel.progress)
+    end
+end)
 
 hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
     if IsValid(frame) and not frame.isMinimalized then
