@@ -143,6 +143,261 @@ local function applyInfo(panel, result)
     updateBox(panel.infoPanels[3], sauthor .. ": " .. owner)
 end
 
+local c202020215 = Color(20, 20, 20, 215)
+local c707070255 = Color(70, 70, 70, 255)
+local c808080255 = Color(80, 80, 80, 255)
+local c100100100 = Color(100, 100, 100)
+local c606060 = Color(60, 60, 60)
+local blur = Material("pp/blurscreen")
+local function drawBlur(panel, amount)
+    local x, y = panel:LocalToScreen(0, 0)
+    surface.SetMaterial(blur)
+    surface.SetDrawColor(255, 255, 255)
+    for i = 1, 3 do
+        blur:SetFloat("$blur", (i / 3) * (amount or 6))
+        blur:Recompute()
+        render.UpdateScreenEffectTexture()
+        surface.DrawTexturedRect(-x, -y, ScrW(), ScrH())
+    end
+end
+function BATTLEBEATS.openImportFrame(frame)
+    local background = vgui.Create("DPanel", frame)
+    background:SetSize(frame:GetWide(), frame:GetTall())
+    background:Center()
+    background.Paint = function(self)
+        drawBlur(self, 2)
+    end
+    local importFrame
+    local playlistFrame = vgui.Create("DPanel", background)
+    playlistFrame:SetSize(400, 220)
+    playlistFrame:Center()
+    playlistFrame.Paint = function(self, w, h)
+        draw.RoundedBox(12, 0, 0, w, h, c202020215)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+    end
+    local playlistBtn = vgui.Create("DButton", playlistFrame)
+    playlistBtn:SetSize(360, 80)
+    playlistBtn:SetPos(20, 20)
+    playlistBtn:SetText("#btb.ps.button_create")
+    playlistBtn:SetFont("BattleBeats_Font")
+    playlistBtn:SetTextColor(color_white)
+    playlistBtn:BTB_SetButton(c2552100, c707070255, c808080255)
+    playlistBtn.DoClick = function()
+        BATTLEBEATS.openPlaylistEditor(nil, function()
+            RefreshList()
+        end)
+        background:Remove()
+    end
+    local importBtn = vgui.Create("DButton", playlistFrame)
+    importBtn:SetSize(360, 80)
+    importBtn:SetPos(20, 120)
+    importBtn:SetText("#btb.ps.button_import")
+    importBtn:SetFont("BattleBeats_Font")
+    importBtn:SetTextColor(color_white)
+    importBtn:BTB_SetButton(c2552100, c707070255, c808080255)
+    importBtn.DoClick = function()
+        playlistFrame:Remove()
+        if IsValid(importFrame) then return end
+        surface.PlaySound("btb_button_click.mp3")
+        importFrame = vgui.Create("DPanel", frame)
+        importFrame:SetSize(500, 230)
+        importFrame:Center()
+        importFrame.Paint = function(self, w, h)
+            drawBlur(self, 3)
+            draw.RoundedBox(12, 0, 0, w, h, c202020215)
+            BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        end
+        BATTLEBEATS.importBox = vgui.Create("DTextEntry", importFrame)
+        BATTLEBEATS.importBox:SetSize(460, 80)
+        BATTLEBEATS.importBox:SetPos(20, 20)
+        BATTLEBEATS.importBox:SetMultiline(true)
+        BATTLEBEATS.importBox.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, c808080255)
+            self:DrawTextEntryText(color_white, color_white, color_white)
+            if self:GetText() == "" and not self:IsEditing() then
+                draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            end
+        end
+        BATTLEBEATS.plNameBox = vgui.Create("DTextEntry", importFrame)
+        BATTLEBEATS.plNameBox:SetMaximumCharCount(30)
+        BATTLEBEATS.plNameBox:SetSize(460, 30)
+        BATTLEBEATS.plNameBox:SetPos(20, 110)
+        BATTLEBEATS.plNameBox:SetFont("BattleBeats_Font")
+        BATTLEBEATS.plNameBox.Paint = function(self, w, h)
+            draw.RoundedBox(4, 0, 0, w, h, c808080255)
+            self:DrawTextEntryText(color_white, color_white, color_white)
+            if self:GetText() == "" and not self:IsEditing() then
+                draw.SimpleText("#btb.playlist.create.enter_name", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            end
+        end
+        local infoLabel = vgui.Create("DLabel", importFrame)
+        infoLabel:SetPos(20, 150)
+        infoLabel:SetSize(460, 20)
+        infoLabel:SetTextColor(color_white)
+        infoLabel:SetFont("CenterPrintText")
+        infoLabel:SetContentAlignment(5)
+        infoLabel:SetText("No data loaded")
+        local decodedData = nil
+        local missing = {}
+        local importClean = vgui.Create("DButton", importFrame)
+        local importKeep = vgui.Create("DButton", importFrame)
+        importClean:SetEnabled(false)
+        importKeep:SetEnabled(false)
+        importClean:SetTooltip("#btb.ps.button_import_clean_tip")
+        importClean:SetTooltipPanelOverride("BattleBeatsTooltip")
+        importKeep:SetTooltip("#btb.ps.button_import_keep_tip")
+        importKeep:SetTooltipPanelOverride("BattleBeatsTooltip")
+        importClean:SetTextColor(c100100100)
+        importKeep:SetTextColor(c100100100)
+        importClean:SetCursor("no")
+        importKeep:SetCursor("no")
+        importClean:SetFont("CenterPrintText")
+        importKeep:SetFont("CenterPrintText")
+        BATTLEBEATS.importBox.OnTextChanged = function(self)
+            timer.Remove("BTB_ImportDecodeTimer")
+            timer.Create("BTB_ImportDecodeTimer", 0.3, 1, function()
+                if not IsValid(self) then return end
+                local text = self:GetValue()
+                decodedData = nil
+                missing = {}
+                local data = BATTLEBEATS.importPlaylist(text)
+                if not data then
+                    infoLabel:SetText("#btb.playlist.import.invalid_code")
+                    importClean:SetEnabled(false)
+                    importKeep:SetEnabled(false)
+                    importClean:SetCursor("no")
+                    importKeep:SetCursor("no")
+                    importClean:SetTextColor(c100100100)
+                    importKeep:SetTextColor(c100100100)
+                    return
+                end
+                decodedData = data
+                local function check(list)
+                    for _, track in ipairs(list or {}) do
+                        if not file.Exists(track.path, "GAME") then
+                            table.insert(missing, track.path)
+                        end
+                    end
+                end
+                check(data.ambient)
+                check(data.combat)
+                if #missing > 0 then
+                    importClean:SetEnabled(true)
+                    importKeep:SetEnabled(true)
+                    importClean:SetCursor("hand")
+                    importKeep:SetCursor("hand")
+                    importClean:SetTextColor(color_white)
+                    importKeep:SetTextColor(color_white)
+                    infoLabel:SetText(language.GetPhrase("btb.playlist.import.missing_tracks") .. ": " .. table.concat(missing, ", "))
+                else
+                    importClean:SetEnabled(true)
+                    importKeep:SetEnabled(false)
+                    importClean:SetCursor("hand")
+                    importKeep:SetCursor("no")
+                    importClean:SetTextColor(color_white)
+                    importKeep:SetTextColor(c100100100)
+                    infoLabel:SetText("#btb.playlist.import.all_good")
+                end
+            end)
+        end
+
+        importClean:SetSize(140, 30)
+        importClean:SetPos(20, 180)
+        importClean:SetText("#btb.ps.button_import_clean")
+        importClean.DoClick = function()
+            if not decodedData then return end
+            background:Remove()
+            local name = BATTLEBEATS.plNameBox:GetValue()
+            if name == "" then
+                notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
+                surface.PlaySound("buttons/button11.wav")
+                return
+            end
+            for packName, _ in pairs(BATTLEBEATS.musicPacks or {}) do
+                if name == packName then
+                    if not isEdit or editedTitle ~= title then
+                        notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
+                        surface.PlaySound("buttons/button11.wav")
+                        return
+                    end
+                end
+            end
+
+            local function filter(list)
+                local new = {}
+                for _, track in ipairs(list or {}) do
+                    if file.Exists(track.path, "GAME") then
+                        table.insert(new, track)
+                    end
+                end
+                return new
+            end
+            notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
+            surface.PlaySound("buttons/button3.wav")
+            decodedData.ambient = filter(decodedData.ambient)
+            decodedData.combat = filter(decodedData.combat)
+            BATTLEBEATS.musicPlaylists[name] = decodedData
+            BATTLEBEATS.validateAndTransformPlaylist(name, decodedData)
+            BATTLEBEATS.SavePlaylists()
+            importFrame:Remove()
+            RefreshList()
+        end
+        importClean.Paint = function(self, w, h)
+            draw.RoundedBox(8, 0, 0, w, h,
+                self:IsEnabled() and (self:IsHovered() and c100100100 or c808080255) or c606060)
+        end
+
+        importKeep:SetSize(140, 30)
+        importKeep:SetPos(180, 180)
+        importKeep:SetText("#btb.ps.button_import_keep")
+        importKeep.DoClick = function()
+            if not decodedData then return end
+            background:Remove()
+            local name = BATTLEBEATS.plNameBox:GetValue()
+            if name == "" then
+                notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
+                surface.PlaySound("buttons/button11.wav")
+                return
+            end
+            for packName, _ in pairs(BATTLEBEATS.musicPacks or {}) do
+                if name == packName then
+                    if not isEdit or editedTitle ~= title then
+                        notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
+                        surface.PlaySound("buttons/button11.wav")
+                        return
+                    end
+                end
+            end
+            notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
+            surface.PlaySound("buttons/button3.wav")
+            BATTLEBEATS.musicPlaylists[name] = decodedData
+            BATTLEBEATS.validateAndTransformPlaylist(name, decodedData)
+            BATTLEBEATS.SavePlaylists()
+            importFrame:Remove()
+            RefreshList()
+        end
+        importKeep.Paint = function(self, w, h)
+            draw.RoundedBox(8, 0, 0, w, h,
+                self:IsEnabled() and (self:IsHovered() and c100100100 or c808080255) or c606060)
+        end
+
+        local cancelBtn = vgui.Create("DButton", importFrame)
+        cancelBtn:SetSize(140, 30)
+        cancelBtn:SetPos(340, 180)
+        cancelBtn:SetText("#btb.main.volume_cancel")
+        cancelBtn:SetTextColor(color_white)
+        cancelBtn:SetFont("CenterPrintText")
+        cancelBtn.DoClick = function()
+            background:Remove()
+            importFrame:Remove()
+        end
+        cancelBtn.Paint = function(self, w, h)
+            draw.RoundedBox(8, 0, 0, w, h, self:IsHovered() and c100100100 or c808080255)
+        end
+    end
+    return playlistFrame
+end
+
 function BATTLEBEATS.createInfoPanel(panel, packData, callback)
     if not IsValid(panel) then return end
 
@@ -176,19 +431,21 @@ function BATTLEBEATS.createInfoPanel(panel, packData, callback)
 end
 
 --MARK:Volume edit
-function BATTLEBEATS.openVolumeEditor(track, pack, func)
-    local frame = vgui.Create("DFrame")
-    frame:BTB_SetButtons(false)
-    frame:SetSize(360, 120)
-    frame:SetTitle("")
-    frame:Center()
-    frame:BTB_SetFocus()
-    frame:MakePopup()
-    frame.Paint = function(self, w, h)
-        Derma_DrawBackgroundBlur(self, 1)
-        draw.RoundedBox(4, 0, 0, w, h, c000200)
+function BATTLEBEATS.openVolumeEditor(panel, track, pack, func)
+    local background = vgui.Create("DPanel", panel)
+    background:SetSize(panel:GetWide(), panel:GetTall())
+    background:Center()
+    background.Paint = function(self)
+        drawBlur(self, 2)
     end
-    frame:BTB_SetTitle("Volume Boost", false)
+    local frame = vgui.Create("DPanel", background)
+    frame:SetSize(360, 150)
+    frame:Center()
+    frame.Paint = function(self, w, h)
+        draw.RoundedBox(12, 0, 0, w, h, c000200)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+    end
+    frame:BTB_SetTitle("Volume Boost", true)
 
     local warning = vgui.Create("DLabel", frame)
     warning:SetFont("DermaDefault")
@@ -369,7 +626,7 @@ function BATTLEBEATS.openVolumeEditor(track, pack, func)
         end
     end
 
-    frame.OnClose = function()
+    frame.OnRemove = function()
         if isfunction(func) then
             func()
         end
@@ -380,6 +637,18 @@ function BATTLEBEATS.openVolumeEditor(track, pack, func)
         end
     end
 
+    local saveBtn = vgui.Create("DButton", frame)
+    saveBtn:SetPos((frame:GetWide() - 150) / 2, 120)
+    saveBtn:SetSize(150, 25)
+    saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
+    saveBtn:SetFont("CreditsText")
+    saveBtn:SetTextColor(color_white)
+    saveBtn.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
+    end
+
+    saveBtn.DoClick = function() background:Remove() end
+
     updateLabel()
 end
 
@@ -388,25 +657,27 @@ local c808080255 = Color(80, 80, 80, 255)
 local c707070255 = Color(70, 70, 70, 255)
 local c255100100 = Color(255, 100, 100)
 local c100255100 = Color(100, 255, 100)
-function BATTLEBEATS.openTrimEditor(track, func)
+function BATTLEBEATS.openTrimEditor(panel, track, func)
     local trackLength = 0
     local trimData = BATTLEBEATS.trackTrim[track] or {}
 
-    local frame = vgui.Create("DFrame")
-    frame:BTB_SetButtons(false)
-    frame:SetTitle("")
-    frame:SetSize(500, 160)
-    frame:Center()
-    frame:BTB_SetFocus()
-    frame:MakePopup()
+    local background = vgui.Create("DPanel", panel)
+    background:SetSize(panel:GetWide(), panel:GetTall())
+    background:Center()
+    background.Paint = function(self)
+        drawBlur(self, 2)
+    end
 
+    local frame = vgui.Create("DPanel", background)
+    frame:SetSize(500, 130)
+    frame:Center()
     frame.Paint = function(self, w, h)
-        Derma_DrawBackgroundBlur(self, 1)
-        draw.RoundedBox(4, 0, 0, w, h, c000200)
+        draw.RoundedBox(12, 0, 0, w, h, c000200)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
 
     local title = language.GetPhrase("btb.ps.ts.rmb.trim_title")
-    frame:BTB_SetTitle(title .. ": " .. BATTLEBEATS.FormatTrackName(track), false)
+    frame:BTB_SetTitle(title .. ": " .. BATTLEBEATS.FormatTrackName(track), true)
 
     local slider = vgui.Create("DPanel", frame)
     slider:SetPos(20, 55)
@@ -487,8 +758,8 @@ function BATTLEBEATS.openTrimEditor(track, func)
                 end
 
                 local saveButton = vgui.Create("DButton", frame)
-                saveButton:SetPos(70, 115)
-                saveButton:SetSize(130, 30)
+                saveButton:SetPos(60, 90)
+                saveButton:SetSize(150, 25)
                 saveButton:SetText("#btb.ps.ts.rmb.assign_save")
                 saveButton:SetFont("CreditsText")
                 saveButton:SetTextColor(color_white)
@@ -530,12 +801,12 @@ function BATTLEBEATS.openTrimEditor(track, func)
                     end
 
                     surface.PlaySound("buttons/button14.wav")
-                    frame:Close()
+                    background:Remove()
                 end
 
                 local cancelButton = vgui.Create("DButton", frame)
-                cancelButton:SetPos(300, 115)
-                cancelButton:SetSize(130, 30)
+                cancelButton:SetPos(290, 90)
+                cancelButton:SetSize(150, 25)
                 cancelButton:SetText("#btb.main.volume_cancel")
                 cancelButton:SetFont("CreditsText")
                 cancelButton:SetTextColor(color_white)
@@ -546,42 +817,61 @@ function BATTLEBEATS.openTrimEditor(track, func)
                 end
 
                 cancelButton.DoClick = function()
-                    frame:Close()
+                    background:Remove()
                 end
             elseif slider.endValue <= 30 then
                 local frameTitle = vgui.Create("DLabel", frame)
-                frameTitle:SetPos((frame:GetWide() / 2) - 200, 53)
+                frameTitle:SetPos((frame:GetWide() / 2) - 200, 30)
                 frameTitle:SetSize(400, 40)
                 frameTitle:SetText("Cannot trim track because it's too short!")
                 frameTitle:SetContentAlignment(5)
                 frameTitle:SetFont("BattleBeats_Checkbox_Font")
                 frameTitle:SetTextColor(color_white)
                 local frameTitle2 = vgui.Create("DLabel", frame)
-                frameTitle2:SetPos((frame:GetWide() / 2) - 200, 67)
+                frameTitle2:SetPos((frame:GetWide() / 2) - 200, 45)
                 frameTitle2:SetSize(400, 40)
                 frameTitle2:SetText("(track needs to be at least 30 seconds long)")
                 frameTitle2:SetContentAlignment(5)
                 frameTitle2:SetFont("BattleBeats_Checkbox_Font")
                 frameTitle2:SetTextColor(color_white)
+
+                local cancelButton = vgui.Create("DButton", frame)
+                cancelButton:SetPos((frame:GetWide() - 150) / 2, 90)
+                cancelButton:SetSize(150, 25)
+                cancelButton:SetText("#btb.main.volume_cancel")
+                cancelButton:SetFont("CreditsText")
+                cancelButton:SetTextColor(color_white)
+
+                cancelButton.Paint = function(self, w, h)
+                    local bgColor = self:IsHovered() and c808080255 or c707070255
+                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
+                end
+
+                cancelButton.DoClick = function()
+                    background:Remove()
+                end
             end
         end
     end)
 end
 
 --MARK:NPC assign
-function BATTLEBEATS.createAssignFrame(title, defaultClass, defaultPriority, onSave)
-    local frame = vgui.Create("DFrame")
-    frame:BTB_SetButtons(false)
-    frame:SetTitle("")
+function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriority, onSave)
+    local background = vgui.Create("DPanel", panel)
+    background:SetSize(panel:GetWide(), panel:GetTall())
+    background:Center()
+    background.Paint = function(self)
+        drawBlur(self, 2)
+    end
+
+    local frame = vgui.Create("DPanel", background)
     frame:SetSize(400, 110)
     frame:Center()
-    frame:BTB_SetFocus()
-    frame:MakePopup()
     frame.Paint = function(self, w, h)
-        Derma_DrawBackgroundBlur(self, 1)
-        draw.RoundedBox(4, 0, 0, w, h, c000200)
+        draw.RoundedBox(12, 0, 0, w, h, c000200)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
-    frame:BTB_SetTitle(title, false)
+    frame:BTB_SetTitle(title, true)
 
     local classLabel = vgui.Create("DLabel", frame)
     classLabel:SetPos(10, 25)
@@ -639,7 +929,7 @@ function BATTLEBEATS.createAssignFrame(title, defaultClass, defaultPriority, onS
         local class = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
         local _, prio = priorityCombo:GetSelected()
         prio = math.Clamp(prio or defaultPriority or 1, 1, 5)
-        onSave(class, prio, frame)
+        onSave(class, prio, background)
     end
 
     local cancelBtn = vgui.Create("DButton", frame)
@@ -651,26 +941,29 @@ function BATTLEBEATS.createAssignFrame(title, defaultClass, defaultPriority, onS
     cancelBtn.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
     end
-    cancelBtn.DoClick = function() frame:Close() end
+    cancelBtn.DoClick = function() background:Remove() end
 
-    return frame, textEntry, priorityCombo
+    return textEntry
 end
 
 --MARK:Subtitles
-function BATTLEBEATS.openSubtitles(trackName, subs)
-    local frame = vgui.Create("DFrame")
-    frame:BTB_SetButtons(false)
-    local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
-    frame:SetTitle("")
-    frame:SetSize(500, 400)
-    frame:Center()
-    frame:BTB_SetFocus()
-    frame:MakePopup()
-    frame.Paint = function(self, w, h)
-        Derma_DrawBackgroundBlur(self, 1)
-        draw.RoundedBox(4, 0, 0, w, h, c000200)
+function BATTLEBEATS.openSubtitles(panel, trackName, subs)
+    local background = vgui.Create("DPanel", panel)
+    background:SetSize(panel:GetWide(), panel:GetTall())
+    background:Center()
+    background.Paint = function(self)
+        drawBlur(self, 2)
     end
-    frame:BTB_SetTitle(title .. trackName, false)
+
+    local frame = vgui.Create("DPanel", background)
+    frame:SetSize(500, 430)
+    frame:Center()
+    frame.Paint = function(self, w, h)
+        draw.RoundedBox(12, 0, 0, w, h, c000200)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+    end
+    local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
+    frame:BTB_SetTitle(title .. trackName, true)
 
     local scroll = vgui.Create("DScrollPanel", frame)
     scroll:SetSize(480, 360)
@@ -699,5 +992,19 @@ function BATTLEBEATS.openSubtitles(trackName, subs)
         rich:AppendText(sub.text .. "\n")
         lastEnd = sub['end']
     end
-    return frame
+
+    local cancelButton = vgui.Create("DButton", frame)
+    cancelButton:SetPos((frame:GetWide() - 150) / 2, 400)
+    cancelButton:SetSize(150, 25)
+    cancelButton:SetText("#btb.main.volume_cancel")
+    cancelButton:SetFont("CreditsText")
+    cancelButton:SetTextColor(color_white)
+    cancelButton.Paint = function(self, w, h)
+        local bgColor = self:IsHovered() and c808080255 or c707070255
+        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+    end
+
+    cancelButton.DoClick = function()
+        background:Remove()
+    end
 end

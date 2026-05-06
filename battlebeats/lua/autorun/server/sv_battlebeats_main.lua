@@ -1,20 +1,22 @@
 BATTLEBEATS_server = BATTLEBEATS_server or {}
 
+util.AddNetworkString("BTB_Change_ConVar")
+
 resource.AddWorkshop("3473911205")
 
 local lastCombatTime = {}
 local playerCombatTargets = {}
 local incomingShots = {}
 
-local combatCooldown = CreateConVar("battlebeats_server_combat_cooldown", "5", { FCVAR_ARCHIVE }, "", 3, 30)
-local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", { FCVAR_ARCHIVE, FCVAR_REPLICATED }, "", 100, 10000)
-local pvpEnabled = CreateConVar("battlebeats_pvp_enable", "1", { FCVAR_ARCHIVE, FCVAR_NOTIFY }, "", 0, 1)
-local pvpMode = CreateConVar("battlebeats_pvp_mode", "1", { FCVAR_ARCHIVE }, "", 0, 2)
-local pvpCombatTime = CreateConVar("battlebeats_pvp_combat_time", "30", { FCVAR_ARCHIVE }, "", 5, 120)
-local pvpTeam = CreateConVar("battlebeats_pvp_allow_team_combat", "1", { FCVAR_ARCHIVE }, "", 0, 1)
-local pvpRequireLOS = CreateConVar("battlebeats_pvp_lineofsight", "0", { FCVAR_ARCHIVE }, "", 0, 1)
-local maxDistancePVP = CreateConVar("battlebeats_pvp_max_distance", "5000", { FCVAR_ARCHIVE }, "", 100, 10000)
-local shotsNearTrigger = CreateConVar("battlebeats_pvp_near_shots_trigger_combat", "1", { FCVAR_ARCHIVE }, "", 0, 1)
+local combatCooldown = GetConVar("battlebeats_server_combat_cooldown")
+local maxDistance = GetConVar("battlebeats_server_max_distance")
+local pvpEnabled = GetConVar("battlebeats_pvp_enable")
+local pvpMode = GetConVar("battlebeats_pvp_mode")
+local pvpCombatTime = GetConVar("battlebeats_pvp_combat_time")
+local pvpTeam = GetConVar("battlebeats_pvp_allow_team_combat")
+local pvpRequireLOS = GetConVar("battlebeats_pvp_lineofsight")
+local maxDistancePVP = GetConVar("battlebeats_pvp_max_distance")
+local shotsNearTrigger = GetConVar("battlebeats_pvp_near_shots_trigger_combat")
 
 local c2555050220 = Color(255, 50, 50, 220)
 local function debugPVETrigger(ply, ent)
@@ -34,6 +36,7 @@ BATTLEBEATS_server.ignoredNPCs = {
     ["npc_seagull"] = true
 }
 
+local isSinglePlayer = game.SinglePlayer()
 local function CheckCombatState(ply)
     if not IsValid(ply) then return end
 
@@ -49,20 +52,18 @@ local function CheckCombatState(ply)
 
     local curTime = CurTime()
     local isInCombat = false
-    local isSinglePlayer = game.SinglePlayer()
+    /*local shotTime = incomingShots[ply]
+    if shotTime then
+        if (curTime - shotTime) <= 10 then
+            isInCombat = true
+            lastCombatTime[ply] = curTime
+        else
+            incomingShots[ply] = nil
+        end
+    end*/
 
     if not isSinglePlayer and pvpEnabled:GetBool() then
         local mode = pvpMode:GetInt()
-        /*local shotTime = incomingShots[ply]
-        if shotTime then
-            if (curTime - shotTime) <= 2 then
-                isInCombat = true
-                lastCombatTime[ply] = curTime
-                goto skipCombat
-            else
-                incomingShots[ply] = nil
-            end
-        end*/
         if mode == 0 then -- until death
             if playerCombatTargets[ply] then
                 for enemy, _ in pairs(playerCombatTargets[ply]) do
@@ -103,14 +104,12 @@ local function CheckCombatState(ply)
                 end
             end
         end
-        --::skipCombat::
     end
 
     if not isInCombat then
         local reqiresLos = tobool(ply:GetInfoNum("battlebeats_detection_mode", 1))
         local NPCfightTriggersCombat = tobool(ply:GetInfoNum("battlebeats_npc_combat", 0))
         local plyPos = ply:GetPos()
-
         local nearbyEnts = ents.FindInSphere(plyPos, maxDistance:GetInt())
         for _, ent in ipairs(nearbyEnts) do
             if (ent:IsNPC() or ent:IsNextBot()) and ent.GetEnemy then
@@ -168,32 +167,33 @@ hook.Add("PlayerHurt", "BattleBeats_PVPCombat", function(victim, attacker)
     lastCombatTime[attacker] = curTime
 end)
 
---WIP
-/*hook.Add("EntityFireBullets", "BattleBeats_PVPIncoming", function(attacker, bullet)
-    if not pvpEnabled:GetBool() or game.SinglePlayer() then return end
+/*local rad = math.rad
+local cos = math.cos
+hook.Add("EntityFireBullets", "BattleBeats_NearbyBullets", function(attacker, bullet)
     if not shotsNearTrigger:GetBool() then return end
-    if pvpMode:GetInt() == 2 and not pvpRequireLOS:GetBool() then return end
-    if not IsValid(attacker) or not attacker:IsPlayer() then return end
+    if not bullet or not bullet.Src or not bullet.Dir then return end
 
     local start = bullet.Src
     local dir = bullet.Dir:GetNormalized()
-    local maxDist = maxDistancePVP:GetInt()
+    local maxDist = maxDistance:GetInt()
     local maxDistSqr = maxDist * maxDist
-    local cosThreshold = math.cos(math.rad(45))
 
     for _, ply in ipairs(player.GetAll()) do
         if ply == attacker then continue end
         if not IsValid(ply) or not ply:Alive() then continue end
-        if ply:Team() == attacker:Team() and not pvpTeam:GetBool() then continue end
+        if IsValid(attacker) and attacker:IsPlayer() then
+            if ply:Team() == attacker:Team() and not pvpTeam:GetBool() then
+                continue
+            end
+        end
 
         local toPly = ply:GetPos() - start
-        local distSqr = toPly:LengthSqr()
-        if distSqr > maxDistSqr then continue end
+        if toPly:LengthSqr() > maxDistSqr then continue end
 
         local dirToPly = toPly:GetNormalized()
         local dot = dir:Dot(dirToPly)
 
-        if dot > cosThreshold then
+        if dot > cos(rad(45)) then
             incomingShots[ply] = CurTime()
         end
     end
@@ -236,4 +236,14 @@ timer.Create("BattleBeats_CombatCheck", 0.5, 0, function()
             print("[BattleBeats] BattleBeats_CombatCheck error: " .. tostring(err))
         end
     end
+end)
+
+net.Receive("BTB_Change_ConVar", function(len, ply)
+    if not ply:IsSuperAdmin() then return end
+    local conVar = net.ReadString()
+    local value = net.ReadFloat()
+    if conVar == "" then return end
+    if not string.StartWith(conVar, "battlebeats_") then return end
+    if not GetConVar(conVar) then return end
+    RunConsoleCommand(conVar, tostring(value))
 end)

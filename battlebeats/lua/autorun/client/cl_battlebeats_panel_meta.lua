@@ -25,6 +25,7 @@ end
 
 vgui.Register("BattleBeatsTooltip", tooltipPanel, "DTooltip")
 
+local tooltipDelay = GetConVar("tooltip_delay"):GetFloat()
 local PANEL = FindMetaTable("Panel")
 function PANEL:BTB_SetImageTooltip(imagePath, text, width, maxImageHeight)
     width = width or 350
@@ -33,68 +34,73 @@ function PANEL:BTB_SetImageTooltip(imagePath, text, width, maxImageHeight)
     self:SetMouseInputEnabled(true)
     local imgtooltipPanel = nil
 
+    local timerID = "BTB_ImageTooltip_" .. tostring(self)
     self.OnCursorEntered = function()
-        if IsValid(imgtooltipPanel) then imgtooltipPanel:Remove() end
-        imgtooltipPanel = vgui.Create("DPanel")
-        imgtooltipPanel:SetAlpha(0)
-        imgtooltipPanel:MakePopup()
-        imgtooltipPanel.Think = function(self)
-            local mx, my = gui.MousePos()
-            if not mx or mx == 0 then return end
-            local w = self:GetWide()
-            local h = self:GetTall()
-            local targetX = mx - w / 2
-            local targetY = my - h - 12
-            self:SetPos(targetX, targetY)
-        end
+        timer.Remove(timerID)
+        timer.Create(timerID, tooltipDelay, 1, function()
+            if IsValid(imgtooltipPanel) then imgtooltipPanel:Remove() end
+            imgtooltipPanel = vgui.Create("DPanel")
+            imgtooltipPanel:SetAlpha(0)
+            imgtooltipPanel:MakePopup()
+            imgtooltipPanel.Think = function(self)
+                local mx, my = gui.MousePos()
+                if not mx or mx == 0 then return end
+                local w = self:GetWide()
+                local h = self:GetTall()
+                local targetX = mx - w / 2
+                local targetY = my - h - 12
+                self:SetPos(targetX, targetY)
+            end
 
-        local img = vgui.Create("DImage", imgtooltipPanel)
-        img:SetPos(10, 10)
-        img:SetSize(width - 20, maxImageHeight)
-        img:SetImage(imagePath)
-        img:SetKeepAspect(true)
+            local img = vgui.Create("DImage", imgtooltipPanel)
+            img:SetPos(10, 10)
+            img:SetSize(width - 20, maxImageHeight)
+            img:SetImage(imagePath)
+            img:SetKeepAspect(true)
 
-        local mat = Material(imagePath, "noclamp smooth")
-        local realW, realH = mat:Width(), mat:Height()
-        local targetW = width - 20
-        local scale = targetW / realW
-        local newImgH = realH * scale
-        if newImgH > maxImageHeight then
-            newImgH = maxImageHeight
-            scale = maxImageHeight / realH
-        end
-        img:SetSize(targetW, newImgH)
+            local mat = Material(imagePath, "noclamp smooth")
+            local realW, realH = mat:Width(), mat:Height()
+            local targetW = width - 20
+            local scale = targetW / realW
+            local newImgH = realH * scale
+            if newImgH > maxImageHeight then
+                newImgH = maxImageHeight
+                scale = maxImageHeight / realH
+            end
+            img:SetSize(targetW, newImgH)
 
-        local imageBottom = 10 + newImgH + 15
-        if text and text ~= "" then
-            local label = vgui.Create("DLabel", imgtooltipPanel)
-            label:SetPos(10, imageBottom)
-            label:SetSize(width - 20, 20)
-            label:SetText(text)
-            label:SetTextColor(color_white)
-            label:SetFont("HudHintTextLarge")
-            label:SetWrap(true)
-            label:SetAutoStretchVertical(true)
-            timer.Simple(0, function()
-                if IsValid(label) and IsValid(imgtooltipPanel) then
-                    label:SizeToContentsY(15)
-                    local totalH = imageBottom + label:GetTall()
-                    imgtooltipPanel:SetSize(width, totalH)
-                    imgtooltipPanel:SetAlpha(255)
-                end
-            end)
-        else
-            imgtooltipPanel:SetSize(width, imageBottom)
-            imgtooltipPanel:SetAlpha(255)
-        end
+            local imageBottom = 10 + newImgH + 15
+            if text and text ~= "" then
+                local label = vgui.Create("DLabel", imgtooltipPanel)
+                label:SetPos(10, imageBottom)
+                label:SetSize(width - 20, 20)
+                label:SetText(text)
+                label:SetTextColor(color_white)
+                label:SetFont("HudHintTextLarge")
+                label:SetWrap(true)
+                label:SetAutoStretchVertical(true)
+                timer.Simple(0, function()
+                    if IsValid(label) and IsValid(imgtooltipPanel) then
+                        label:SizeToContentsY(15)
+                        local totalH = imageBottom + label:GetTall()
+                        imgtooltipPanel:SetSize(width, totalH)
+                        imgtooltipPanel:SetAlpha(255)
+                    end
+                end)
+            else
+                imgtooltipPanel:SetSize(width, imageBottom)
+                imgtooltipPanel:SetAlpha(255)
+            end
 
-        imgtooltipPanel.Paint = function(self, w, h)
-            draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-            draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
-        end
+            imgtooltipPanel.Paint = function(self, w, h)
+                draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
+                draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+            end
+        end)
     end
 
     self.OnCursorExited = function()
+        timer.Remove(timerID)
         if IsValid(imgtooltipPanel) then
             imgtooltipPanel:Remove()
             imgtooltipPanel = nil

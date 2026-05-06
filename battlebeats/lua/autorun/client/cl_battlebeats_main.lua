@@ -49,7 +49,7 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.6.7"
+BATTLEBEATS.currentVersion = "2.7.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -57,7 +57,7 @@ CreateClientConVar("battlebeats_npc_combat", "0", true, true, "", 0, 1)
 
 CreateClientConVar("battlebeats_allow_server", "1", true, false, "", 0, 1)
 
-local maxDistance = CreateConVar("battlebeats_server_max_distance", "5000", { FCVAR_ARCHIVE, FCVAR_REPLICATED }, "", 100, 10000)
+local maxDistance = GetConVar("battlebeats_server_max_distance")
 
 local volumeSet = CreateClientConVar("battlebeats_volume", "100", true, false, "", 0, 1000)
 local debugMode = CreateClientConVar("battlebeats_debug_mode", "0", true, false, "", 0, 1)
@@ -76,6 +76,7 @@ local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_not
 local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "0", true, false, "", 0, 1)
 local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, true, "", 0, 1)
 local disableFade = CreateClientConVar("battlebeats_disable_fade", "0", true, true, "", 0, 1)
+local favMultiplier = CreateClientConVar("battlebeats_favorite_weight", "3", true, false, "", 1, 10)
 
 local enableSubtitles = CreateClientConVar("battlebeats_subtitles_enabled", "1", true, false, "", 0, 1)
 
@@ -346,16 +347,29 @@ function BATTLEBEATS.GetRandomTrack(packs, isCombat, excluded, previousTrack, ex
             end
         end
         if #availableTracks > 0 then
-            local chosen = availableTracks[math.random(#availableTracks)]
+            local chosen
+            if favMultiplier:GetInt() <= 1 or not BATTLEBEATS.favoriteTracks or table.IsEmpty(BATTLEBEATS.favoriteTracks) then
+                chosen = availableTracks[math.random(#availableTracks)]
+            else
+                local weightedTracks = {}
+                for _, track in ipairs(availableTracks) do
+                    local weight = 1
+                    if BATTLEBEATS.favoriteTracks[track] then
+                        weight = favMultiplier:GetInt()
+                    end
+                    for i = 1, weight do
+                        table.insert(weightedTracks, track)
+                    end
+                end
+                chosen = weightedTracks[math.random(#weightedTracks)]
+            end
             local override = hook.Run("BattleBeats_OnTrackSelected", chosen, isCombat)
             if isstring(override) then return override end
             return chosen
         else
             local fallbackTrack = allTracks[math.random(#allTracks)]
             local override = hook.Run("BattleBeats_OnFallbackTrack", fallbackTrack, isCombat)
-            if isstring(override) then
-                return override
-            end
+            if isstring(override) then return override end
             notification.AddLegacy("#btb.main.allexcluded", NOTIFY_ERROR, 4)
             return fallbackTrack
         end
@@ -916,18 +930,19 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
 
     if BATTLEBEATS.disableSwitch then return end
 
+    local curTime = CurTime()
     if BATTLEBEATS.isInCombat ~= lastCombatState then
-        if ambienceStartTime == nil then ambienceStartTime = CurTime() end
+        if ambienceStartTime == nil then ambienceStartTime = curTime end
         lastCombatState = BATTLEBEATS.isInCombat
         if BATTLEBEATS.isInCombat then
-            combatStartTime = CurTime()
+            combatStartTime = curTime
             local npcTrack = getNPCMatchingTrack()
             local success, err = pcall(switchTrack, npcTrack)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
             end
         else
-            ambienceStartTime = CurTime()
+            ambienceStartTime = curTime
             local success, err = pcall(switchTrack, nil)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
@@ -957,12 +972,12 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
             end
 
             if shouldSwitch then
-                pendingSwitch = { track = npcTrack, time = CurTime() + 2 }
+                pendingSwitch = { track = npcTrack, time = curTime + 2 }
                 pendingTrack = npcTrack
             end
         end
 
-        if pendingSwitch and CurTime() >= pendingSwitch.time then
+        if pendingSwitch and curTime >= pendingSwitch.time then
             local success, err = pcall(switchTrack, pendingSwitch.track)
             if not success then
                 print("[BattleBeats Client] NPC track switch error: " .. tostring(err))

@@ -699,7 +699,7 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added server-side track enforcement (beta)\nFor more information on how to use it, check the addon change notes"
+            Color(150, 255, 150), "- Added a 'weight' option to favorite tracks\n By default, they now have a 3x higher chance of being selected as the next random track"
             --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(
@@ -763,7 +763,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         end
     end
     BATTLEBEATS.ValidatePacks()
-    --loadPatchNotes()
+    loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
