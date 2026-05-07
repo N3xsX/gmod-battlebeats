@@ -464,6 +464,11 @@ function BATTLEBEATS.SavePlaylists()
     file.Write("battlebeats/battlebeats_playlists.txt", json)
 end
 
+function BATTLEBEATS.SaveTrackAliases()
+    local json = util.TableToJSON(BATTLEBEATS.trackAliases, true)
+    file.Write("battlebeats/battlebeats_track_aliases.txt", json)
+end
+
 --MARK: Loading functions
 local function loadExcludedTracks()
     loadTableFromFile("battlebeats/battlebeats_excluded_tracks.txt", "excludedTracks", function(track) return track, true end, BATTLEBEATS.SaveExcludedTracks)
@@ -545,6 +550,10 @@ end
 
 local function loadPackVolumes()
     loadTableFromFile("battlebeats/battlebeats_pack_volumes.txt", "packVolume", volumeTransform)
+end
+
+local function loadTrackAliases()
+    loadTableFromFile("battlebeats/battlebeats_track_aliases.txt", "trackAliases")
 end
 
 local function loadPlaylists()
@@ -699,7 +708,7 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added a 'weight' option to favorite tracks\n By default, they now have a 3x higher chance of being selected as the next random track"
+            Color(150, 255, 150), "- Added option to rename tracks"
             --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
         )
         chat.AddText(
@@ -751,6 +760,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadTrackVolumes()
     loadPackVolumes()
     loadPlaylists()
+    loadTrackAliases()
     buildTrackMap()
     findConflicts()
     --

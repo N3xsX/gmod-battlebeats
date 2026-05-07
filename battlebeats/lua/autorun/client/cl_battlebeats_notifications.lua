@@ -190,11 +190,13 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     local override = hook.Run("BattleBeats_PreShowNotification", trackName, inCombat, isPreviewedTrack)
     if override == true then return end
     local packName = getPackName(trackName)
+    local aliasName = BATTLEBEATS.trackAliases and BATTLEBEATS.trackAliases[trackName]
     trackName = BATTLEBEATS.FormatTrackName(trackName)
+    local displayName = aliasName or trackName
 
     if istable(override) then
         if isstring(override.trackName) then
-            trackName = override.trackName
+            displayName = override.trackName
         end
         if isstring(override.packName) then
             packName = override.packName
@@ -206,7 +208,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
         end
     end
 
-    if string.match(trackName:lower(), "^[ca]%d+$") and skipNombat:GetBool() then -- if the name of the track is letter A or C then skip it
+    if string.match(displayName:lower(), "^[ca]%d+$") and skipNombat:GetBool() then -- if the name of the track is letter A or C then skip it
         if IsValid(trackNotification) then BATTLEBEATS.HideNotification() end
         return
     end
@@ -231,7 +233,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
 
     local textX = 10
     local radius = 16
-    local textWidth = surface.GetTextSize(trackName)
+    local textWidth = surface.GetTextSize(displayName)
     local isScrolling = textWidth > 280 -- scroll if text too long
     local textColor = inCombat and Color(255, 165, 0) or Color(0, 255, 0) -- green = ambient, orange = in combat, gold = preview
     textColor = isPreviewedTrack and Color(255, 215, 0) or textColor
@@ -310,10 +312,10 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
             if textX < -textWidth - 50 then
                 textX = textX + textWidth + 40
             end
-            draw.SimpleText(trackName, "BattleBeats_Notification_Font", textX + 30, 25, textColor, TEXT_ALIGN_LEFT)
-            draw.SimpleText(trackName, "BattleBeats_Notification_Font", textX + textWidth + 70, 25, textColor, TEXT_ALIGN_LEFT)
+            draw.SimpleText(displayName, "BattleBeats_Notification_Font", textX + 30, 25, textColor, TEXT_ALIGN_LEFT)
+            draw.SimpleText(displayName, "BattleBeats_Notification_Font", textX + textWidth + 70, 25, textColor, TEXT_ALIGN_LEFT)
         else
-            draw.SimpleText(trackName, "BattleBeats_Notification_Font", 150, 25, textColor, TEXT_ALIGN_CENTER)
+            draw.SimpleText(displayName, "BattleBeats_Notification_Font", 150, 25, textColor, TEXT_ALIGN_CENTER)
         end
 
         if showBar:GetBool() then

@@ -928,6 +928,13 @@ concommand.Add("battlebeats_delete_data", function()
     surface.PlaySound("buttons/button14.wav")
     
     cookie.Delete("battlebeats_selected_packs")
+    cookie.Delete("battlebeats_start_track")
+    cookie.Delete('BattleBeats_FirstTime')
+    cookie.Delete("battlebeats_high_volume_time")
+    cookie.Delete("battlebeats_high_volume_warn")
+    cookie.Delete("battlebeats_last_track")
+    cookie.Delete("battlebeats_vol_expanded")
+    RunConsoleCommand("battlebeats_seen_version", "0")
     file.Delete("battlebeats/battlebeats_excluded_tracks.txt")
     BATTLEBEATS.excludedTracks = {}
     file.Delete("battlebeats/battlebeats_favorite_tracks.txt")
@@ -942,6 +949,8 @@ concommand.Add("battlebeats_delete_data", function()
     BATTLEBEATS.trackTrim = {}
     file.Delete("battlebeats/battlebeats_playlists.txt")
     BATTLEBEATS.musicPlaylists = {}
+    file.Delete("battlebeats/battlebeats_track_aliases.txt")
+    BATTLEBEATS.trackAliases = {}
 end)
 
 concommand.Add("battlebeats_clean_unused_tracks", function()
@@ -962,4 +971,6 @@ concommand.Add("battlebeats_clean_unused_tracks", function()
     BATTLEBEATS.SavePackVolumes()
     cleanupInvalidTracks(BATTLEBEATS.trackTrim)
     BATTLEBEATS.SaveTrackTrim()
+    cleanupInvalidTracks(BATTLEBEATS.trackAliases)
+    BATTLEBEATS.SaveTrackAliases()
 end)

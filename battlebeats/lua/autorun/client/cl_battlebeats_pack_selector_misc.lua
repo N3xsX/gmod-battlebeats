@@ -160,6 +160,7 @@ local function drawBlur(panel, amount)
         surface.DrawTexturedRect(-x, -y, ScrW(), ScrH())
     end
 end
+--MARK: Import frame
 function BATTLEBEATS.openImportFrame(frame)
     local background = vgui.Create("DPanel", frame)
     background:SetSize(frame:GetWide(), frame:GetTall())
@@ -944,6 +945,89 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     cancelBtn.DoClick = function() background:Remove() end
 
     return textEntry
+end
+
+function BATTLEBEATS.changeName(panel, track, func)
+    local tname = BATTLEBEATS.FormatTrackName(track)
+    local currentAlias = BATTLEBEATS.trackAliases and BATTLEBEATS.trackAliases[track] or tname
+    local background = vgui.Create("DPanel", panel)
+    background:SetSize(panel:GetWide(), panel:GetTall())
+    background:Center()
+    background.Paint = function(self)
+        drawBlur(self, 2)
+    end
+
+    local frame = vgui.Create("DPanel", background)
+    frame:SetSize(400, 110)
+    frame:Center()
+    frame.Paint = function(self, w, h)
+        draw.RoundedBox(12, 0, 0, w, h, c000200)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+    end
+    frame:BTB_SetTitle("#btb.ps.ts.rmb.set_name_title", true)
+
+    local entry = vgui.Create("DTextEntry", frame)
+    entry:SetPos(10, 30)
+    entry:SetSize(380, 40)
+    entry:SetText(currentAlias)
+    entry:SetMaximumCharCount(56)
+    entry:SetCaretPos(string.len(currentAlias))
+    entry:RequestFocus()
+    entry:SetFont("BattleBeats_Font")
+    entry.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, c707070255)
+        self:DrawTextEntryText(color_white, color_white, color_white)
+        if self:GetText() == "" and not self:IsEditing() then
+            draw.SimpleText(tname, "BattleBeats_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
+    end
+
+    local function saveAlias()
+        local text = string.Trim(entry:GetValue() or "")
+
+        BATTLEBEATS.trackAliases = BATTLEBEATS.trackAliases or {}
+
+        if text == tname or text == "" then
+            BATTLEBEATS.trackAliases[track] = nil
+        else
+            BATTLEBEATS.trackAliases[track] = text
+        end
+
+        BATTLEBEATS.SaveTrackAliases()
+        func()
+        background:Remove()
+    end
+
+    entry.OnEnter = function ()
+        saveAlias()
+    end
+
+    local saveBtn = vgui.Create("DButton", frame)
+    saveBtn:SetPos(45, 75)
+    saveBtn:SetSize(150, 25)
+    saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
+    saveBtn:SetFont("CreditsText")
+    saveBtn:SetTextColor(color_white)
+    saveBtn.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
+    end
+
+    saveBtn.DoClick = function()
+        saveAlias()
+    end
+
+    local cancelBtn = vgui.Create("DButton", frame)
+    cancelBtn:SetPos(205, 75)
+    cancelBtn:SetSize(150, 25)
+    cancelBtn:SetText("#btb.main.volume_cancel")
+    cancelBtn:SetFont("CreditsText")
+    cancelBtn:SetTextColor(color_white)
+    cancelBtn.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
+    end
+    cancelBtn.DoClick = function() background:Remove() end
+
+    return entry
 end
 
 --MARK:Subtitles

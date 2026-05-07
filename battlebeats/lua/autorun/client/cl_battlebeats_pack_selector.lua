@@ -1,14 +1,14 @@
 -- pls dont kill me for this mess
 
 local frame
-local searchBox
 local volumePanel
-local assignBox
 local trackMenu = nil
 local panelMenu = nil
 local isLooping = false
 local skipExcluded = false
 local isSingle = game.SinglePlayer()
+
+local activeTextEntries = {}
 
 BATTLEBEATS.activeConflicts = BATTLEBEATS.activeConflicts or {}
 BATTLEBEATS.wsCache = BATTLEBEATS.wsCache or {}
@@ -1109,7 +1109,9 @@ local function openBTBmenu()
         parent:Clear()
         local isAllMode = (trackType == "all")
         local function addTrackRow(track, excluded, isFavorite, actualTrackType)
+            local aliasName = BATTLEBEATS.trackAliases and BATTLEBEATS.trackAliases[track]
             local trackName = BATTLEBEATS.FormatTrackName(track)
+            local displayName = aliasName or trackName
             local row = vgui.Create("DPanel", parent)
             row:SetSize(0, 50)
             row:Dock(TOP)
@@ -1183,7 +1185,11 @@ local function openBTBmenu()
             end
 
             surface.SetFont("BattleBeats_Font")
-            local textWidth = surface.GetTextSize(isFavorite and "★ " .. trackName or trackName)
+            local textWidth = surface.GetTextSize(isFavorite and "★ " .. displayName or displayName)
+            if aliasName then
+                surface.SetFont("BattleBeats_Rename_Font")
+                textWidth = textWidth + surface.GetTextSize("   " .. trackName)
+            end
             local npcs = BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs
             local count = istable(npcs) and #npcs or 0
             local startTrack = cookie.GetString("battlebeats_start_track", "") == track
@@ -1299,7 +1305,11 @@ local function openBTBmenu()
                     local starW = surface.GetTextSize("★ ")
                     textPosX = textPosX + starW
                 end
-                draw.SimpleTextOutlined(trackName, "BattleBeats_Font", textPosX, h / 2, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, clr.c000200)
+                draw.SimpleTextOutlined(displayName, "BattleBeats_Font", textPosX, h / 2, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, 1, clr.c000200)
+                if aliasName then
+                    local aliasW = surface.GetTextSize(displayName .. " ")
+                    draw.SimpleText(trackName, "BattleBeats_Rename_Font", textPosX + aliasW, h / 2, clr.c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                end
                 render.SetScissorRect(0, 0, 0, 0, false)
                 surface.SetAlphaMultiplier(1)
             end
@@ -1319,7 +1329,7 @@ local function openBTBmenu()
                         playPause:SetText("⏸")
                         currentTimeLabel:SetText("0:00")
                         totalTimeLabel:SetText("0:00")
-                        trackNameLabel:SetText(trackName)
+                        trackNameLabel:SetText(displayName)
                         ui.scrollPanel:ScrollToChild(self)
 
                         BATTLEBEATS.PlayNextTrackPreview(track, nil, false, function()
@@ -1539,7 +1549,7 @@ local function openBTBmenu()
                         local currentNPCs = BATTLEBEATS.npcTrackMappings[track] and
                         BATTLEBEATS.npcTrackMappings[track].npcs or {}
                         local assignNPC = menu:AddOption("#btb.ps.ts.rmb.assign_add", function()
-                            assignBox = BATTLEBEATS.createAssignFrame(frame, "#btb.ps.ts.rmb.assign_title", nil, 1, function(class, priority, fframe)
+                            activeTextEntries.assignBox = BATTLEBEATS.createAssignFrame(frame, "#btb.ps.ts.rmb.assign_title", nil, 1, function(class, priority, fframe)
                                 if not class or class == "" then
                                     notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                     surface.PlaySound("buttons/button11.wav")
@@ -1625,7 +1635,7 @@ local function openBTBmenu()
                             end
 
                             local editOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_edit", function()
-                                assignBox = BATTLEBEATS.createAssignFrame(frame, language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class, npcInfo.class, npcInfo.priority, function(newClass, newPrio, fframe)
+                                activeTextEntries.assignBox = BATTLEBEATS.createAssignFrame(frame, language.GetPhrase("#btb.ps.ts.rmb.assign_edit") .. ": " .. npcInfo.class, npcInfo.class, npcInfo.priority, function(newClass, newPrio, fframe)
                                     if not newClass or newClass == "" then
                                         notification.AddLegacy("#btb.ps.ts.rmb.assign_no_class", NOTIFY_ERROR, 3)
                                         surface.PlaySound("buttons/button11.wav")
@@ -1746,6 +1756,17 @@ local function openBTBmenu()
                         lyricsOption:BTB_PaintProperties()
                     end
 
+                    --MARK:RMB Rename
+                    BATTLEBEATS.trackAliases = BATTLEBEATS.trackAliases or {}
+                    local renameOption = menu:AddOption("#btb.ps.ts.rmb.set_name", function()
+                        activeTextEntries.changeNameBox = BATTLEBEATS.changeName(frame, track, function()
+                            createTrackList(parent, trackType, selectedPack)
+                        end)
+                    end)
+
+                    renameOption:SetImage("icon16/tag_blue_edit.png")
+                    renameOption:BTB_PaintProperties()
+
                     local copy = menu:AddOption("#btb.ps.ts.rmb.copy", function()
                         SetClipboardText(track)
                     end)
@@ -1778,11 +1799,11 @@ local function openBTBmenu()
             draw.SimpleText(excludeText, "DermaDefaultBold", w - excludeW - 40, 45, clr.c100100100, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end
 
-        searchBox = vgui.Create("DTextEntry", searchPanel)
-        searchBox:SetSize(600, 30)
-        searchBox:SetPos(170, 10)
-        searchBox:SetFont("BattleBeats_Font")
-        searchBox.Paint = function(self, w, h)
+        activeTextEntries.searchBox = vgui.Create("DTextEntry", searchPanel)
+        activeTextEntries.searchBox:SetSize(600, 30)
+        activeTextEntries.searchBox:SetPos(170, 10)
+        activeTextEntries.searchBox:SetFont("BattleBeats_Font")
+        activeTextEntries.searchBox.Paint = function(self, w, h)
             draw.RoundedBox(4, 0, 0, w, h, clr.c707070255)
             self:DrawTextEntryText(color_white, color_white, color_white)
             if self:GetText() == "" and not self:IsEditing() then
@@ -1807,6 +1828,7 @@ local function openBTBmenu()
         if isAllMode or trackType == "combat" then
             sortCombo:AddChoice("#btb.ps.sort.assigned_only", "assigned", false, "icon16/user.png")
         end
+        sortCombo:AddChoice("#btb.ps.sort.renamed_only", "rename", false, "icon16/tag_blue.png")
         sortCombo:AddChoice("#btb.ps.sort.offset_only", "offset", false, "icon16/time.png")
         sortCombo:AddChoice("#btb.ps.sort.volume_only", "volume", false, "icon16/sound.png")
         sortCombo:SetSortItems(false)
@@ -1904,8 +1926,8 @@ local function openBTBmenu()
         local trackRows = {}
         local noResultsLabel
         local function filterAndSort()
-            if not IsValid(searchBox) then return end
-            local query = string.lower(searchBox:GetValue())
+            if not IsValid(activeTextEntries.searchBox) then return end
+            local query = string.lower(activeTextEntries.searchBox:GetValue())
             local sortMode = sortCombo:GetOptionData(sortCombo:GetSelectedID()) or "az"
 
             for _, row in ipairs(trackRows) do row:Remove() end
@@ -1919,7 +1941,7 @@ local function openBTBmenu()
             local typesToProcess = isAllMode and {"ambient", "combat"} or {trackType}
             for _, tType in ipairs(typesToProcess) do
                 for _, t in ipairs(BATTLEBEATS.musicPacks[selectedPack][tType] or {}) do
-                    local name = string.lower(BATTLEBEATS.FormatTrackName(t))
+                    local name = string.lower(BATTLEBEATS.trackAliases[t] or BATTLEBEATS.FormatTrackName(t))
                     local excluded = BATTLEBEATS.excludedTracks[t]
                     local favorite = BATTLEBEATS.favoriteTracks[t]
 
@@ -1944,7 +1966,7 @@ local function openBTBmenu()
                     tracks[i], tracks[j] = tracks[j], tracks[i]
                 end
             else
-                if sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" then
+                if sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" or sortMode == "rename" then
                     local filtered = {}
                     for _, data in ipairs(tracks) do
                         local hasFeature = false
@@ -1958,6 +1980,8 @@ local function openBTBmenu()
                             (trim and trim.finish and trim.finish > 0)
                         elseif sortMode == "volume" then
                             hasFeature = BATTLEBEATS.trackVolume[data.track]
+                        elseif sortMode == "rename" then
+                            hasFeature = BATTLEBEATS.trackAliases[data.track] ~= nil
                         end
 
                         if hasFeature then
@@ -1971,7 +1995,7 @@ local function openBTBmenu()
                         if a.fav and not b.fav then return true end
                         if not a.fav and b.fav then return false end
 
-                        if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" or sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" then
+                        if sortMode == "az" or sortMode == "fav" or sortMode == "ex" or sortMode == "inc" or sortMode == "assigned" or sortMode == "offset" or sortMode == "volume" or sortMode == "rename" then
                             return a.name < b.name
                         elseif sortMode == "za" then
                             return a.name > b.name
@@ -2018,7 +2042,7 @@ local function openBTBmenu()
             filterAndSort()
         end
 
-        searchBox.OnChange = function() timer.Create("BattleBeats_SearchDelay", 0.3, 1, filterAndSort) end
+        activeTextEntries.searchBox.OnChange = function() timer.Create("BattleBeats_SearchDelay", 0.3, 1, filterAndSort) end
         sortCombo.OnSelect = function()
             selectedSorting = sortCombo:GetSelectedID()
             selectedText = sortCombo:GetOptionText(selectedSorting)
@@ -2928,12 +2952,20 @@ hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
     end
 end)
 
+local function isAnyTextEntryEditing()
+    activeTextEntries.plNameBox = BATTLEBEATS.plNameBox
+    activeTextEntries.importBox = BATTLEBEATS.importBox
+    for _, pnl in pairs(activeTextEntries) do
+        if IsValid(pnl) and pnl:IsEditing() then
+            return true
+        end
+    end
+    return false
+end
+
 hook.Add("OnContextMenuClose", "BattleBeats_HideUI", function()
-    if IsValid(frame) and not toogleFrame:GetBool() 
-        and not (IsValid(searchBox) and searchBox:IsEditing())
-        and not (IsValid(BATTLEBEATS.plNameBox) and BATTLEBEATS.plNameBox:IsEditing())
-        and not (IsValid(assignBox) and assignBox:IsEditing())
-        and not (IsValid(BATTLEBEATS.importBox) and BATTLEBEATS.importBox:IsEditing()) then
+    if isAnyTextEntryEditing() then return end
+    if IsValid(frame) and not toogleFrame:GetBool() then
         frame:SetVisible(false)
     end
 end)

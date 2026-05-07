@@ -41,6 +41,7 @@ BATTLEBEATS.packVolume = BATTLEBEATS.packVolume or {}
 BATTLEBEATS.trackVolume = BATTLEBEATS.trackVolume or {}
 BATTLEBEATS.trackTrim = BATTLEBEATS.trackTrim or {}
 BATTLEBEATS.musicPlaylists = BATTLEBEATS.musicPlaylists or {}
+BATTLEBEATS.trackAliases = BATTLEBEATS.trackAliases or {}
 
 --Dev
 BATTLEBEATS.disableFade = BATTLEBEATS.disableFade or false
@@ -49,7 +50,7 @@ BATTLEBEATS.disableNextTrackTimer = BATTLEBEATS.disableNextTrackTimer or false
 BATTLEBEATS.disableCheckingTimer = BATTLEBEATS.disableCheckingTimer or false
 BATTLEBEATS.volumeOverride = BATTLEBEATS.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-BATTLEBEATS.currentVersion = "2.7.0"
+BATTLEBEATS.currentVersion = "2.7.1"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -158,7 +159,7 @@ function BATTLEBEATS.adjustVolume(track, baseVolume, isPreview)
     local tgVolume = baseVolume or (volumeType / 100 * masterVolume)
 
     tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
-    --debugPrint("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. tostring(track))
+    --print("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. tostring(track))
 
     if not track or track == "" then
         return math.Round(tgVolume, 2)
@@ -1035,12 +1036,13 @@ end)
 local warningBox
 
 local function applyVolume()
-    local sName = IsValid(BATTLEBEATS.currentStation) and BATTLEBEATS.currentStation:GetFileName() or nil
     if IsValid(BATTLEBEATS.currentStation) then
+        local sName = IsValid(BATTLEBEATS.currentStation) and BATTLEBEATS.currentStation:GetFileName() or nil
         local tgVolume = BATTLEBEATS.adjustVolume(sName)
         BATTLEBEATS.currentStation:SetVolume(tgVolume)
     end
     if IsValid(BATTLEBEATS.currentPreviewStation) then
+        local sName = IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetFileName() or nil
         local tgVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
         BATTLEBEATS.currentPreviewStation:SetVolume(tgVolume)
     end

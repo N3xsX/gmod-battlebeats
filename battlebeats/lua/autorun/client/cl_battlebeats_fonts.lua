@@ -40,3 +40,10 @@ surface.CreateFont("BattleBeats_Subtitles", {
     size = 36,
     weight = 600
 })
+
+surface.CreateFont("BattleBeats_Rename_Font", {
+    font = "Roboto Bold",
+    size = 15,
+    weight = 500,
+    italic = true
+})
