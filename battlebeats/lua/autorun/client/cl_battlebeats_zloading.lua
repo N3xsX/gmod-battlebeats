@@ -591,7 +591,10 @@ local function getStartingTrack()
 
         local validFavorites = {}
         for trackPath, _ in pairs(BATTLEBEATS.favoriteTracks) do
-            if trackExists(trackPath) then
+            if not trackExists(trackPath) then continue end
+            local packName = BATTLEBEATS.trackToPack[trackPath]
+            local pack = packName and BATTLEBEATS.musicPacks[packName]
+            if pack and pack.ambient and table.HasValue(pack.ambient, trackPath) then
                 table.insert(validFavorites, trackPath)
             end
         end
@@ -708,8 +711,8 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added option to rename tracks"
-            --Color(150, 255, 150), "- Track previewer now respects ambient/combat volume settings"
+            Color(150, 255, 150), "- New UI for assigning NPCs to tracks\n",
+            Color(150, 255, 150), "- Improved tooltip readability"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"

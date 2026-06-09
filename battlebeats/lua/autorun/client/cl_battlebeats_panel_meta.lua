@@ -1,106 +1,246 @@
-local tooltipPanel = {}
-function tooltipPanel:PerformLayout()
-    self:SetFontInternal("HudHintTextLarge")
-    self:SetTextColor(color_white)
-    self:SetContentAlignment(5)
-    local tw, th = self:GetContentSize()
-    self:SetWide(tw + 15)
-    self:SetTall(th + 10)
+local defColor = Color(255, 210, 0)
+local function parseSegmentColor(segmentText)
+    local textPart, r, g, b = string.match(segmentText, "^(.-)<(%d+),(%d+),(%d+)>$")
+    if textPart then
+        return textPart, Color(math.Clamp(tonumber(r) or 255, 0, 255), math.Clamp(tonumber(g) or 210, 0, 255), math.Clamp(tonumber(b) or 0, 0, 255))
+    end
+    return segmentText, defColor
 end
 
+local function addSegment(line, segmentText, mode)
+    if not segmentText or segmentText == "" then return end
+    local color = color_white
+    if mode and mode > 0 then
+        segmentText, color = parseSegmentColor(segmentText)
+    end
+    table.insert(line, {
+        text = segmentText,
+        mode = mode or 0,
+        color = color
+    })
+end
+
+local function setText(self, text)
+    text = text or ""
+    if string.StartWith(text, "#") then
+        text = language.GetPhrase(string.sub(text, 2))
+    end
+    self.rText = text
+    self.lines = {}
+    local cleanText = string.gsub(self.rText, "\\n", "\n")
+    for rawLine in string.gmatch(cleanText .. "\n", "(.-)\n") do
+        local line = {}
+        local pos = 1
+
+        while pos <= #rawLine do
+            local doubleStart = string.find(rawLine, "||", pos, true)
+            local singleStart = string.find(rawLine, "|", pos, true)
+
+            if not singleStart then
+                addSegment(line, string.sub(rawLine, pos), 0)
+                break
+            end
+
+            if doubleStart and doubleStart == singleStart then
+                addSegment(line, string.sub(rawLine, pos, doubleStart - 1), 0)
+                local doubleEnd = string.find(rawLine, "||", doubleStart + 2, true)
+                if not doubleEnd then
+                    addSegment(line, string.sub(rawLine, doubleStart), 0)
+                    break
+                end
+                addSegment(line, string.sub(rawLine, doubleStart + 2, doubleEnd - 1), 2)
+                pos = doubleEnd + 2
+            else
+                addSegment(line, string.sub(rawLine, pos, singleStart - 1), 0)
+                local singleEnd = string.find(rawLine, "|", singleStart + 1, true)
+                if not singleEnd then
+                    addSegment(line, string.sub(rawLine, singleStart), 0)
+                    break
+                end
+                addSegment(line, string.sub(rawLine, singleStart + 1, singleEnd - 1), 1)
+                pos = singleEnd + 1
+            end
+        end
+
+        table.insert(self.lines, line)
+    end
+    self:InvalidateLayout()
+end
+
+local function perfLayout(self)
+    surface.SetFont("HudHintTextLarge")
+    local maxW = 0
+    local totalH = 0
+    local lineGap = 2
+    for _, line in ipairs(self.lines or {}) do
+        local lineW = 0
+        local lineH = 0
+        for _, segment in ipairs(line) do
+            local tw, th = surface.GetTextSize(segment.text)
+
+            lineW = lineW + tw
+            lineH = math.max(lineH, th)
+        end
+        maxW = math.max(maxW, lineW)
+        totalH = totalH + lineH + lineGap
+    end
+    if totalH > 0 then
+        totalH = totalH - lineGap
+    end
+    self:SetSize(maxW + 20, totalH + 14)
+end
+
+local function drawText(self, w, y, lineGap)
+    for _, line in ipairs(self.lines or {}) do
+        local lineW = 0
+        local lineH = 0
+        for _, segment in ipairs(line) do
+            local tw, th = surface.GetTextSize(segment.text)
+            lineW = lineW + tw
+            lineH = math.max(lineH, th)
+        end
+        local x = (w - lineW) / 2
+        for _, segment in ipairs(line) do
+            local tw, th = surface.GetTextSize(segment.text)
+            local segColor = segment.color or defColor
+            if segment.mode == 2 then
+                draw.RoundedBox(6, x - 2, y + lineH / 2 - th / 2 - 1, tw + 4, th + 2, Color(segColor.r - 30, segColor.g - 30, segColor.b - 30, 30))
+                draw.SimpleText(segment.text, "HudHintTextLarge", x, y + lineH / 2, Color(segColor.r, segColor.g, segColor.b), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            elseif segment.mode == 1 then
+                draw.SimpleText(segment.text, "HudHintTextLarge", x, y + lineH / 2, Color(segColor.r, segColor.g, segColor.b), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            else
+                draw.SimpleText(segment.text, "HudHintTextLarge", x, y + lineH / 2, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            end
+            x = x + tw
+        end
+        y = y + lineH + lineGap
+    end
+end
+
+local tooltipPanel = {}
+function tooltipPanel:SetText(text)
+    setText(self, text)
+end
+function tooltipPanel:PerformLayout()
+    perfLayout(self)
+end
+function tooltipPanel:Paint(w, h)
+    draw.RoundedBox(10, 0, 0, w, h, defColor)
+    draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+    surface.SetFont("HudHintTextLarge")
+    local y = 7
+    local lineGap = 2
+    drawText(self, w, y, lineGap)
+end
 function tooltipPanel:Think()
     local mx, my = gui.MousePos()
     if not mx or mx == 0 then return end
-    local w = self:GetWide()
-    local h = self:GetTall()
-    local targetX = mx - w / 2
-    local targetY = my - h - 12
-    self:SetPos(targetX, targetY)
+    self:SetPos(mx - self:GetWide() / 2, my - self:GetTall() - 12)
 end
-
-function tooltipPanel:Paint(w, h)
-    draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-    draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
-end
-
 vgui.Register("BattleBeatsTooltip", tooltipPanel, "DTooltip")
+
+local tooltipTextOnly = {}
+function tooltipTextOnly:SetMaxWidth(w)
+    self.maxWidth = w or 330
+    self:InvalidateLayout()
+end
+function tooltipTextOnly:SetText(text)
+    setText(self, text)
+end
+function tooltipTextOnly:PerformLayout()
+    perfLayout(self)
+end
+function tooltipTextOnly:Paint(w, h)
+    surface.SetFont("HudHintTextLarge")
+    local y = 0
+    local lineGap = 2
+    drawText(self, w, y, lineGap)
+end
+vgui.Register("BattleBeatsTooltipTextOnly", tooltipTextOnly, "DPanel")
 
 local tooltipDelay = GetConVar("tooltip_delay"):GetFloat()
 local PANEL = FindMetaTable("Panel")
 function PANEL:BTB_SetImageTooltip(imagePath, text, width, maxImageHeight)
     width = width or 350
     maxImageHeight = maxImageHeight or 400
-
     self:SetMouseInputEnabled(true)
-    local imgtooltipPanel = nil
 
+    local imgtooltipPanel = nil
     local timerID = "BTB_ImageTooltip_" .. tostring(self)
+
     self.OnCursorEntered = function()
         timer.Remove(timerID)
+
         timer.Create(timerID, tooltipDelay, 1, function()
-            if IsValid(imgtooltipPanel) then imgtooltipPanel:Remove() end
+            if IsValid(imgtooltipPanel) then
+                imgtooltipPanel:Remove()
+            end
+
             imgtooltipPanel = vgui.Create("DPanel")
             imgtooltipPanel:SetAlpha(0)
             imgtooltipPanel:MakePopup()
             imgtooltipPanel.Think = function(self)
                 local mx, my = gui.MousePos()
                 if not mx or mx == 0 then return end
-                local w = self:GetWide()
-                local h = self:GetTall()
-                local targetX = mx - w / 2
-                local targetY = my - h - 12
-                self:SetPos(targetX, targetY)
+                self:SetPos(mx - self:GetWide() / 2, my - self:GetTall() - 12)
             end
+            imgtooltipPanel.Paint = function(self, w, h)
+                draw.RoundedBox(10, 0, 0, w, h, defColor)
+                draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
+            end
+
+            local baseWidth = width
+            local padding = 20
+            local textW = 0
+            local textPanel = nil
+
+            if text and text ~= "" then
+                textPanel = vgui.Create("BattleBeatsTooltipTextOnly", imgtooltipPanel)
+                textPanel:SetText(text)
+                textPanel:InvalidateLayout(true)
+
+                textW = textPanel.textW or textPanel:GetWide()
+            end
+
+            local finalWidth = math.max(baseWidth, textW + padding)
+            finalWidth = math.min(finalWidth, ScrW() - 40)
 
             local img = vgui.Create("DImage", imgtooltipPanel)
             img:SetPos(10, 10)
-            img:SetSize(width - 20, maxImageHeight)
             img:SetImage(imagePath)
             img:SetKeepAspect(true)
 
             local mat = Material(imagePath, "noclamp smooth")
             local realW, realH = mat:Width(), mat:Height()
-            local targetW = width - 20
-            local scale = targetW / realW
-            local newImgH = realH * scale
-            if newImgH > maxImageHeight then
-                newImgH = maxImageHeight
-                scale = maxImageHeight / realH
+            local targetW = finalWidth - 20
+            local newImgH = maxImageHeight
+
+            if realW > 0 and realH > 0 then
+                local scale = targetW / realW
+                newImgH = realH * scale
+                if newImgH > maxImageHeight then
+                    newImgH = maxImageHeight
+                    targetW = realW * (maxImageHeight / realH)
+                end
             end
+
             img:SetSize(targetW, newImgH)
-
-            local imageBottom = 10 + newImgH + 15
-            if text and text ~= "" then
-                local label = vgui.Create("DLabel", imgtooltipPanel)
-                label:SetPos(10, imageBottom)
-                label:SetSize(width - 20, 20)
-                label:SetText(text)
-                label:SetTextColor(color_white)
-                label:SetFont("HudHintTextLarge")
-                label:SetWrap(true)
-                label:SetAutoStretchVertical(true)
-                timer.Simple(0, function()
-                    if IsValid(label) and IsValid(imgtooltipPanel) then
-                        label:SizeToContentsY(15)
-                        local totalH = imageBottom + label:GetTall()
-                        imgtooltipPanel:SetSize(width, totalH)
-                        imgtooltipPanel:SetAlpha(255)
-                    end
-                end)
+            img:SetPos((finalWidth - targetW) / 2, 10)
+            local imageBottom = 10 + newImgH + 5
+            if IsValid(textPanel) then
+                textPanel:SetPos((finalWidth - textPanel:GetWide()) / 2, imageBottom)
+                local totalH = imageBottom + textPanel:GetTall() - 5
+                imgtooltipPanel:SetSize(finalWidth, totalH)
             else
-                imgtooltipPanel:SetSize(width, imageBottom)
-                imgtooltipPanel:SetAlpha(255)
+                imgtooltipPanel:SetSize(finalWidth, imageBottom)
             end
-
-            imgtooltipPanel.Paint = function(self, w, h)
-                draw.RoundedBox(10, 0, 0, w, h, Color(255, 210, 0))
-                draw.RoundedBox(9, 1, 1, w - 2, h - 2, Color(50, 50, 50))
-            end
+            imgtooltipPanel:SetAlpha(255)
         end)
     end
 
     self.OnCursorExited = function()
         timer.Remove(timerID)
+
         if IsValid(imgtooltipPanel) then
             imgtooltipPanel:Remove()
             imgtooltipPanel = nil

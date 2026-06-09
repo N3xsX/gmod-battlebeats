@@ -184,6 +184,10 @@ local function getPackName(trackName)
 end
 
 local finalWidth, finalHeight = 300, 80
+local mfloor = math.floor
+local mClamp = math.Clamp
+local mlog = math.log
+local Lerp = Lerp
 
 function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
     if not trackName then return end
@@ -247,21 +251,23 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
 
     --local from = language.GetPhrase("btb.notification.from")
 
+    local fft = {}
     panel.Paint = function(self, w, h)
         draw.RoundedBoxEx(radius, 0, 0, w, radius, c000200, true, true, false, false)
         surface.SetDrawColor(c000200)
         surface.DrawRect(0, radius, w, h - radius)
         draw.SimpleText("#btb.notification.now_playing", "BattleBeats_Notification_Font_Misc", progressBarX + progressBarWidth / 2, 10, color_white, TEXT_ALIGN_CENTER)
-
         surface.SetTexture(gradient)
         surface.DrawTexturedRect(0, 0, w, h)
 
         local yBase = h
-
         local station = isPreviewedTrack and BATTLEBEATS.currentPreviewStation or BATTLEBEATS.currentStation
         if IsValid(station) and showNotificationVisualizer:GetBool() then
-            local fft = {}
             if station:FFT(fft, 0) then
+                local vol = math.min(station:GetVolume(), 2)
+                local visSmooth = notificationVisualizerSmooth:GetBool()
+                local visBoost = notificationVisualizerBoost:GetInt()
+                surface.SetDrawColor(textColor.r, textColor.g, textColor.b, 100)
                 for i = 1, bars do
                     -- pick FFT index (linear for first half, exponential for second)
                     local idx
@@ -269,7 +275,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
                         idx = i
                     else
                         local t = (i - bars / 2) / (bars / 2)
-                        idx = math.floor((#fft) ^ t)
+                        idx = mfloor((#fft) ^ t)
                     end
 
                     -- raw amplitude
@@ -279,27 +285,24 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
                     end
 
                     local boost = Lerp(i / bars, 1, 3)
-                    local vol = math.min(station:GetVolume(), 2)
                     local scaled
 
                     if vol <= 0 then
                         scaled = 0
                     else
-                        local boostedAmp = amp * boost * (notificationVisualizerBoost:GetInt() * vol)
-                        scaled = math.log(1 + boostedAmp)
+                        local boostedAmp = amp * boost * (visBoost * vol)
+                        scaled = mlog(1 + boostedAmp)
                     end
 
-                    if notificationVisualizerSmooth:GetBool() then
+                    if visSmooth then
                         lastAmplitudes[i] = lastAmplitudes[i] or 0
                         lastAmplitudes[i] = Lerp(FrameTime() * 5, lastAmplitudes[i], scaled)
                     else
                         lastAmplitudes[i] = scaled
                     end
 
-                    local height = math.Clamp(lastAmplitudes[i] * 60, 1, 60)
+                    local height = mClamp(lastAmplitudes[i] * 60, 1, 60)
                     local x = 7 + (i - 1) * (barWidth + 4)
-
-                    surface.SetDrawColor(textColor.r, textColor.g, textColor.b, 100)
                     surface.DrawTexturedRect(x, yBase - height, barWidth, height)
                 end
             else
@@ -324,7 +327,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
             local progress = trackDuration > 0 and math.Clamp(currentTime / trackDuration, 0, 1) or 0
 
             local elapsedTime = CurTime() - self.startTime
-            if math.floor(elapsedTime % 30) < 4 and showNotificationPackName:GetBool() then -- text visible for 4 seconds every 30 seconds
+            if mfloor(elapsedTime % 30) < 4 and showNotificationPackName:GetBool() then -- text visible for 4 seconds every 30 seconds
                 draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, color_white, TEXT_ALIGN_CENTER)
             else
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c100100100)

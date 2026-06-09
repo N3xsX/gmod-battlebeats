@@ -146,6 +146,7 @@ end
 local c202020215 = Color(20, 20, 20, 215)
 local c707070255 = Color(70, 70, 70, 255)
 local c808080255 = Color(80, 80, 80, 255)
+local c150150150 = Color(150, 150, 150)
 local c100100100 = Color(100, 100, 100)
 local c606060 = Color(60, 60, 60)
 local blur = Material("pp/blurscreen")
@@ -216,7 +217,7 @@ function BATTLEBEATS.openImportFrame(frame)
             draw.RoundedBox(4, 0, 0, w, h, c808080255)
             self:DrawTextEntryText(color_white, color_white, color_white)
             if self:GetText() == "" and not self:IsEditing() then
-                draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
         BATTLEBEATS.plNameBox = vgui.Create("DTextEntry", importFrame)
@@ -228,7 +229,7 @@ function BATTLEBEATS.openImportFrame(frame)
             draw.RoundedBox(4, 0, 0, w, h, c808080255)
             self:DrawTextEntryText(color_white, color_white, color_white)
             if self:GetText() == "" and not self:IsEditing() then
-                draw.SimpleText("#btb.playlist.create.enter_name", "BattleBeats_Checkbox_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                draw.SimpleText("#btb.playlist.create.enter_name", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
         local infoLabel = vgui.Create("DLabel", importFrame)
@@ -857,6 +858,157 @@ function BATTLEBEATS.openTrimEditor(panel, track, func)
 end
 
 --MARK:NPC assign
+
+local function getIcon(npc)
+    local candidates = {npc.id, npc.class, npc.name and string.lower(string.Replace(npc.name, " ", "_")) or nil}
+    if npc.data and npc.data.Model then
+        local modelName = string.GetFileFromFilename(npc.data.Model or "")
+        modelName = string.StripExtension(modelName or "")
+        if modelName and modelName ~= "" then
+            table.insert(candidates, modelName)
+        end
+    end
+    for _, candidate in ipairs(candidates) do
+        if isstring(candidate) and candidate ~= "" then
+            if file.Exists("materials/entities/" .. candidate .. ".png", "GAME") then
+                return "entities/" .. candidate .. ".png"
+            end
+            if file.Exists("materials/entities/" .. candidate .. ".vmt", "GAME") then
+                return "entities/" .. candidate
+            end
+            if file.Exists("materials/vgui/entities/" .. candidate .. ".png", "GAME") then
+                return "vgui/entities/" .. candidate .. ".png"
+            end
+            if file.Exists("materials/vgui/entities/" .. candidate .. ".vtf", "GAME") then
+                return "vgui/entities/" .. candidate
+            end
+            if file.Exists("materials/vgui/entities/" .. candidate .. ".vmt", "GAME") then
+                return "vgui/entities/" .. candidate
+            end
+        end
+    end
+    return "btbna.jpg"
+end
+
+local NPCAssignCache = { list = nil, icons = {}, wrappedText = {} }
+local NPCBlacklist = {
+    npc_crow = true,
+    npc_pigeon = true,
+    npc_seagull = true,
+    nb_example = true,
+    npc_monk = true,
+    npc_stalker = true,
+    npc_antlion_grub = true,
+    npc_alyx = true,
+    npc_barney = true,
+    npc_breen = true,
+    npc_citizen = true,
+    Medic = true,
+    Rebel = true,
+    Refugee = true,
+    npc_dog = true,
+    npc_eli = true,
+    npc_fisherman = true,
+    npc_gman = true,
+    npc_kleiner = true,
+    npc_magnusson = true,
+    npc_mossman = true,
+    npc_odessa = true,
+    npc_rollermine_hacked = true,
+    npc_turret_floor_resistance = true,
+    npc_vortigaunt = true,
+    VortigauntSlave = true,
+    VortigauntUriah = true,
+    --VJ BASE exclusive
+    npc_vj_test_aerial = true,
+    npc_vj_test_interactive = true,
+    npc_vj_test_player = true,
+}
+
+local function getCachedIcon(npc)
+    local key = npc.id or npc.class
+    if NPCAssignCache.icons[key] then
+        return NPCAssignCache.icons[key]
+    end
+    local icon = getIcon(npc)
+    NPCAssignCache.icons[key] = icon
+    return icon
+end
+
+local function getCachedNPCList()
+    if NPCAssignCache.list then
+        return NPCAssignCache.list
+    end
+    local npcList = {}
+    for listClass, npcData in SortedPairsByMemberValue(list.Get("NPC"), "Name") do
+        local class = npcData.Class or npcData.class or listClass
+        if isstring(class) and class ~= "" and not NPCBlacklist[class] and not NPCBlacklist[listClass] then
+            table.insert(npcList, {
+                id = listClass,
+                class = class,
+                name = npcData.Name or npcData.PrintName or listClass,
+                category = npcData.Category or "Other",
+                data = npcData
+            })
+        end
+    end
+    NPCAssignCache.list = npcList
+    return npcList
+end
+
+local c808080220 = Color(80, 80, 80, 220)
+local c454545220 = Color(45, 45, 45, 220)
+local c505050 = Color(50,50,50)
+
+-- from my roblox chat bubbles addon
+local function wrapText(text, font, maxWidth)
+    surface.SetFont(font)
+    local words = string.Explode(" ", text)
+    local lines = {}
+    local currentLine = ""
+    for i = 1, #words do
+        local word = words[i]
+        ::retry_word::
+        local testLine = currentLine .. (currentLine == "" and "" or " ") .. word
+        local w = surface.GetTextSize(testLine)
+        if w > maxWidth then
+            if currentLine == "" then
+                for j = 1, #word do
+                    local substr = string.sub(word, 1, j)
+                    local sw = surface.GetTextSize(substr)
+                    if sw > maxWidth then
+                        local cut = j > 1 and string.sub(word, 1, j - 1) or string.sub(word, 1, 1)
+                        word = j > 1 and string.sub(word, j) or string.sub(word, 2)
+                        table.insert(lines, cut)
+                        goto retry_word
+                    end
+                end
+                currentLine = word
+            else
+                table.insert(lines, currentLine)
+                currentLine = ""
+                goto retry_word
+            end
+        else
+            currentLine = testLine
+        end
+    end
+    if currentLine ~= "" then
+        table.insert(lines, currentLine)
+    end
+    return lines
+end
+
+local function getCachedWrappedText(text, font, maxWidth)
+    local key = text .. "|" .. font .. "|" .. maxWidth
+    if NPCAssignCache.wrappedText[key] then
+        return NPCAssignCache.wrappedText[key]
+    end
+    local lines = wrapText(text, font, maxWidth)
+    NPCAssignCache.wrappedText[key] = lines
+    return lines
+end
+
 function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriority, onSave)
     local background = vgui.Create("DPanel", panel)
     background:SetSize(panel:GetWide(), panel:GetTall())
@@ -866,41 +1018,38 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     end
 
     local frame = vgui.Create("DPanel", background)
-    frame:SetSize(400, 110)
+    frame:SetSize(620, 520)
     frame:Center()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c000200)
         BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        surface.SetDrawColor(c2552100)
+        surface.DrawRect(0, 65, w, 1)
     end
     frame:BTB_SetTitle(title, true)
 
-    local classLabel = vgui.Create("DLabel", frame)
-    classLabel:SetPos(10, 25)
-    classLabel:SetSize(270, 20)
-    classLabel:SetText("#btb.ps.ts.rmb.assign_class")
-
     local textEntry = vgui.Create("DTextEntry", frame)
-    textEntry:SetPos(10, 45)
+    textEntry:SetPos(120, 30)
     textEntry:SetSize(250, 20)
     textEntry:SetText(defaultClass or "")
-    if not defaultClass then
-        textEntry:SetPlaceholderText("#btb.ps.ts.rmb.assign_enter_class")
+    textEntry:SetFont("BattleBeats_Checkbox_Font")
+    textEntry.Paint = function(self, w, h)
+        draw.RoundedBox(6, 0, 0, w, h, c808080255)
+        self:DrawTextEntryText(color_white, color_white, color_white)
+        if self:GetText() == "" and not self:IsEditing() then
+            draw.SimpleText("#btb.ps.ts.rmb.assign_enter_class", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
     end
 
     local helpBtn = vgui.Create("DImage", frame)
-    helpBtn:SetPos(267.5, 47.5)
+    helpBtn:SetPos(382, 32.5)
     helpBtn:SetSize(15, 15)
     helpBtn:SetImage("icon16/help.png")
     helpBtn:SetMouseInputEnabled(true)
     helpBtn:BTB_SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
 
-    local priorityLabel = vgui.Create("DLabel", frame)
-    priorityLabel:SetPos(290, 25)
-    priorityLabel:SetSize(100, 20)
-    priorityLabel:SetText("#btb.ps.ts.rmb.assign_priority")
-
     local priorityCombo = vgui.Create("DComboBox", frame)
-    priorityCombo:SetPos(290, 45)
+    priorityCombo:SetPos(410, 30)
     priorityCombo:SetSize(100, 20)
 
     local priorityNames = {
@@ -914,10 +1063,127 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     for i = 1, 5 do
         priorityCombo:AddChoice(priorityNames[i], i)
     end
+
     priorityCombo:SetValue(priorityNames[defaultPriority or 1])
 
+    local searchEntry = vgui.Create("DTextEntry", frame)
+    searchEntry:SetPos(10, 76)
+    searchEntry:SetSize(600, 22)
+    searchEntry:SetFont("BattleBeats_Checkbox_Font")
+    searchEntry.Paint = function(self, w, h)
+        draw.RoundedBox(6, 0, 0, w, h, c808080255)
+        self:DrawTextEntryText(color_white, color_white, color_white)
+        if self:GetText() == "" and not self:IsEditing() then
+            draw.SimpleText("Search NPC...", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        end
+    end
+
+    local scroll = vgui.Create("DScrollPanel", frame)
+    scroll:SetPos(10, 110)
+    scroll:SetSize(600, 360)
+    scroll:GetVBar():SetWide(0)
+
+    local iconLayout = vgui.Create("DIconLayout", scroll)
+    iconLayout:Dock(TOP)
+    iconLayout:SetWide(scroll:GetWide())
+    iconLayout:SetSpaceX(13)
+    iconLayout:SetSpaceY(10)
+
+    local function getSelectedNPCID()
+        return string.Trim(string.lower(textEntry:GetText() or ""))
+    end
+
+    local npcList = getCachedNPCList()
+    local searchDebounceName = "BTB_AssignNPCSearchDebounce_" .. tostring(frame)
+    local npcTiles = {}
+    local function createNPCTile(npc)
+        local tile = iconLayout:Add("DButton")
+        tile:SetSize(140, 150)
+        tile:SetText("")
+        tile.NPCIDLower = string.lower(tostring(npc.id))
+        tile.SearchText = string.lower(tostring(npc.name))
+        tile.Paint = function(self, w, h)
+            local selected = getSelectedNPCID() ~= "" and self.NPCIDLower == getSelectedNPCID()
+            if selected then
+                draw.RoundedBox(6, 0, 0, w, h, c2552100)
+                draw.RoundedBox(5, 1, 1, w - 2, h - 2, c808080255)
+                return
+            end
+            draw.RoundedBox(6, 0, 0, w, h, self:IsHovered() and c808080220 or c454545220)
+        end
+        tile:SetTooltip("|Name:| " .. language.GetPhrase(npc.name or "N/A") .. "\n|Category:| " .. language.GetPhrase(npc.category or "N/A") .. "\n|Class:| " .. npc.class .. "\n|Key:| ||" .. npc.id .. "<255,255,255>||")
+        tile:SetTooltipPanelOverride("BattleBeatsTooltip")
+
+        local icon = vgui.Create("DImage", tile)
+        icon:SetPos(25, 10)
+        icon:SetSize(90, 90)
+        icon:SetImage(getCachedIcon(npc))
+        icon:SetKeepAspect(true)
+        icon:SetMouseInputEnabled(false)
+
+        local nameLabel = vgui.Create("DPanel", tile)
+        nameLabel:SetPos(5, 105)
+        nameLabel:SetSize(130, 40)
+        nameLabel:SetMouseInputEnabled(false)
+        local lines = getCachedWrappedText(language.GetPhrase(npc.name or "N/A"), "CreditsText", 130)
+        nameLabel.Paint = function(self, w, h)
+            local lineH = 16
+            local totalH = #lines * lineH
+            local startY = (h - totalH) / 2
+            for i, line in ipairs(lines) do
+                draw.SimpleText(line, "CreditsText", w / 2, startY + (i - 1) * lineH + lineH / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            end
+        end
+
+        tile.DoClick = function()
+            textEntry:SetText(npc.id)
+            textEntry:RequestFocus()
+            textEntry:SetCaretPos(#npc.id)
+            surface.PlaySound("ui/buttonclickrelease.wav")
+        end
+
+        npcTiles[#npcTiles + 1] = tile
+    end
+
+    local function filterNPCTiles(filter)
+        filter = string.Trim(string.lower(filter or ""))
+        for _, tile in ipairs(npcTiles) do
+            if IsValid(tile) then
+                local visible = filter == "" or string.find(tile.SearchText or "", filter, 1, true) ~= nil
+                tile:SetVisible(visible)
+            end
+        end
+        iconLayout:InvalidateLayout(true)
+        timer.Simple(0, function()
+            if not IsValid(iconLayout) or not IsValid(scroll) then return end
+            iconLayout:Layout()
+            iconLayout:InvalidateLayout(true)
+            scroll:InvalidateLayout(true)
+            local canvas = scroll:GetCanvas()
+            if IsValid(canvas) then
+                canvas:InvalidateLayout(true)
+            end
+        end)
+    end
+
+    for _, npc in ipairs(npcList) do
+        createNPCTile(npc)
+    end
+
+    filterNPCTiles("")
+
+    searchEntry.OnChange = function(self)
+        local value = self:GetValue()
+        timer.Remove(searchDebounceName)
+        timer.Create(searchDebounceName, 0.08, 1, function()
+            if IsValid(self) then
+                filterNPCTiles(value)
+            end
+        end)
+    end
+
     local saveBtn = vgui.Create("DButton", frame)
-    saveBtn:SetPos(45, 75)
+    saveBtn:SetPos(150, 485)
     saveBtn:SetSize(150, 25)
     saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
     saveBtn:SetFont("CreditsText")
@@ -934,7 +1200,7 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     end
 
     local cancelBtn = vgui.Create("DButton", frame)
-    cancelBtn:SetPos(205, 75)
+    cancelBtn:SetPos(320, 485)
     cancelBtn:SetSize(150, 25)
     cancelBtn:SetText("#btb.main.volume_cancel")
     cancelBtn:SetFont("CreditsText")
@@ -942,9 +1208,17 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     cancelBtn.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
     end
-    cancelBtn.DoClick = function() background:Remove() end
 
-    return textEntry
+    cancelBtn.DoClick = function()
+        timer.Remove(searchDebounceName)
+        background:Remove()
+    end
+
+    background.OnRemove = function()
+        timer.Remove(searchDebounceName)
+    end
+
+    return textEntry, searchEntry
 end
 
 function BATTLEBEATS.changeName(panel, track, func)
@@ -978,7 +1252,7 @@ function BATTLEBEATS.changeName(panel, track, func)
         draw.RoundedBox(4, 0, 0, w, h, c707070255)
         self:DrawTextEntryText(color_white, color_white, color_white)
         if self:GetText() == "" and not self:IsEditing() then
-            draw.SimpleText(tname, "BattleBeats_Font", 5, h / 2, Color(150, 150, 150), TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            draw.SimpleText(tname, "BattleBeats_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
         end
     end
 

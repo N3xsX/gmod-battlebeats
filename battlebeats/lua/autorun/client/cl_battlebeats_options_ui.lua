@@ -1,8 +1,10 @@
 local c2552100 = Color(255, 210, 0)
 local c909090 = Color(90, 90, 90)
 local c230230230 = Color(230, 230, 230)
+local btbDefault = language.GetPhrase("btb.options.noti.default_pos")
 local function checkbox(isServer, parent, x, y, labelText, cvarName, helpText, img)
     isServer = isServer or false
+    local cvar = GetConVar(cvarName)
     local panel = vgui.Create("DPanel", parent)
     panel:SetTall(20)
     panel:SetPos(0, y)
@@ -11,7 +13,7 @@ local function checkbox(isServer, parent, x, y, labelText, cvarName, helpText, i
     local switch = vgui.Create("DPanel", panel)
     switch:SetSize(40, 20)
 
-    local enabled = GetConVar(cvarName):GetBool()
+    local enabled = cvar:GetBool()
     switch.KnobX = enabled and (40 - 16 - 2) or 2
 
     switch.Paint = function(self, w, h)
@@ -23,7 +25,7 @@ local function checkbox(isServer, parent, x, y, labelText, cvarName, helpText, i
     end
 
     switch.OnMousePressed = function()
-        local newVal = GetConVar(cvarName):GetBool() and "0" or "1"
+        local newVal = cvar:GetBool() and "0" or "1"
         if newVal == "1" then
             enabled = true
             surface.PlaySound("btb_switch_on.mp3")
@@ -42,6 +44,10 @@ local function checkbox(isServer, parent, x, y, labelText, cvarName, helpText, i
     end
 
     if helpText then
+        local on = "||" .. language.GetPhrase("btb.ps.pack_enabled") .. "<0,255,50>||"
+        local off = "||" .. language.GetPhrase("btb.ps.pack_disabled") .. "<220,0,0>||"
+        local text = cvar:GetDefault() == "1" and on or off
+        helpText = language.GetPhrase(helpText) .. "\n" .. "|" .. btbDefault .. "<200,200,50>|" .. text
         if img then
             switch:BTB_SetImageTooltip(img, helpText)
             panel:BTB_SetImageTooltip(img, helpText)
@@ -88,12 +94,14 @@ local function checkbox(isServer, parent, x, y, labelText, cvarName, helpText, i
 end
 
 local function numSlider(parent, x, y, labelText, cvarName, min, max, helpText)
+    local cvar = GetConVar(cvarName)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 40)
     panel:SetPos(x, y)
     panel.Paint = nil
 
     if helpText then
+        helpText = language.GetPhrase(helpText) .. "\n" .. "|" .. btbDefault .. "<200,200,50>|" .. "||" .. cvar:GetDefault() .. "<200,200,200>||"
         panel:SetTooltip(helpText)
         panel:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
@@ -111,7 +119,7 @@ local function numSlider(parent, x, y, labelText, cvarName, min, max, helpText)
     sliderBar:SetPos(0, 25)
     sliderBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, c909090)
-        local progress = (GetConVar(cvarName):GetInt() - min) / (max - min)
+        local progress = (cvar:GetInt() - min) / (max - min)
         draw.RoundedBox(4, 0, 0, w * progress, h, c2552100)
     end
 
@@ -139,7 +147,7 @@ local function numSlider(parent, x, y, labelText, cvarName, min, max, helpText)
     end
 
     panel.PaintOver = function(self, w, h)
-        local val = GetConVar(cvarName):GetInt()
+        local val = cvar:GetInt()
         local xx = sliderBar.x + sliderBar:GetWide() / 2
         local yy = sliderBar.y + sliderBar:GetTall() / 2 - 1
         draw.SimpleTextOutlined(val .. "%", "DermaDefaultBold", xx, yy, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 120))
@@ -157,6 +165,7 @@ end
 
 local function arrowStepper(isServer, parent, x, y, labelText, cvarName, min, max, helpText, suffix)
     isServer = isServer or false
+    local cvar = GetConVar(cvarName)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(300, 50)
     panel:SetPos(x, y)
@@ -171,6 +180,7 @@ local function arrowStepper(isServer, parent, x, y, labelText, cvarName, min, ma
     label:SetContentAlignment(5)
 
     if helpText then
+        helpText = language.GetPhrase(helpText) .. "\n" .. "|" .. btbDefault .. "<200,200,50>|" .. "||" .. cvar:GetDefault() .. (suffix or "") .. "<200,200,200>||"
         panel:SetTooltip(helpText)
         panel:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
@@ -180,7 +190,7 @@ local function arrowStepper(isServer, parent, x, y, labelText, cvarName, min, ma
     sliderBar:SetPos(30, 25)
     sliderBar.Paint = function(self, w, h)
         draw.RoundedBox(4, 0, 0, w, h, c909090)
-        local progress = (GetConVar(cvarName):GetInt() - min) / (max - min)
+        local progress = (cvar:GetInt() - min) / (max - min)
         draw.RoundedBox(4, 0, 0, w * progress, h, c2552100)
     end
 
@@ -222,7 +232,6 @@ local function arrowStepper(isServer, parent, x, y, labelText, cvarName, min, ma
         if code ~= MOUSE_LEFT then return end
         if IsValid(self.Entry) then return end
 
-        local cvar = GetConVar(cvarName)
         local maxChars = string.len(tostring(math.floor(cvar:GetMax() or 111)))
         local entry = vgui.Create("DTextEntry", panel)
         entry:SetSize(30, 20)
@@ -263,14 +272,14 @@ local function arrowStepper(isServer, parent, x, y, labelText, cvarName, min, ma
     local function updateSlider(bar, x)
         local progress = math.Clamp(x / bar:GetWide(), 0, 1)
         local newValue = math.floor(min + progress * (max - min))
-        local oldValue = GetConVar(cvarName):GetInt()
+        local oldValue = cvar:GetInt()
         if newValue ~= oldValue then
             sendValue(newValue)
         end
     end
 
     local function updateValue(delta)
-        local current = GetConVar(cvarName):GetInt()
+        local current = cvar:GetInt()
         sendValue(current + delta)
     end
 
@@ -328,7 +337,7 @@ local function arrowStepper(isServer, parent, x, y, labelText, cvarName, min, ma
     setupHoldButton(rightBtn, 1)
 
     sliderBar.Think = function(self)
-        local val = GetConVar(cvarName):GetInt()
+        local val = cvar:GetInt()
         if suffix then
             valueLabel:SetText(val .. " " .. suffix)
         else
@@ -356,6 +365,7 @@ local c505050 = Color(50, 50, 50)
 local c100100100 = Color(100, 100, 100)
 local function comboBox(isServer, parent, x, y, labelText, cvarName, options, helpText)
     isServer = isServer or false
+    local cvar = GetConVar(cvarName)
     local panel = vgui.Create("DPanel", parent)
     panel:SetSize(200, 200)
     panel:SetPos(x, y)
@@ -375,16 +385,20 @@ local function comboBox(isServer, parent, x, y, labelText, cvarName, options, he
     combo.Paint = function(self, w, h)
         draw.RoundedBox(10, 0, 0, w, h, c2552100)
         draw.RoundedBox(9, 1, 1, w - 2, h - 2, c909090)
-        local cvarValue = GetConVar(cvarName):GetInt()
+        local cvarValue = cvar:GetInt()
         local index = math.Clamp(cvarValue + 1, 1, #options)
         local displayText = options[index] or "Unknown"
         draw.SimpleText(displayText, "DermaDefaultBold", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
 
-    if helpText then
+    --if helpText then
+        local defaultIndex = tonumber(cvar:GetDefault() or 0) + 1
+        defaultIndex = math.Clamp(defaultIndex, 1, #options)
+        local defaultText = options[defaultIndex] or "Unknown"
+        helpText = language.GetPhrase(helpText or "\n") .. "\n" .. "|" .. btbDefault .. "<200,200,50>|" .. "||" .. defaultText .. "||"
         combo:SetTooltip(helpText)
         combo:SetTooltipPanelOverride("BattleBeatsTooltip")
-    end
+    --end
 
     combo.OnCursorEntered = function(self)
         self:SetCursor("hand")
@@ -716,7 +730,6 @@ function BATTLEBEATS.createOptions(panel)
 
                 local contentPanel_2 = contentPanel:GetWide() / 2
                 local contentPanel_NumSlider = (panel:GetWide() - 300) / 2
-                local btbDefault = language.GetPhrase("btb.options.noti.default_pos")
 
                 if category.name == catSound then
                     numSlider(panel, contentPanel_NumSlider, 10, "#btb.options.snd.master_volume", "battlebeats_volume", 0, 200, "#btb.options.snd.master_volume_tip")
@@ -738,11 +751,11 @@ function BATTLEBEATS.createOptions(panel)
                     checkbox(nil, panel, contentPanel_2, 130, "#btb.options.noti.visualizer", "battlebeats_show_notification_visualizer", "#btb.options.noti.visualizer_tip", "tooltips/showbars.png")
                     checkbox(nil, panel, contentPanel_2, 160, "#btb.options.noti.visualizer_smooth", "battlebeats_visualizer_smooth", "#btb.options.noti.visualizer_smooth_tip")
                     arrowStepper(nil, panel, contentPanel_NumSlider, 200, "#btb.options.noti.visualizer_boost", "battlebeats_visualizer_boost", 1, 20, "#btb.options.noti.visualizer_boost_tip")
-                    arrowStepper(nil, panel, contentPanel_NumSlider, 250, "#btb.options.noti.x_pos", "battlebeats_notif_x", 0, ScrW(), btbDefault .. tostring(ScrW() - 310))
-                    arrowStepper(nil, panel, contentPanel_NumSlider, 300, "#btb.options.noti.y_pos", "battlebeats_notif_y", 0, ScrH(), btbDefault .. tostring(ScrH() / 6))
+                    arrowStepper(nil, panel, contentPanel_NumSlider, 250, "#btb.options.noti.x_pos", "battlebeats_notif_x", 0, ScrW(), "\n")
+                    arrowStepper(nil, panel, contentPanel_NumSlider, 300, "#btb.options.noti.y_pos", "battlebeats_notif_y", 0, ScrH(), "\n")
                 elseif category.name == catSub then
                     checkbox(nil, panel, contentPanel_2, 10, "#btb.options.sub.enable_sub", "battlebeats_subtitles_enabled")
-                    arrowStepper(nil, panel, contentPanel_NumSlider, 40, "#btb.options.sub.sub_height", "battlebeats_subtitles_y", 0, ScrH(), btbDefault .. tostring(ScrH() - 200))
+                    arrowStepper(nil, panel, contentPanel_NumSlider, 40, "#btb.options.sub.sub_height", "battlebeats_subtitles_y", 0, ScrH(), "\n")
                     checkbox(nil, panel, contentPanel_2, 100, "#btb.options.sub.static", "battlebeats_subtitles_static", "#btb.options.sub.static_tip")
                     comboBox(nil, panel, (contentPanel_2 - 100), 130, "#btb.options.sub.combo", "battlebeats_subtitles_mode", {"#btb.options.sub.combo1", "#btb.options.sub.combo2"}, "#btb.options.sub.combo_tip")
                 elseif category.name == catPlayer then
