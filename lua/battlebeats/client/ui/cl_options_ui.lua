@@ -953,22 +953,12 @@ concommand.Add("battlebeats_delete_data", function()
     cookie.Delete("battlebeats_last_track")
     cookie.Delete("battlebeats_vol_expanded")
     RunConsoleCommand("battlebeats_seen_version", "0")
-    file.Delete("battlebeats/battlebeats_excluded_tracks.txt")
-    BATTLEBEATS.excludedTracks = {}
-    file.Delete("battlebeats/battlebeats_favorite_tracks.txt")
-    BATTLEBEATS.favoriteTracks = {}
-    file.Delete("battlebeats/battlebeats_npc_mappings.txt")
-    BATTLEBEATS.npcTrackMappings = {}
-    file.Delete("battlebeats/battlebeats_track_volumes.txt")
-    BATTLEBEATS.trackVolume = {}
     file.Delete("battlebeats/battlebeats_pack_volumes.txt")
     BATTLEBEATS.packVolume = {}
-    file.Delete("battlebeats/battlebeats_track_trims.txt")
-    BATTLEBEATS.trackTrim = {}
     file.Delete("battlebeats/battlebeats_playlists.txt")
     BATTLEBEATS.musicPlaylists = {}
-    file.Delete("battlebeats/battlebeats_track_aliases.txt")
-    BATTLEBEATS.trackAliases = {}
+    file.Delete("battlebeats/track_data.json")
+    BATTLEBEATS.trackData = {}
 end)
 
 concommand.Add("battlebeats_clean_unused_tracks", function()

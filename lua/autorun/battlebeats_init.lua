@@ -28,7 +28,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/ui/cl_playlists.lua")
 
     AddCSLuaFile("battlebeats/client/cl_spawnmenu.lua")
-    AddCSLuaFile("battlebeats/client/cl_spawnmenu_nodegraph.lua")
+    --AddCSLuaFile("battlebeats/client/cl_spawnmenu_nodegraph.lua")
     AddCSLuaFile("battlebeats/client/cl_loading.lua")
 
     include("battlebeats/server/sv_main.lua")
@@ -93,7 +93,7 @@ if CLIENT then
     include("battlebeats/client/ui/cl_playlists.lua")
 
     include("battlebeats/client/cl_spawnmenu.lua")
-    include("battlebeats/client/cl_spawnmenu_nodegraph.lua")
+    --include("battlebeats/client/cl_spawnmenu_nodegraph.lua")
     include("battlebeats/client/cl_loading.lua")
 
     includeNF("battlebeats", "subtitles")

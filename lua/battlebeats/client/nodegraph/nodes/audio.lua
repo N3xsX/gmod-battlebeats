@@ -20,10 +20,10 @@ BATTLEBEATS.RegisterNode("audio.RANDOM_TRACK_BTB", {
     oninputschanged = function(ctx, node, args)
         if ctx:ReadBool(node, "impulse") then
             if ctx:ReadBool(node, "iscombat") or (args.isCombat == true) then
-                local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, true, BATTLEBEATS.excludedTracks)
+                local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, true)
                 ctx:Write(node, "track", track)
             else
-                local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false, BATTLEBEATS.excludedTracks)
+                local track = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, false)
                 ctx:Write(node, "track", track)
             end
         end

@@ -5,6 +5,8 @@ local c2552100 = Color(255, 210, 0)
 local c2001500 = Color(200, 150, 0)
 local c404040 = Color(40, 40, 40)
 
+local btb = BATTLEBEATS
+
 local SEG = 6
 local ang_step = math.rad(90 / SEG)
 local quarter = {}
@@ -13,7 +15,7 @@ for i = 0, SEG do
     quarter[i] = { math.cos(a), math.sin(a) }
 end
 
-function BATTLEBEATS.drawRoundedOutline(radius, x, y, w, h, thickness, col)
+function btb.drawRoundedOutline(radius, x, y, w, h, thickness, col)
     if radius > math.min(w, h) / 2 then radius = math.min(w, h) / 2 end
     if thickness < 1 then thickness = 1 end
 
@@ -149,7 +151,7 @@ local function drawBlur(panel, amount)
     end
 end
 --MARK: Import frame
-function BATTLEBEATS.openImportFrame(frame)
+function btb.openImportFrame(frame)
     local background = vgui.Create("DPanel", frame)
     background:SetSize(frame:GetWide(), frame:GetTall())
     background:Center()
@@ -162,7 +164,7 @@ function BATTLEBEATS.openImportFrame(frame)
     playlistFrame:Center()
     playlistFrame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c202020215)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
     local playlistBtn = vgui.Create("DButton", playlistFrame)
     playlistBtn:SetSize(360, 80)
@@ -172,7 +174,7 @@ function BATTLEBEATS.openImportFrame(frame)
     playlistBtn:SetTextColor(color_white)
     playlistBtn:BTB_SetButton(c2552100, c707070255, c808080255)
     playlistBtn.DoClick = function()
-        BATTLEBEATS.openPlaylistEditor(nil, function()
+        btb.openPlaylistEditor(nil, function()
             RefreshList()
         end)
         background:Remove()
@@ -194,25 +196,25 @@ function BATTLEBEATS.openImportFrame(frame)
         importFrame.Paint = function(self, w, h)
             drawBlur(self, 3)
             draw.RoundedBox(12, 0, 0, w, h, c202020215)
-            BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+            btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
         end
-        BATTLEBEATS.importBox = vgui.Create("DTextEntry", importFrame)
-        BATTLEBEATS.importBox:SetSize(460, 80)
-        BATTLEBEATS.importBox:SetPos(20, 20)
-        BATTLEBEATS.importBox:SetMultiline(true)
-        BATTLEBEATS.importBox.Paint = function(self, w, h)
+        btb.importBox = vgui.Create("DTextEntry", importFrame)
+        btb.importBox:SetSize(460, 80)
+        btb.importBox:SetPos(20, 20)
+        btb.importBox:SetMultiline(true)
+        btb.importBox.Paint = function(self, w, h)
             draw.RoundedBox(4, 0, 0, w, h, c808080255)
             self:DrawTextEntryText(color_white, color_white, color_white)
             if self:GetText() == "" and not self:IsEditing() then
                 draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
-        BATTLEBEATS.plNameBox = vgui.Create("DTextEntry", importFrame)
-        BATTLEBEATS.plNameBox:SetMaximumCharCount(30)
-        BATTLEBEATS.plNameBox:SetSize(460, 30)
-        BATTLEBEATS.plNameBox:SetPos(20, 110)
-        BATTLEBEATS.plNameBox:SetFont("BattleBeats_Font")
-        BATTLEBEATS.plNameBox.Paint = function(self, w, h)
+        btb.plNameBox = vgui.Create("DTextEntry", importFrame)
+        btb.plNameBox:SetMaximumCharCount(30)
+        btb.plNameBox:SetSize(460, 30)
+        btb.plNameBox:SetPos(20, 110)
+        btb.plNameBox:SetFont("BattleBeats_Font")
+        btb.plNameBox.Paint = function(self, w, h)
             draw.RoundedBox(4, 0, 0, w, h, c808080255)
             self:DrawTextEntryText(color_white, color_white, color_white)
             if self:GetText() == "" and not self:IsEditing() then
@@ -242,14 +244,14 @@ function BATTLEBEATS.openImportFrame(frame)
         importKeep:SetCursor("no")
         importClean:SetFont("CenterPrintText")
         importKeep:SetFont("CenterPrintText")
-        BATTLEBEATS.importBox.OnTextChanged = function(self)
+        btb.importBox.OnTextChanged = function(self)
             timer.Remove("BTB_ImportDecodeTimer")
             timer.Create("BTB_ImportDecodeTimer", 0.3, 1, function()
                 if not IsValid(self) then return end
                 local text = self:GetValue()
                 decodedData = nil
                 missing = {}
-                local data = BATTLEBEATS.importPlaylist(text)
+                local data = btb.importPlaylist(text)
                 if not data then
                     infoLabel:SetText("#btb.playlist.import.invalid_code")
                     importClean:SetEnabled(false)
@@ -296,13 +298,13 @@ function BATTLEBEATS.openImportFrame(frame)
         importClean.DoClick = function()
             if not decodedData then return end
             background:Remove()
-            local name = BATTLEBEATS.plNameBox:GetValue()
+            local name = btb.plNameBox:GetValue()
             if name == "" then
                 notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
                 surface.PlaySound("buttons/button11.wav")
                 return
             end
-            for packName, _ in pairs(BATTLEBEATS.musicPacks or {}) do
+            for packName, _ in pairs(btb.musicPacks or {}) do
                 if name == packName then
                     if not isEdit or editedTitle ~= title then
                         notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
@@ -325,9 +327,9 @@ function BATTLEBEATS.openImportFrame(frame)
             surface.PlaySound("buttons/button3.wav")
             decodedData.ambient = filter(decodedData.ambient)
             decodedData.combat = filter(decodedData.combat)
-            BATTLEBEATS.musicPlaylists[name] = decodedData
-            BATTLEBEATS.validateAndTransformPlaylist(name, decodedData)
-            BATTLEBEATS.SavePlaylists()
+            btb.musicPlaylists[name] = decodedData
+            btb.validateAndTransformPlaylist(name, decodedData)
+            btb.savePlaylists()
             importFrame:Remove()
             RefreshList()
         end
@@ -342,13 +344,13 @@ function BATTLEBEATS.openImportFrame(frame)
         importKeep.DoClick = function()
             if not decodedData then return end
             background:Remove()
-            local name = BATTLEBEATS.plNameBox:GetValue()
+            local name = btb.plNameBox:GetValue()
             if name == "" then
                 notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
                 surface.PlaySound("buttons/button11.wav")
                 return
             end
-            for packName, _ in pairs(BATTLEBEATS.musicPacks or {}) do
+            for packName, _ in pairs(btb.musicPacks or {}) do
                 if name == packName then
                     if not isEdit or editedTitle ~= title then
                         notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
@@ -359,9 +361,9 @@ function BATTLEBEATS.openImportFrame(frame)
             end
             notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
             surface.PlaySound("buttons/button3.wav")
-            BATTLEBEATS.musicPlaylists[name] = decodedData
-            BATTLEBEATS.validateAndTransformPlaylist(name, decodedData)
-            BATTLEBEATS.SavePlaylists()
+            btb.musicPlaylists[name] = decodedData
+            btb.validateAndTransformPlaylist(name, decodedData)
+            btb.savePlaylists()
             importFrame:Remove()
             RefreshList()
         end
@@ -387,7 +389,7 @@ function BATTLEBEATS.openImportFrame(frame)
     return playlistFrame
 end
 
-function BATTLEBEATS.createInfoPanel(panel, packData, callback)
+function btb.createInfoPanel(panel, packData, callback)
     if not IsValid(panel) then return end
 
     local sizeP, dateP, authorP = createInfoBoxes(panel)
@@ -405,14 +407,14 @@ function BATTLEBEATS.createInfoPanel(panel, packData, callback)
         return
     end
 
-    if BATTLEBEATS.wsCache[wsid] then
-        applyInfo(panel, BATTLEBEATS.wsCache[wsid])
+    if btb.wsCache[wsid] then
+        applyInfo(panel, btb.wsCache[wsid])
         return
     end
 
     steamworks.FileInfo(wsid, function(result)
         result = result or {}
-        BATTLEBEATS.wsCache[wsid] = result
+        btb.wsCache[wsid] = result
         if IsValid(panel) then
             applyInfo(panel, result)
         end
@@ -420,7 +422,7 @@ function BATTLEBEATS.createInfoPanel(panel, packData, callback)
 end
 
 --MARK:Volume edit
-function BATTLEBEATS.openVolumeEditor(panel, track, pack, func)
+function btb.openVolumeEditor(panel, track, pack, func)
     local background = vgui.Create("DPanel", panel)
     background:SetSize(panel:GetWide(), panel:GetTall())
     background:Center()
@@ -432,7 +434,7 @@ function BATTLEBEATS.openVolumeEditor(panel, track, pack, func)
     frame:Center()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c000200)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
     frame:BTB_SetTitle("Volume Boost", true)
 
@@ -446,9 +448,9 @@ function BATTLEBEATS.openVolumeEditor(panel, track, pack, func)
 
     local current = 100
     if track then
-        current = BATTLEBEATS.trackVolume[track] or 100
+        current = btb.getTrackData(track).vol or 100
     elseif pack then
-        current = BATTLEBEATS.packVolume[pack] or 100
+        current = btb.packVolume[pack] or 100
     end
 
     local bar = vgui.Create("DPanel", frame)
@@ -533,43 +535,42 @@ function BATTLEBEATS.openVolumeEditor(panel, track, pack, func)
         value = math.Clamp(math.floor(val), 0, 200)
 
         if track then
-            BATTLEBEATS.trackVolume = BATTLEBEATS.trackVolume or {}
             if value == 100 then
-                BATTLEBEATS.trackVolume[track] = nil
+                btb.setTrackData(track, "vol", nil)
             else
-                BATTLEBEATS.trackVolume[track] = value
+                btb.setTrackData(track, "vol", value)
             end
             updateLabel()
-            local sName = IsValid(BATTLEBEATS.currentStation) and BATTLEBEATS.currentStation:GetFileName() or nil
-            if not sName then sName = IsValid(BATTLEBEATS.currentPreviewStation) and
-                BATTLEBEATS.currentPreviewStation:GetFileName() or nil end
+            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
+            if not sName then sName = IsValid(btb.currentPreviewStation) and
+                btb.currentPreviewStation:GetFileName() or nil end
             if sName == track then
-                if IsValid(BATTLEBEATS.currentStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName)
-                    BATTLEBEATS.currentStation:SetVolume(targetVolume)
-                elseif IsValid(BATTLEBEATS.currentPreviewStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
-                    BATTLEBEATS.currentPreviewStation:SetVolume(targetVolume)
+                if IsValid(btb.currentStation) then
+                    local targetVolume = btb.adjustVolume(sName)
+                    btb.currentStation:SetVolume(targetVolume)
+                elseif IsValid(btb.currentPreviewStation) then
+                    local targetVolume = btb.adjustVolume(sName, nil, true)
+                    btb.currentPreviewStation:SetVolume(targetVolume)
                 end
             end
         elseif pack then
-            BATTLEBEATS.packVolume = BATTLEBEATS.packVolume or {}
+            btb.packVolume = btb.packVolume or {}
             if value == 100 then
-                BATTLEBEATS.packVolume[pack] = nil
+                btb.packVolume[pack] = nil
             else
-                BATTLEBEATS.packVolume[pack] = value
+                btb.packVolume[pack] = value
             end
             updateLabel()
-            local sName = IsValid(BATTLEBEATS.currentStation) and BATTLEBEATS.currentStation:GetFileName() or nil
-            if not sName then sName = IsValid(BATTLEBEATS.currentPreviewStation) and
-                BATTLEBEATS.currentPreviewStation:GetFileName() or nil end
-            if pack == BATTLEBEATS.trackToPack[sName] then
-                if IsValid(BATTLEBEATS.currentStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName)
-                    BATTLEBEATS.currentStation:SetVolume(targetVolume)
-                elseif IsValid(BATTLEBEATS.currentPreviewStation) then
-                    local targetVolume = BATTLEBEATS.adjustVolume(sName, nil, true)
-                    BATTLEBEATS.currentPreviewStation:SetVolume(targetVolume)
+            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
+            if not sName then sName = IsValid(btb.currentPreviewStation) and
+                btb.currentPreviewStation:GetFileName() or nil end
+            if pack == btb.trackToPack[sName] then
+                if IsValid(btb.currentStation) then
+                    local targetVolume = btb.adjustVolume(sName)
+                    btb.currentStation:SetVolume(targetVolume)
+                elseif IsValid(btb.currentPreviewStation) then
+                    local targetVolume = btb.adjustVolume(sName, nil, true)
+                    btb.currentPreviewStation:SetVolume(targetVolume)
                 end
             end
         end
@@ -619,10 +620,8 @@ function BATTLEBEATS.openVolumeEditor(panel, track, pack, func)
         if isfunction(func) then
             func()
         end
-        if track then
-            BATTLEBEATS.SaveTrackVolumes()
-        else
-            BATTLEBEATS.SavePackVolumes()
+        if not track then
+            btb.savePackVolumes()
         end
     end
 
@@ -646,9 +645,9 @@ local c808080255 = Color(80, 80, 80, 255)
 local c707070255 = Color(70, 70, 70, 255)
 local c255100100 = Color(255, 100, 100)
 local c100255100 = Color(100, 255, 100)
-function BATTLEBEATS.openTrimEditor(panel, track, func)
+function btb.openTrimEditor(panel, track, func)
     local trackLength = 0
-    local trimData = BATTLEBEATS.trackTrim[track] or {}
+    local trimData = btb.getTrackData(track).trim or {}
 
     local background = vgui.Create("DPanel", panel)
     background:SetSize(panel:GetWide(), panel:GetTall())
@@ -662,11 +661,11 @@ function BATTLEBEATS.openTrimEditor(panel, track, func)
     frame:Center()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c000200)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
 
     local title = language.GetPhrase("btb.ps.ts.rmb.trim_title")
-    frame:BTB_SetTitle(title .. ": " .. BATTLEBEATS.FormatTrackName(track), true)
+    frame:BTB_SetTitle(title .. ": " .. btb.FormatTrackName(track), true)
 
     local slider = vgui.Create("DPanel", frame)
     slider:SetPos(20, 55)
@@ -708,8 +707,8 @@ function BATTLEBEATS.openTrimEditor(panel, track, func)
                     draw.RoundedBox(4, startPos - 4, 0, 8, h, c100255100)
                     draw.RoundedBox(4, endPos - 4, 0, 8, h, c255100100)
 
-                    local startText = BATTLEBEATS.FormatTime(self.startValue)
-                    local endText = BATTLEBEATS.FormatTime(self.endValue)
+                    local startText = btb.FormatTime(self.startValue)
+                    local endText = btb.FormatTime(self.endValue)
                     draw.SimpleTextOutlined(startText .. " - " .. endText, "BattleBeats_Checkbox_Font", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 255))
                 end
 
@@ -776,14 +775,12 @@ function BATTLEBEATS.openTrimEditor(panel, track, func)
                     end
 
                     if next(trim) == nil then
-                        BATTLEBEATS.trackTrim[track] = nil
+                        btb.setTrackData(track, "trim", nil)
                         notification.AddLegacy("Trim removed", NOTIFY_GENERIC, 3)
                     else
-                        BATTLEBEATS.trackTrim[track] = trim
+                        btb.setTrackData(track, "trim", trim)
                         notification.AddLegacy("Trim set: " .. startVal .. "s - " .. endVal .. "s", NOTIFY_GENERIC, 3)
                     end
-
-                    BATTLEBEATS.SaveTrackTrim()
 
                     if isfunction(func) then
                         func()
@@ -996,7 +993,7 @@ local function getCachedWrappedText(text, font, maxWidth)
     return lines
 end
 
-function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriority, onSave)
+function btb.createAssignFrame(panel, title, defaultClass, defaultPriority, onSave)
     local background = vgui.Create("DPanel", panel)
     background:SetSize(panel:GetWide(), panel:GetTall())
     background:Center()
@@ -1009,7 +1006,7 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     frame:Center()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c000200)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
         surface.SetDrawColor(c2552100)
         surface.DrawRect(0, 65, w, 1)
     end
@@ -1208,9 +1205,10 @@ function BATTLEBEATS.createAssignFrame(panel, title, defaultClass, defaultPriori
     return textEntry, searchEntry
 end
 
-function BATTLEBEATS.changeName(panel, track, func)
-    local tname = BATTLEBEATS.FormatTrackName(track)
-    local currentAlias = BATTLEBEATS.trackAliases and BATTLEBEATS.trackAliases[track] or tname
+function btb.changeName(panel, track, func)
+    local tname = btb.FormatTrackName(track)
+    local td = btb.getTrackData(track)
+    local currentAlias = td.alias or tname
     local background = vgui.Create("DPanel", panel)
     background:SetSize(panel:GetWide(), panel:GetTall())
     background:Center()
@@ -1223,7 +1221,7 @@ function BATTLEBEATS.changeName(panel, track, func)
     frame:Center()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c000200)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
     frame:BTB_SetTitle("#btb.ps.ts.rmb.set_name_title", true)
 
@@ -1245,16 +1243,11 @@ function BATTLEBEATS.changeName(panel, track, func)
 
     local function saveAlias()
         local text = string.Trim(entry:GetValue() or "")
-
-        BATTLEBEATS.trackAliases = BATTLEBEATS.trackAliases or {}
-
         if text == tname or text == "" then
-            BATTLEBEATS.trackAliases[track] = nil
+            btb.setTrackData(track, "alias", nil)
         else
-            BATTLEBEATS.trackAliases[track] = text
+            btb.setTrackData(track, "alias", text)
         end
-
-        BATTLEBEATS.SaveTrackAliases()
         func()
         background:Remove()
     end
@@ -1292,7 +1285,7 @@ function BATTLEBEATS.changeName(panel, track, func)
 end
 
 --MARK:Subtitles
-function BATTLEBEATS.openSubtitles(panel, trackName, subs)
+function btb.openSubtitles(panel, trackName, subs)
     local background = vgui.Create("DPanel", panel)
     background:SetSize(panel:GetWide(), panel:GetTall())
     background:Center()
@@ -1305,7 +1298,7 @@ function BATTLEBEATS.openSubtitles(panel, trackName, subs)
     frame:Center()
     frame.Paint = function(self, w, h)
         draw.RoundedBox(12, 0, 0, w, h, c000200)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
     end
     local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
     frame:BTB_SetTitle(title .. trackName, true)

@@ -1,3 +1,4 @@
+local btb = BATTLEBEATS
 local defaultX = tostring(ScrW() - 310)
 local defaultY = tostring(ScrH() / 6)
 
@@ -10,7 +11,7 @@ local notificationVisualizerSmooth = CreateClientConVar("battlebeats_visualizer_
 local skipNombat = CreateClientConVar("battlebeats_skip_nombat_names", "1", true, false, "", 0, 1)
 local showBar = CreateClientConVar("battlebeats_show_status_bar", "1", true, false, "", 0, 1)
 
-BATTLEBEATS.packPrefixes = {
+btb.packPrefixes = {
     "BattleBeats",
     "Nombat",
     "SBM DLC",
@@ -25,7 +26,7 @@ BATTLEBEATS.packPrefixes = {
 
 local stripCache = {}
 
-function BATTLEBEATS.FormatTime(seconds)
+function btb.FormatTime(seconds)
     if not seconds or seconds < 0 then return "0:00" end
     local time = string.ToMinutesSeconds(math.floor(seconds))
     time = string.gsub(time, "^0(%d:)", "%1") -- remove unnecessary 0 in minute mark (eg 01:23 -> 1:23)
@@ -50,7 +51,7 @@ local function capitalizeLetters(str)
     return str
 end
 
-function BATTLEBEATS.FormatTrackName(trackName) -- cleans file path, extensions, suffix numbers, capitalizes
+function btb.FormatTrackName(trackName) -- cleans file path, extensions, suffix numbers, capitalizes
     trackName = string.GetFileFromFilename(trackName)
     trackName = string.StripExtension(trackName)
     trackName = string.gsub(trackName, "(_%d%d%d)$", "") -- remove numbers from the end of the track name (for SBM packs)
@@ -64,7 +65,7 @@ local gradient = surface.GetTextureID("gui/gradient_up")
 local animDur = 0.25
 local trackNotification = nil
 
-function BATTLEBEATS.HideNotification()
+function btb.HideNotification()
     local override = hook.Run("BattleBeats_PreHideNotification")
     if override == true then return end
     if not IsValid(trackNotification) then return end
@@ -146,14 +147,14 @@ local function expandPanel(panel, finalX, finalY, finalWidth, finalHeight, onDon
     end
 end
 
-function BATTLEBEATS.stripPackPrefix(name)
+function btb.stripPackPrefix(name)
     if not name then return "" end
     if stripCache[name] then
         return stripCache[name]
     end
     local original = name
     local lname = name:lower()
-    for _, prefix in ipairs(BATTLEBEATS.packPrefixes) do
+    for _, prefix in ipairs(btb.packPrefixes) do
         local esc = prefix:gsub("([%(%)%[%]%-%_%.])", "%%%1")
         local lprefix = esc:lower()
         local pattern = "^%s*[%[%(%<]*%s*" .. lprefix .. "%s*[%]%)%>]*%s*[%-–—:%|%!]*%s*"
@@ -178,9 +179,9 @@ function BATTLEBEATS.stripPackPrefix(name)
 end
 
 local function getPackName(trackName)
-    local packName = BATTLEBEATS.trackToPack[trackName]
+    local packName = btb.trackToPack[trackName]
     if not packName then return language.GetPhrase("btb.notification.unknown_pack") end
-    return BATTLEBEATS.stripPackPrefix(packName)
+    return btb.stripPackPrefix(packName)
 end
 
 local finalWidth, finalHeight = 300, 80
@@ -189,13 +190,13 @@ local mClamp = math.Clamp
 local mlog = math.log
 local Lerp = Lerp
 
-function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
+function btb.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
     if not trackName then return end
     local override = hook.Run("BattleBeats_PreShowNotification", trackName, inCombat, isPreviewedTrack)
     if override == true then return end
     local packName = getPackName(trackName)
-    local aliasName = BATTLEBEATS.trackAliases and BATTLEBEATS.trackAliases[trackName]
-    trackName = BATTLEBEATS.FormatTrackName(trackName)
+    local aliasName = btb.getTrackData(trackName).alias or nil
+    trackName = btb.FormatTrackName(trackName)
     local displayName = aliasName or trackName
 
     if istable(override) then
@@ -213,7 +214,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
     end
 
     if string.match(displayName:lower(), "^[ca]%d+$") and skipNombat:GetBool() then -- if the name of the track is letter A or C then skip it
-        if IsValid(trackNotification) then BATTLEBEATS.HideNotification() end
+        if IsValid(trackNotification) then btb.HideNotification() end
         return
     end
 
@@ -261,7 +262,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
         surface.DrawTexturedRect(0, 0, w, h)
 
         local yBase = h
-        local station = isPreviewedTrack and BATTLEBEATS.currentPreviewStation or BATTLEBEATS.currentStation
+        local station = isPreviewedTrack and btb.currentPreviewStation or btb.currentStation
         if IsValid(station) and showNotificationVisualizer:GetBool() then
             if station:FFT(fft, 0) then
                 local vol = math.min(station:GetVolume(), 2)
@@ -332,8 +333,8 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
             else
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth, progressBarHeight, c100100100)
                 draw.RoundedBox(4, progressBarX, progressBarY, progressBarWidth * progress, progressBarHeight, textColor)
-                draw.SimpleText(BATTLEBEATS.FormatTime(currentTime), "CenterPrintText", progressBarX - 30, progressBarY - 6, color_white, TEXT_ALIGN_LEFT)
-                draw.SimpleText(BATTLEBEATS.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, color_white, TEXT_ALIGN_LEFT)
+                draw.SimpleText(btb.FormatTime(currentTime), "CenterPrintText", progressBarX - 30, progressBarY - 6, color_white, TEXT_ALIGN_LEFT)
+                draw.SimpleText(btb.FormatTime(trackDuration), "CenterPrintText", progressBarX + progressBarWidth + 5, progressBarY - 6, color_white, TEXT_ALIGN_LEFT)
             end
         elseif showNotificationPackName:GetBool() then
             draw.SimpleText(packName, "CenterPrintText", progressBarX + progressBarWidth / 2, progressBarY - 6, color_white, TEXT_ALIGN_CENTER)
@@ -342,7 +343,7 @@ function BATTLEBEATS.ShowTrackNotification(trackName, inCombat, isPreviewedTrack
 
     if not GetConVar("battlebeats_persistent_notification"):GetBool() then
         timer.Simple(isScrolling and 12 or 6, function()
-            if IsValid(panel) then BATTLEBEATS.HideNotification() end
+            if IsValid(panel) then btb.HideNotification() end
         end)
     end
 end

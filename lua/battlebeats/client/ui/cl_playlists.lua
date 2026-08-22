@@ -20,7 +20,7 @@ function BATTLEBEATS.addTrackToPlaylist(title, track, trackType)
         exists = true
     })
     table.insert(pack[trackType], track)
-    BATTLEBEATS.SavePlaylists()
+    BATTLEBEATS.savePlaylists()
 end
 
 function BATTLEBEATS.removeTrackFromPlaylist(title, track, trackType)
@@ -41,7 +41,7 @@ function BATTLEBEATS.removeTrackFromPlaylist(title, track, trackType)
             end
         end
     end
-    BATTLEBEATS.SavePlaylists()
+    BATTLEBEATS.savePlaylists()
 end
 
 local function buildMusicPackFromPlaylist(title)
@@ -950,7 +950,7 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
         validatePlaylist(editedTitle)
         buildMusicPackFromPlaylist(editedTitle)
 
-        BATTLEBEATS.SavePlaylists()
+        BATTLEBEATS.savePlaylists()
 
         if isfunction(func) then
             func()
@@ -969,7 +969,7 @@ function BATTLEBEATS.openPlaylistEditor(title, func)
         end
         timer.Simple(2, function()
             if not table.IsEmpty(BATTLEBEATS.currentPacks) and not IsValid(BATTLEBEATS.currentStation) then
-                local nextTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+                local nextTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat)
                 if nextTrack then
                     BATTLEBEATS.PlayNextTrack(nextTrack)
                 end

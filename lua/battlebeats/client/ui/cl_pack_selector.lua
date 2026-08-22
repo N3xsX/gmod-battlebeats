@@ -903,12 +903,12 @@ local function openBTBmenu()
                 if newIndex > totalTracks then newIndex = 1 end
 
                 local candidate = activeList[newIndex]
-                if not BATTLEBEATS.excludedTracks[candidate] then
+                if not BATTLEBEATS.getTrackData(candidate).exl then
                     BATTLEBEATS.currentPreviewTrack = candidate
                     break
                 end
             end
-            if BATTLEBEATS.excludedTracks[BATTLEBEATS.currentPreviewTrack] then
+            if BATTLEBEATS.getTrackData(BATTLEBEATS.currentPreviewTrack).exl then
                 newIndex = currentIndex + direction
                 if newIndex < 1 then newIndex = totalTracks end
                 if newIndex > totalTracks then newIndex = 1 end
@@ -1104,7 +1104,8 @@ local function openBTBmenu()
         parent:Clear()
         local isAllMode = (trackType == "all")
         local function addTrackRow(track, excluded, isFavorite, actualTrackType)
-            local aliasName = BATTLEBEATS.trackAliases and BATTLEBEATS.trackAliases[track]
+            local td = BATTLEBEATS.getTrackData(track)
+            local aliasName = td.alias
             local trackName = BATTLEBEATS.FormatTrackName(track)
             local displayName = aliasName or trackName
             local row = vgui.Create("DPanel", parent)
@@ -1186,17 +1187,17 @@ local function openBTBmenu()
                 textWidth = textWidth + surface.GetTextSize("   " .. trackName)
             end
             surface.SetFont("BattleBeats_Font")
-            local npcs = BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs
+            local npcs = BATTLEBEATS.getTrackData(track).npcMap
             local count = istable(npcs) and #npcs or 0
             local startTrack = cookie.GetString("battlebeats_start_track", "") == track
 
             local iconData = {
                 {check = count == 1, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
                 {check = count >= 2, tooltip = "#btb.ps.ts.icon_assigned_multiple", image = "icon16/group.png"},
-                {check = BATTLEBEATS.trackTrim[track] ~= nil, tooltip = "#btb.ps.ts.icon_trim", image = "icon16/time.png"},
+                {check = td.trim ~= nil, tooltip = "#btb.ps.ts.icon_trim", image = "icon16/time.png"},
                 {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"},
                 {check = startTrack, tooltip = "#btb.ps.ts.icon_start", image = "icon16/door_in.png"},
-                {check = BATTLEBEATS.trackVolume[track] ~= nil, tooltip = "#btb.ps.ts.icon_volume", image = "icon16/sound.png"},
+                {check = td.vol ~= nil, tooltip = "#btb.ps.ts.icon_volume", image = "icon16/sound.png"},
             }
 
             local xOffset = 840
@@ -1239,8 +1240,7 @@ local function openBTBmenu()
 
             customCheckbox.OnMousePressed = function(self)
                 excluded = not excluded
-                BATTLEBEATS.excludedTracks[track] = excluded
-                BATTLEBEATS.SaveExcludedTracks()
+                BATTLEBEATS.setTrackData(track, "exl", excluded and true or nil)
                 ui.changesMade = true
                 targetColor = excluded and clr.c25500 or clr.c2552100
                 targetW = excluded and disabledW or enabledW
@@ -1418,7 +1418,7 @@ local function openBTBmenu()
                         local clientDivider = menu:AddOption("------CLIENT------")
                         clientDivider:BTB_PaintProperties()
                     end
-                    local vol = (BATTLEBEATS.trackVolume[track] ~= nil and (BATTLEBEATS.trackVolume[track] - 100)) or 0
+                    local vol = (td.vol ~= nil and (td.vol - 100)) or 0
                     local optionName
                     if vol ~= 0 then
                         local opTrans = language.GetPhrase("btb.ps.pack_rmb.edit_volume")
@@ -1494,8 +1494,7 @@ local function openBTBmenu()
                     --MARK:RMB favorites
                     if isFavorite then
                         local unfavorite = menu:AddOption("#btb.ps.ts.rmb.remove_fav", function()
-                            BATTLEBEATS.favoriteTracks[track] = nil
-                            BATTLEBEATS.SaveFavoriteTracks()
+                            BATTLEBEATS.setTrackData(track, "fav", nil)
                             ui.changesMade = true
                             createTrackList(parent, trackType, selectedPack)
                         end)
@@ -1503,8 +1502,7 @@ local function openBTBmenu()
                         unfavorite:BTB_PaintProperties()
                     else
                         local favorite = menu:AddOption("#btb.ps.ts.rmb.add_fav", function()
-                            BATTLEBEATS.favoriteTracks[track] = true
-                            BATTLEBEATS.SaveFavoriteTracks()
+                            BATTLEBEATS.setTrackData(track, "fav", true)
                             ui.changesMade = true
                             createTrackList(parent, trackType, selectedPack)
                         end)
@@ -1534,7 +1532,7 @@ local function openBTBmenu()
                     end
 
                     --MARK:RMB offset/trim
-                    local trim = BATTLEBEATS.trackTrim[track]
+                    local trim = td.trim
                     local trimOptionTitle = language.GetPhrase("#btb.ps.ts.rmb.trim_edit")
                     local trimText = nil
                     if trim then
@@ -1557,8 +1555,7 @@ local function openBTBmenu()
 
                     --MARK:RMB npc assign
                     if row.actualType == "combat" then
-                        local currentNPCs = BATTLEBEATS.npcTrackMappings[track] and
-                        BATTLEBEATS.npcTrackMappings[track].npcs or {}
+                        local currentNPCs = BATTLEBEATS.getTrackData(track).npcMap or {}
                         local assignNPC = menu:AddOption("#btb.ps.ts.rmb.assign_add", function()
                             activeTextEntries.assignBox, activeTextEntries.assignBoxSearch = BATTLEBEATS.createAssignFrame(frame, "#btb.ps.ts.rmb.assign_title", nil, 1, function(class, priority, fframe)
                                 if not class or class == "" then
@@ -1568,50 +1565,24 @@ local function openBTBmenu()
                                 end
 
                                 local isDuplicateInTrack = false
-                                if BATTLEBEATS.npcTrackMappings[track] and BATTLEBEATS.npcTrackMappings[track].npcs then
-                                    for _, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
-                                        if npc.class == class then
-                                            isDuplicateInTrack = true
-                                            break
-                                        end
-                                    end
-                                end
-
-                                local oldTrack = nil
-                                if not isDuplicateInTrack then
-                                    for t, info in pairs(BATTLEBEATS.npcTrackMappings) do
-                                        if t ~= track and info.npcs then
-                                            for _, npc in ipairs(info.npcs) do
-                                                if npc.class == class then
-                                                    oldTrack = t
-                                                    break
-                                                end
-                                            end
-                                            if oldTrack then break end
-                                        end
+                                local npcMap = BATTLEBEATS.getTrackData(track).npcMap or {}
+                                for _, npc in ipairs(npcMap) do
+                                    if npc.class == class then
+                                        isDuplicateInTrack = true
+                                        break
                                     end
                                 end
 
                                 local function assignNPCToTrack()
-                                    BATTLEBEATS.npcTrackMappings[track] = BATTLEBEATS.npcTrackMappings[track] or
-                                    { npcs = {} }
-                                    table.insert(BATTLEBEATS.npcTrackMappings[track].npcs,
-                                        { class = class, priority = priority })
-                                    if oldTrack and BATTLEBEATS.npcTrackMappings[oldTrack] then
-                                        for i = #BATTLEBEATS.npcTrackMappings[oldTrack].npcs, 1, -1 do
-                                            if BATTLEBEATS.npcTrackMappings[oldTrack].npcs[i].class == class then
-                                                table.remove(BATTLEBEATS.npcTrackMappings[oldTrack].npcs, i)
-                                                break
-                                            end
-                                        end
-                                        if #BATTLEBEATS.npcTrackMappings[oldTrack].npcs == 0 then
-                                            BATTLEBEATS.npcTrackMappings[oldTrack] = nil
-                                        end
-                                    end
+                                    local d = BATTLEBEATS.getTrackData(track)
+                                    d.npcMap = d.npcMap or {}
+                                    d.npcMap[#d.npcMap + 1] = {class = class, priority = priority}
+                                    BATTLEBEATS.setTrackData(track, "npcMap", d.npcMap)
+                                    BATTLEBEATS.buildNPCTrackMap()
+                                    
+                                    ui.changesMade = true
                                     notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_noti_class") .. ": " .. class .. " " .. language.GetPhrase("btb.ps.ts.rmb.assign_noti_priority") .. " " .. priority .. " " .. language.GetPhrase("btb.ps.ts.rmb.assign_noti_track") .. ": " .. BATTLEBEATS.FormatTrackName(track), NOTIFY_GENERIC, 3)
                                     surface.PlaySound("buttons/button14.wav")
-                                    BATTLEBEATS.SaveNPCMappings()
-                                    ui.changesMade = true
                                     fframe:Remove()
                                     createTrackList(parent, trackType, selectedPack)
                                 end
@@ -1619,9 +1590,6 @@ local function openBTBmenu()
                                 if isDuplicateInTrack then
                                     notification.AddLegacy("NPC '" .. class .. "' " .. language.GetPhrase("btb.ps.ts.rmb.assign_this_track"), NOTIFY_ERROR, 3)
                                     surface.PlaySound("buttons/button11.wav")
-                                elseif oldTrack then
-                                    surface.PlaySound("buttons/button17.wav")
-                                    Derma_Query("NPC: (" .. class .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"), "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() assignNPCToTrack() end, "#btb.ps.ts.rmb.assign_no", function() end)
                                 else
                                     assignNPCToTrack()
                                 end
@@ -1654,13 +1622,14 @@ local function openBTBmenu()
                                     end
 
                                     if newClass == npcInfo.class then
-                                        for i, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
+                                        local npcMap = BATTLEBEATS.getTrackData(track).npcMap or {}
+                                        for i, npc in ipairs(npcMap) do
                                             if npc.class == npcInfo.class then
-                                                BATTLEBEATS.npcTrackMappings[track].npcs[i].priority = newPrio
+                                                npcMap[i].priority = newPrio
                                                 break
                                             end
                                         end
-                                        BATTLEBEATS.SaveNPCMappings()
+
                                         ui.changesMade = true
                                         notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " (" .. npcInfo.priority .. ") " .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
                                         surface.PlaySound("buttons/button14.wav")
@@ -1670,7 +1639,8 @@ local function openBTBmenu()
                                     end
 
                                     local isDuplicateInTrack = false
-                                    for _, npc in ipairs(BATTLEBEATS.npcTrackMappings[track].npcs) do
+                                    local npcMap = BATTLEBEATS.getTrackData(track).npcMap or {}
+                                    for _, npc in ipairs(npcMap) do
                                         if npc.class == newClass and npc.class ~= npcInfo.class then
                                             isDuplicateInTrack = true
                                             break
@@ -1683,39 +1653,20 @@ local function openBTBmenu()
                                         return
                                     end
 
-                                    local oldTrack = nil
-                                    for t, info in pairs(BATTLEBEATS.npcTrackMappings) do
-                                        if t ~= track and info.npcs then
-                                            for _, npc in ipairs(info.npcs) do
-                                                if npc.class == newClass then
-                                                    oldTrack = t
-                                                    break
-                                                end
-                                            end
-                                            if oldTrack then break end
-                                        end
-                                    end
-
                                     local function saveEdit()
-                                        for i = #BATTLEBEATS.npcTrackMappings[track].npcs, 1, -1 do
-                                            if BATTLEBEATS.npcTrackMappings[track].npcs[i].class == npcInfo.class then
-                                                table.remove(BATTLEBEATS.npcTrackMappings[track].npcs, i)
+                                        local npcMap = BATTLEBEATS.getTrackData(track).npcMap or {}
+                                        for i = #npcMap, 1, -1 do
+                                            if npcMap[i].class == npcInfo.class then
+                                                table.remove(npcMap, i)
                                                 break
                                             end
                                         end
-                                        table.insert(BATTLEBEATS.npcTrackMappings[track].npcs, {class = newClass, priority = newPrio})
-                                        if oldTrack and BATTLEBEATS.npcTrackMappings[oldTrack] then
-                                            for j = #BATTLEBEATS.npcTrackMappings[oldTrack].npcs, 1, -1 do
-                                                if BATTLEBEATS.npcTrackMappings[oldTrack].npcs[j].class == newClass then
-                                                    table.remove(BATTLEBEATS.npcTrackMappings[oldTrack].npcs, j)
-                                                    break
-                                                end
-                                            end
-                                            if #BATTLEBEATS.npcTrackMappings[oldTrack].npcs == 0 then
-                                                BATTLEBEATS.npcTrackMappings[oldTrack] = nil
-                                            end
+                                        npcMap[#npcMap + 1] = { class = newClass, priority = newPrio }
+                                        if #npcMap > 0 then
+                                            BATTLEBEATS.setTrackData(track, "npcMap", npcMap)
                                         end
-                                        BATTLEBEATS.SaveNPCMappings()
+                                        BATTLEBEATS.buildNPCTrackMap()
+
                                         ui.changesMade = true
                                         notification.AddLegacy(
                                         language.GetPhrase("btb.ps.ts.rmb.assign_edited") .. ": " .. npcInfo.class .. " (" .. npcInfo.priority .. ") " .. " → " .. newClass .. " (" .. newPrio .. ")", NOTIFY_GENERIC, 3)
@@ -1723,30 +1674,26 @@ local function openBTBmenu()
                                         fframe:Remove()
                                         createTrackList(parent, trackType, selectedPack)
                                     end
-
-                                    if oldTrack then
-                                        surface.PlaySound("buttons/button17.wav")
-                                        Derma_Query("NPC: (" .. newClass .. ") " .. language.GetPhrase("btb.ps.ts.rmb.assign_already_assigned") .. ": (" .. BATTLEBEATS.FormatTrackName(oldTrack) .. "). " .. language.GetPhrase("btb.ps.ts.rmb.assign_overwrite"),
-                                        "#btb.ps.ts.rmb.assign_conf_overwrite", "#btb.ps.ts.rmb.assign_yes", function() saveEdit() end, "#btb.ps.ts.rmb.assign_no", function() end)
-                                    else
-                                        saveEdit()
-                                    end
+                                    saveEdit()
                                 end)
                             end)
                             editOpt:SetImage("icon16/user_edit.png")
                             editOpt:BTB_PaintProperties()
 
                             local removeOpt = subMenu:AddOption("#btb.ps.ts.rmb.assign_remove", function()
-                                for i = #BATTLEBEATS.npcTrackMappings[track].npcs, 1, -1 do
-                                    if BATTLEBEATS.npcTrackMappings[track].npcs[i].class == npcInfo.class then
-                                        table.remove(BATTLEBEATS.npcTrackMappings[track].npcs, i)
+                                local npcMap = BATTLEBEATS.getTrackData(track).npcMap
+                                if not npcMap then return end
+                                for i = #npcMap, 1, -1 do
+                                    if npcMap[i].class == npcInfo.class then
+                                        table.remove(npcMap, i)
                                         break
                                     end
                                 end
-                                if #BATTLEBEATS.npcTrackMappings[track].npcs == 0 then
-                                    BATTLEBEATS.npcTrackMappings[track] = nil
+                                if #npcMap == 0 then
+                                    BATTLEBEATS.setTrackData(track, "npcMap", nil)
                                 end
-                                BATTLEBEATS.SaveNPCMappings()
+                                BATTLEBEATS.buildNPCTrackMap()
+
                                 ui.changesMade = true
                                 notification.AddLegacy(language.GetPhrase("btb.ps.ts.rmb.assign_removed") .. ": " .. npcInfo.class, NOTIFY_GENERIC, 3)
                                 surface.PlaySound("buttons/button3.wav")
@@ -1768,7 +1715,6 @@ local function openBTBmenu()
                     end
 
                     --MARK:RMB Rename
-                    BATTLEBEATS.trackAliases = BATTLEBEATS.trackAliases or {}
                     local renameOption = menu:AddOption("#btb.ps.ts.rmb.set_name", function()
                         activeTextEntries.changeNameBox = BATTLEBEATS.changeName(frame, track, function()
                             createTrackList(parent, trackType, selectedPack)
@@ -1936,18 +1882,18 @@ local function openBTBmenu()
 
         local filters = {
             assigned = function(data)
-                local m = BATTLEBEATS.npcTrackMappings[data.track]
-                return m and #m.npcs > 0
+                local m = BATTLEBEATS.getTrackData(data.track).npcMap
+                return m and #m > 0
             end,
             offset = function(data)
-                local trim = BATTLEBEATS.trackTrim[data.track]
+                local trim = BATTLEBEATS.getTrackData(data.track).trim
                 return trim and ((trim.start and trim.start > 0) or (trim.finish and trim.finish > 0))
             end,
             volume = function(data)
-                return BATTLEBEATS.trackVolume[data.track] ~= nil
+                return BATTLEBEATS.getTrackData(data.track).vol ~= nil
             end,
             rename = function(data)
-                return BATTLEBEATS.trackAliases[data.track] ~= nil
+                return BATTLEBEATS.getTrackData(data.track).alias ~= nil
             end,
         }
         local trackRows = {}
@@ -1968,9 +1914,10 @@ local function openBTBmenu()
             local typesToProcess = isAllMode and {"ambient", "combat"} or {trackType}
             for _, tType in ipairs(typesToProcess) do
                 for _, t in ipairs(BATTLEBEATS.musicPacks[selectedPack][tType] or {}) do
-                    local name = string.lower(BATTLEBEATS.trackAliases[t] or BATTLEBEATS.FormatTrackName(t))
-                    local excluded = BATTLEBEATS.excludedTracks[t]
-                    local favorite = BATTLEBEATS.favoriteTracks[t]
+                    local td = BATTLEBEATS.getTrackData(t)
+                    local name = string.lower(td.alias or BATTLEBEATS.FormatTrackName(t))
+                    local excluded = td.exl
+                    local favorite = td.fav
 
                     if query == "" or string.find(name, query, 1, true) then
                         if sortMode == "fav" and not favorite then continue end
@@ -2042,11 +1989,11 @@ local function openBTBmenu()
         includeExcludeCombo.OnSelect = function(_, _, value)
             if value == "#btb.ps.sort.options_include" then
                 for _, t in ipairs(currentFilteredTracks or {}) do
-                    BATTLEBEATS.excludedTracks[t] = false
+                    BATTLEBEATS.setTrackData(t, "exl", nil)
                 end
             elseif value == "#btb.ps.sort.options_exclude" then
                 for _, t in ipairs(currentFilteredTracks or {}) do
-                    BATTLEBEATS.excludedTracks[t] = true
+                    BATTLEBEATS.setTrackData(t, "exl", true)
                 end
             end
             includeExcludeCombo:SetValue("#btb.ps.sort.options")
@@ -2382,7 +2329,7 @@ local function openBTBmenu()
                                         BATTLEBEATS.musicPlaylists[packName] = nil
                                         BATTLEBEATS.musicPacks[packName] = nil
                                         BATTLEBEATS.packVolume[packName] = nil
-                                        BATTLEBEATS.SavePlaylists()
+                                        BATTLEBEATS.savePlaylists()
                                         RefreshList()
                                         surface.PlaySound("buttons/button15.wav")
                                         ui.changesMade = true
@@ -2945,6 +2892,7 @@ local function openBTBmenu()
 
     frame.OnClose = function()
         BATTLEBEATS.ValidatePacks()
+        BATTLEBEATS.saveTrackData()
         if IsValid(BATTLEBEATS.optionsFrame) then BATTLEBEATS.optionsFrame:Remove() end
         if timer.Exists("BattleBeats_NextPreviewTrack") then
             timer.Remove("BattleBeats_NextPreviewTrack")
@@ -2962,7 +2910,7 @@ local function openBTBmenu()
         if ui.changesMade then
             -- if no preview track is playing, start a random track from selected packs
             if BATTLEBEATS.currentPreviewTrack == nil or (IsValid(BATTLEBEATS.currentPreviewStation) and BATTLEBEATS.currentPreviewStation:GetState() ~= GMOD_CHANNEL_PLAYING) then
-                local nextTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat, BATTLEBEATS.excludedTracks)
+                local nextTrack = BATTLEBEATS.GetRandomTrack(BATTLEBEATS.currentPacks, BATTLEBEATS.isInCombat)
                 if nextTrack then
                     BATTLEBEATS.PlayNextTrack(nextTrack)
                 end
