@@ -106,20 +106,33 @@ btb.dirHandlers = {
     }
 }
 
+local loadedWS = {}
+
 --MARK: Finding packs
-local function loadSource(name, src, wsid, dbg, root)
+local function loadSource(name, src, wsid, dbg, root, base, pack)
     local a, c, pt = {}, {}, nil
     root = root or "sound/"
 
-    for _, d in ipairs(btb.baseDirs) do
+    local function load(d, p)
         local h = btb.dirHandlers[d] or btb.dirHandlers.default
         local fs = {}
-        scan(root .. d .. "/", src, fs, "sound/" .. d .. "/")
+
+        if p then
+            scan(root .. d .. "/" .. p .. "/", src, fs, "sound/" .. d .. "/" .. p .. "/")
+        else
+            local _, packs = file.Find(root .. d .. "/*", src)
+            for _, n in ipairs(packs or {}) do
+                loadedWS[d .. "/" .. n] = true
+                scan(root .. d .. "/" .. n .. "/", src, fs, "sound/" .. d .. "/" .. n .. "/")
+            end
+        end
+
         for _, f in ipairs(fs) do
             if not isAudio(f) then
                 if dbg then badExt(f) end
                 continue
             end
+
             local aa, cc = h.handle(f)
             if aa then a[#a + 1] = f end
             if cc then c[#c + 1] = f end
@@ -127,10 +140,18 @@ local function loadSource(name, src, wsid, dbg, root)
         end
     end
 
+    if base then
+        if not wsid and loadedWS[base .. "/" .. pack] then return end
+        load(base, pack)
+    else
+        for _, d in ipairs(btb.baseDirs) do load(d) end
+    end
+
     if #a == 0 and #c == 0 then return end
 
     print("[BattleBeats Client] Loaded pack: " .. name)
     assert(not btb.musicPacks[name], "duplicate BattleBeats pack name: " .. name)
+
     btb.musicPacks[name] = {
         ambient = a,
         combat = c,
@@ -192,9 +213,13 @@ local function mainloadPacks(dbg)
     end
 
     -- local/dedicated server addons
-    local _, packs = file.Find("addons/*", "GAME")
-    for _, name in ipairs(packs or {}) do
-        loadSource(name, "GAME", nil, dbg, "addons/" .. name .. "/sound/")
+    for _, d in ipairs(btb.baseDirs) do
+        local _, packs = file.Find("sound/" .. d .. "/*", "GAME")
+        for _, name in ipairs(packs or {}) do
+            if not loadedWS[d .. "/" .. name] then
+                loadSource(name, "GAME", nil, dbg, "sound/", d, name)
+            end
+        end
     end
 
     print("[BattleBeats Client] Loaded packs in " .. math.Truncate(SysTime() - t, 3) .. " seconds")
@@ -611,6 +636,7 @@ concommand.Add("battlebeats_reload_packs", function()
     if IsValid(btb.frame) then btb.frame:Close() end
     btb.musicPacks = {}
     btb.checking = false
+    loadedWS = {}
     loadPacks()
     loadPacksDebug()
     loadPlaylists()
