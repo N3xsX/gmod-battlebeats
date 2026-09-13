@@ -179,7 +179,7 @@ function btb.stripPackPrefix(name)
 end
 
 local function getPackName(trackName)
-    local packName = btb.trackToPack[trackName]
+    local packName = btb.getTrackData(trackName, true).pack
     if not packName then return language.GetPhrase("btb.notification.unknown_pack") end
     return btb.stripPackPrefix(packName)
 end
@@ -195,7 +195,7 @@ function btb.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
     local override = hook.Run("BattleBeats_PreShowNotification", trackName, inCombat, isPreviewedTrack)
     if override == true then return end
     local packName = getPackName(trackName)
-    local aliasName = btb.getTrackData(trackName).alias or nil
+    local aliasName = btb.getTrackData(trackName).alias
     trackName = btb.FormatTrackName(trackName)
     local displayName = aliasName or trackName
 

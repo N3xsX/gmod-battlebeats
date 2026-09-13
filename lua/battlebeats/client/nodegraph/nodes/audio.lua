@@ -37,13 +37,19 @@ BATTLEBEATS.RegisterNode("audio.PLAY_TRACK_BTB", {
     desc = "Plays selected track using BattleBeats system",
 
     inputs = {
-        { id = "track", type = "string" }
+        { id = "track", type = "string" },
+        { id = "play", type = "boolean" }
     },
 
     oninputschanged = function(ctx, node, args)
         if ctx:ReadBool(node, "track") then
-            BATTLEBEATS.PlayNextTrack(ctx:ReadString(node, "track"))
+            node.memory.track = ctx:ReadString(node, "track")
         end
+
+        if not ctx:ReadBool(node, "play") then return end
+        if node.memory.track == "" then return end
+
+        BATTLEBEATS.PlayNextTrack(node.memory.track)
     end
 })
 
@@ -56,6 +62,55 @@ BATTLEBEATS.RegisterNode("condition.IN_COMBAT_BTB", {
     outputs = {
         { id = "isincombat", type = "boolean" }
     }
+})
+
+--MARK: THREAT LEVEL BTB
+BATTLEBEATS.RegisterNode("audio.THREAT_LEVEL_BTB", {
+    category = "Audio (BTB)",
+    title = "Threat level",
+    desc = "",
+
+    outputs = {
+        { id = "threat lvl", type = "number" }
+    },
+
+    tick = function(ctx, node, args)
+        ctx:Write(node, "threat lvl", BATTLEBEATS.threatLevel)
+    end
+})
+
+--MARK: DISABLE AMBIENT
+BATTLEBEATS.RegisterNode("audio.DISABLE_AMBIENT_BTB", {
+    category = "Audio (BTB)",
+    title = "Disable Ambient",
+    desc = "",
+
+    inputs = {
+        { id = "toogle", type = "boolean" }
+    },
+
+    oninputschanged = function(ctx, node, args)
+        if ctx:ReadBool(node, "toogle") then
+            BATTLEBEATS.disableAmbient = not BATTLEBEATS.disableAmbient
+        end
+    end
+})
+
+--MARK: DISABLE COMBAT
+BATTLEBEATS.RegisterNode("audio.DISABLE_COMBAT_BTB", {
+    category = "Audio (BTB)",
+    title = "Disable Combat",
+    desc = "",
+
+    inputs = {
+        { id = "toogle", type = "boolean" }
+    },
+
+    oninputschanged = function(ctx, node, args)
+        if ctx:ReadBool(node, "toogle") then
+            BATTLEBEATS.disableCombat = not BATTLEBEATS.disableCombat
+        end
+    end
 })
 
 local function stop(ctx, n)

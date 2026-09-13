@@ -1,9 +1,11 @@
-BATTLEBEATS.Nodes = BATTLEBEATS.Nodes or {}
-BATTLEBEATS.NodeCategories = BATTLEBEATS.NodeCategories or {}
-BATTLEBEATS.ActiveRuntime = BATTLEBEATS.ActiveRuntime or nil
-BATTLEBEATS.TickInterval = 0.1
-BATTLEBEATS.ZoneTickInterval = 0.5
-BATTLEBEATS.ZoneState = BATTLEBEATS.ZoneState or {current = {}}
+local btb = BATTLEBEATS
+
+btb.Nodes = btb.Nodes or {}
+btb.NodeCategories = btb.NodeCategories or {}
+btb.ActiveRuntime = btb.ActiveRuntime or nil
+btb.TickInterval = 0.1
+btb.ZoneTickInterval = 0.5
+btb.ZoneState = btb.ZoneState or {current = {}}
 
 local function fuck(msg)
     ErrorNoHaltWithStack("[BattleBeats Nodes] " .. msg .. "\n")
@@ -228,16 +230,16 @@ local function normArgs(list, class)
     return out
 end
 
-function BATTLEBEATS.SetRuntime(ctx)
-    BATTLEBEATS.ActiveRuntime = ctx
+function btb.SetRuntime(ctx)
+    btb.ActiveRuntime = ctx
 end
 
-function BATTLEBEATS.GetRuntime()
-    return BATTLEBEATS.ActiveRuntime
+function btb.GetRuntime()
+    return btb.ActiveRuntime
 end
 
-function BATTLEBEATS.ClearRuntime()
-    BATTLEBEATS.ActiveRuntime = nil
+function btb.ClearRuntime()
+    btb.ActiveRuntime = nil
 end
 
 --MARK: Create Runtime
@@ -263,7 +265,7 @@ local function sizeeeeeeeeeeeeeeeeee(v, seen)
     return 0
 end
 
-function BATTLEBEATS.CompileRuntime(...)
+function btb.CompileRuntime(...)
     local out = {nodes = {}, links = {}}
     local nodeMap = {}
     local nextId = 1
@@ -291,7 +293,7 @@ function BATTLEBEATS.CompileRuntime(...)
     return out
 end
 
-function BATTLEBEATS.CreateRuntime(data)
+function btb.CreateRuntime(data)
     print("[BattleBeats Runtime] Creating new runtime...")
     local ctx = {
         nodes = {},
@@ -301,27 +303,78 @@ function BATTLEBEATS.CreateRuntime(data)
         listeners = {},
         classIndex = {},
         argIndex = {},
+        changed = {},
         tick = 0,
-        running = false
+        running = false,
+
+        --debugEnabled = data.debug == true,
+        debugEnabled = true,
+
+        debug = {
+            ticks = {},
+            cur = nil,
+            stack = {},
+            maxTicks = 1000,
+
+            reads = true,
+            writes = true,
+            propagation = true,
+            calls = true,
+            errors = true,
+            change = true
+        }
     }
+    if ctx.debugEnabled then
+        print("[Runtime] Debug mode enabled...")
+    end
 
     function ctx:Read(node, inputId, default)
         local nLinks = self.links[node.id]
         if not nLinks then return default or 0 end
+
         local iLinks = nLinks[inputId]
         if not iLinks then return default or 0 end
+
         local i = node.def.inputMap[inputId]
         if not i then return default or 0 end
+
         if i.type == "string" then
             local link = iLinks[1]
             if not link then return default or "" end
+
             local src = self.nodes[link.node]
             if not src then return default or "" end
-            return src.currentState[link.output]
+
+            local v = src.currentState[link.output]
+
+            if self.debugEnabled then
+                self:Dbg("read", {
+                    node = node.id,
+                    input = inputId,
+                    from = link.node,
+                    output = link.output,
+                    value = v
+                })
+            end
+
+            return v
         end
+
         local cb = combiners[i.combine or "max"]
         if not cb then return default or 0 end
-        return cb(self, iLinks, default)
+
+        local v = cb(self, iLinks, default)
+
+        if self.debugEnabled then
+            self:Dbg("read", {
+                node = node.id,
+                input = inputId,
+                combine = i.combine or "max",
+                value = v
+            })
+        end
+
+        return v
     end
 
     function ctx:ReadBool(node, inputId)
@@ -335,17 +388,235 @@ function BATTLEBEATS.CreateRuntime(data)
 
     function ctx:Write(node, output, value)
         node.nextState[output] = value == nil and 1 or value
+        if not self.debugEnabled then return end
+        self:Dbg("write", { node = node.id, class = node.class, output = output, value = value })
     end
 
     function ctx:Call(node, handler, ...)
         local f = node.def.handlers[handler]
-        return f and f(self, node, ...)
+
+        if not f then
+            self:Error(node, "No handler '%s'", handler)
+            return
+        end
+
+        if not self.debugEnabled then
+            return f(self, node, ...)
+        end
+
+        local eid = self:Dbg("call", {
+            node = node.id,
+            class = node.class,
+            handler = handler
+        })
+
+        self:DbgPush(eid)
+        local ok, a, b, c = xpcall(f, debug.traceback, self, node, ...)
+        self:DbgPop()
+
+        if not ok then
+            self:Error(node, "Handler '%s' crashed:\n%s", handler, a)
+            return
+        end
+
+        return a, b, c
+    end
+
+    function ctx:Error(node, msg, trace, ...)
+        local s = { ... }
+        if #s > 0 then msg = string.format(msg, unpack(s)) end
+        local eid = self:Dbg("error", {
+            node = node and node.id,
+            class = node and node.class,
+            message = msg,
+            trace = trace
+        })
+        print(string.format("[BattleBeats RT Error] [Node %s | %s | tick %d] %s", tostring(node and node.id or "?"), tostring(node and node.class or "Runtime"), self.tick, msg))
+        return eid
+    end
+
+    function ctx:Warn(node, msg, ...)
+        local s = { ... }
+        if #s > 0 then msg = string.format(msg, unpack(s)) end
+        local p = node and string.format("[Node: %s | %s | tick %d]", tostring(node.id), tostring(node.class), self.tick) or string.format("[Runtime | tick %d]", self.tick)
+        print(string.format("[BattleBeats RT Warn] %s %s", p, msg))
+    end
+
+    function ctx:Dbg(event, data, parent)
+        if not self.debugEnabled then return end
+        local d = self.debug
+        if event == "read" and not d.reads then return end
+        if event == "write" and not d.writes then return end
+        if event == "propagate" and not d.propagation then return end
+        if event == "call" and not d.calls then return end
+        if event == "error" and not d.errors then return end
+        if event == "change" and not d.change then return end
+        local e = { id = #d.cur.events + 1, type = event, tick = self.tick, parent = parent or d.stack[#d.stack], data = data }
+        d.cur.events[#d.cur.events + 1] = e
+        if event == "change" then
+            print(string.format("[BattleBeats RT Debug] %d [STATE] %s.%s %s -> %s", self.tick, data.node, data.output, tostring(data.old), tostring(data.new)))
+        end
+        return e.id
+    end
+
+    function ctx:DbgPush(id)
+        if self.debugEnabled then
+            local stack = self.debug.stack
+            stack[#stack + 1] = id
+        end
+    end
+
+    function ctx:DbgPop()
+        if self.debugEnabled then
+            local stack = self.debug.stack
+            stack[#stack] = nil
+        end
+    end
+
+    function ctx:DbgTickStart()
+        if not self.debugEnabled then return end
+
+        local d = self.debug
+        d.cur = { tick = self.tick, events = {} }
+        d.ticks[#d.ticks + 1] = d.cur
+
+        while #d.ticks > d.maxTicks do
+            table.remove(d.ticks, 1)
+        end
+
+        table.Empty(d.stack)
+    end
+
+    function ctx:DebugDump(tick)
+        local d = self.debug
+        if not self.debugEnabled then
+            print("[BattleBeats RT Debug] Runtime debug mode is disabled")
+            return
+        end
+        local t
+        if tick then
+            for i = #d.ticks, 1, -1 do
+                if d.ticks[i].tick == tick then
+                    t = d.ticks[i]
+                    break
+                end
+            end
+        else
+            t = d.cur
+        end
+
+        if not t then
+            print("[BattleBeats RT Debug] No debug data for tick " .. tostring(tick or "?"))
+            return
+        end
+
+        local ch = {}
+        for _, e in ipairs(t.events) do
+            local p = e.parent
+            if istable(p) then
+                p = p[1]
+            end
+            p = p or 0
+            ch[p] = ch[p] or {}
+            ch[p][#ch[p] + 1] = e
+        end
+
+        local function fmt(v)
+            if istable(v) then return util.TableToJSON(v, false) or "{}" end
+            if v == nil then return "nil" end
+            return tostring(v)
+        end
+
+        local function printEvent(e, depth, seen)
+            if seen[e.id] then return end
+            seen[e.id] = true
+
+            local d = e.data or {}
+            local s = string.rep("  ", depth)
+
+            local src = ""
+            if istable(e.parent) then
+                local x = {}
+                for _, id in ipairs(e.parent) do
+                    x[#x + 1] = "#" .. id
+                end
+                src = " <- " .. table.concat(x, ", ")
+            elseif e.parent then
+                src = " <- #" .. e.parent
+            end
+
+            if e.type == "change" then
+                print(s .. string.format("[%d] CHANGE %s.%s %s -> %s", e.id, d.node, d.output, fmt(d.old), fmt(d.new)))
+            elseif e.type == "propagate" then
+                print(s .. string.format("[%d] PROPAGATE %s.%s -> %s.%s", e.id, d.from, d.output, d.to, d.input))
+            elseif e.type == "input" then
+                print(s .. string.format("[%d] INPUT %s (%s)%s", e.id, d.node, d.class, src))
+            elseif e.type == "call" then
+                print(s .. string.format("[%d] CALL %s.%s", e.id, d.node, d.handler))
+            elseif e.type == "read" then
+                print(s .. string.format("[%d] READ %s.%s = %s", e.id, d.node, d.input, fmt(d.value)))
+            elseif e.type == "write" then
+                print(s .. string.format("[%d] WRITE %s.%s = %s", e.id, d.node, d.output, fmt(d.value)))
+            elseif e.type == "error" then
+                print(s .. string.format("[%d] ERROR %s", e.id, d.message))
+                if d.trace then
+                    print(s .. "    " .. string.gsub(d.trace, "\n", "\n" .. s .. "    "))
+                end
+            end
+
+            local list = ch[e.id]
+
+            if list then
+                for _, x in ipairs(list) do
+                    printEvent(x, depth + 1, seen)
+                end
+            end
+        end
+
+        print(string.format("[BattleBeats RT Debug] ===== TICK %d =====", t.tick))
+
+        local seen = {}
+        for _, e in ipairs(t.events) do
+            local p = e.parent
+            if istable(p) then
+                p = p[1]
+            end
+            if not p then
+                printEvent(e, 0, seen)
+            end
+        end
+
+        print("[BattleBeats RT Debug] ===== END =====")
+    end
+
+    function ctx:DebugDumpAll()
+        local d = self.debug
+        if not self.debugEnabled then
+            print("[BattleBeats RT Debug] Runtime debug mode is disabled")
+            return
+        end
+        if #d.ticks == 0 then
+            print("[BattleBeats RT Debug] No debug data")
+            return
+        end
+        local count = 0
+        for _, t in ipairs(d.ticks) do
+            if #t.events > 0 then
+                count = count + 1
+                self:DebugDump(t.tick)
+            end
+        end
+        if count == 0 then
+            print("[BattleBeats RT Debug] No debug events")
+            return
+        end
+        print(string.format("[BattleBeats RT Debug] Dumped %d/%d ticks", count, #d.ticks))
     end
 
     print("[Runtime] Creating node instances...")
 
     for _, n in ipairs(data.nodes or {}) do
-        local inst = BATTLEBEATS.CreateNodeInstance(n.class, n.id, n.args)
+        local inst = btb.CreateNodeInstance(n.class, n.id, n.args)
         ctx.nodes[n.id] = inst
         ctx.nodeList[#ctx.nodeList + 1] = inst
 
@@ -409,29 +680,29 @@ function BATTLEBEATS.CreateRuntime(data)
         end
     end
 
-    print(string.format("[BattleBeats Runtime] Ready (%d nodes, %d links)", table.Count(ctx.nodes), #(data.links or {})))
-
-    local bytes = sizeeeeeeeeeeeeeeeeee(ctx)
-    print(string.format("[BattleBeats Runtime] Estimated memory usage: %.1f KB", bytes / 1024))
+    if ctx.debugEnabled then
+        print(string.format("[BattleBeats Runtime] Ready (%d nodes, %d links)", table.Count(ctx.nodes), #(data.links or {})))
+        local bytes = sizeeeeeeeeeeeeeeeeee(ctx)
+        print(string.format("[BattleBeats Runtime] Estimated memory usage: %.1f KB", bytes / 1024))
+    end
 
     return ctx
 end
 
-local changed = {}
-local function getChangedInputs(nodeId)
-    local inputs = changed[nodeId]
+local function getChangedInputs(ctx, nodeId)
+    local inputs = ctx.changed[nodeId]
     if not inputs then
-        inputs = {}
-        changed[nodeId] = inputs
+        inputs = {}; ctx.changed[nodeId] = inputs
     end
     return inputs
 end
 
 --MARK: Runtime tick
-function BATTLEBEATS.TickRuntime(ctx)
+function btb.TickRuntime(ctx)
     if not ctx then return end
 
     ctx.tick = ctx.tick + 1
+    ctx:DbgTickStart()
 
     hook.Run("BattleBeats_PreRuntimeTick", ctx)
 
@@ -440,29 +711,45 @@ function BATTLEBEATS.TickRuntime(ctx)
         node.def.tick(ctx, node, node.args)
     end
 
-    for _, inputs in pairs(changed) do
-        table.Empty(inputs)
-    end
-    table.Empty(changed)
+    table.Empty(ctx.changed)
 
     for i = 1, #ctx.nodeList do
         local node = ctx.nodeList[i]
         for outputId, value in pairs(node.nextState) do
             local old = node.currentState[outputId]
             if old ~= value then
+                local sid
+                if ctx.debugEnabled then
+                    sid = ctx:Dbg("change", {
+                        node = node.id,
+                        class = node.class,
+                        output = outputId,
+                        old = old,
+                        new = value
+                    })
+                end
                 local listeners = ctx.listeners[node.id]
                 listeners = listeners and listeners[outputId]
                 if listeners then
                     for _, link in ipairs(listeners) do
-                        local inputs = getChangedInputs(link.node)
+                        local inputs = getChangedInputs(ctx, link.node)
                         local propagations = inputs[link.input]
                         if not propagations then
                             propagations = {}
                             inputs[link.input] = propagations
                         end
+                        local p = {node = node.id, output = outputId, value = value}
+                        if ctx.debugEnabled then
+                            p.debug = ctx:Dbg("propagate", {
+                                from = node.id,
+                                output = outputId,
+                                to = link.node,
+                                input = link.input
+                            }, sid)
+                        end
+                        propagations[#propagations + 1] = p
                     end
                 end
-                print(ctx.tick .. " [STATE]", node.id .. "." .. outputId, old, "->", value)
             end
             node.currentState[outputId] = value
         end
@@ -482,30 +769,83 @@ function BATTLEBEATS.TickRuntime(ctx)
         end
     end
 
-    for nodeId, changedInputs in pairs(changed) do
+    for nodeId, changedInputs in pairs(ctx.changed) do
         local node = ctx.nodes[nodeId]
         local def = node.def
         if def and def.oninputschanged then
-            def.oninputschanged(ctx, node, node.args, changedInputs)
+            if ctx.debugEnabled then
+                local parents = {}
+
+                for _, propagations in pairs(changedInputs) do
+                    for _, p in ipairs(propagations) do
+                        if p.debug then
+                            parents[#parents + 1] = p.debug
+                        end
+                    end
+                end
+                table.sort(parents)
+
+                local eid = ctx:Dbg("input", {
+                    node = node.id,
+                    class = node.class,
+                    inputs = changedInputs
+                }, parents)
+
+                ctx:DbgPush(eid)
+
+                local cid = ctx:Dbg("call", {
+                    node = node.id,
+                    class = node.class,
+                    handler = "oninputschanged"
+                })
+
+                ctx:DbgPush(cid)
+
+                local ok, err = xpcall(def.oninputschanged, debug.traceback, ctx, node, node.args, changedInputs)
+
+                ctx:DbgPop()
+                ctx:DbgPop()
+
+                if not ok then
+                    ctx:Error(node, "Handler 'oninputschanged' crashed:\n%s", err)
+                end
+            else
+                def.oninputschanged(ctx, node, node.args, changedInputs)
+            end
         end
     end
 
     hook.Run("BattleBeats_PostRuntimeTick", ctx)
 end
 
-function BATTLEBEATS.StartClock()
-    BATTLEBEATS.StopClock()
-    BATTLEBEATS.FireNodeByClass("event.RUNTIME_START", "out")
+concommand.Add("btb_runtime_dump_debug", function(ply, cmd, args)
+    if IsValid(ply) and not ply:IsAdmin() then return end
+    local ctx = btb.ActiveRuntime
+    if not ctx then
+        print("[BattleBeats RT Debug] No runtime")
+        return
+    end
+    local tick = tonumber(args[1])
+    if tick then
+        ctx:DebugDump(tick)
+    else
+        ctx:DebugDumpAll()
+    end
+end)
+
+function btb.StartClock()
+    btb.StopClock()
+    btb.FireNodeByClass("event.RUNTIME_START", "out")
     hook.Add("Think", "BattleBeats_MainClock", function()
-        local ctx = BATTLEBEATS.GetRuntime()
+        local ctx = btb.GetRuntime()
         if not ctx then return end
 
         ctx._accum = (ctx._accum or 0) + FrameTime()
 
         local steps = 0
-        while ctx._accum >= BATTLEBEATS.TickInterval and steps < 10 do
-            ctx._accum = ctx._accum - BATTLEBEATS.TickInterval
-            BATTLEBEATS.TickRuntime(ctx)
+        while ctx._accum >= btb.TickInterval and steps < 10 do
+            ctx._accum = ctx._accum - btb.TickInterval
+            btb.TickRuntime(ctx)
             steps = steps + 1
         end
 
@@ -514,32 +854,32 @@ function BATTLEBEATS.StartClock()
         end
 
         ctx._zoneAccum = (ctx._zoneAccum or 0) + FrameTime()
-        if ctx._zoneAccum >= BATTLEBEATS.ZoneTickInterval then
+        if ctx._zoneAccum >= btb.ZoneTickInterval then
             ctx._zoneAccum = 0
-            BATTLEBEATS.TickZones()
+            btb.TickZones()
         end
     end)
 end
 
-function BATTLEBEATS.StopClock()
+function btb.StopClock()
     hook.Remove("Think", "BattleBeats_MainClock")
 end
 
-function BATTLEBEATS.LoadRuntime(data)
+function btb.LoadRuntime(data)
     if table.IsEmpty(data.nodes) then
         print("[BattleBeats Runtime] Runtime data is empty")
         return
     end
-    local ctx = BATTLEBEATS.CreateRuntime(data)
-    BATTLEBEATS.SetRuntime(ctx)
-    BATTLEBEATS.StartClock()
+    local ctx = btb.CreateRuntime(data)
+    btb.SetRuntime(ctx)
+    btb.StartClock()
     ctx.running = true
     return ctx
 end
 
-function BATTLEBEATS.UnloadRuntime()
-    BATTLEBEATS.StopClock()
-    local ctx = BATTLEBEATS.GetRuntime()
+function btb.UnloadRuntime()
+    btb.StopClock()
+    local ctx = btb.GetRuntime()
     if ctx then
         ctx.running = false
         for _, n in pairs(ctx.nodes) do
@@ -549,7 +889,7 @@ function BATTLEBEATS.UnloadRuntime()
             end
         end
     end
-    BATTLEBEATS.ClearRuntime()
+    btb.ClearRuntime()
 end
 
 local a = {
@@ -571,7 +911,7 @@ local function checkthisshit(class, def)
         fuck("class needs to be a string")
         return false
     end
-    if BATTLEBEATS.Nodes[class] then 
+    if btb.Nodes[class] then 
         fuck("node already exists: " .. class)
         return false
     end
@@ -643,7 +983,7 @@ local function checkthisshit(class, def)
 end
 
 --MARK: Register Node
-function BATTLEBEATS.RegisterNode(class, def)
+function btb.RegisterNode(class, def)
     if not checkthisshit(class, def) then return end
 
     local inputs = normPins(def.inputs, "input", class)
@@ -697,15 +1037,15 @@ function BATTLEBEATS.RegisterNode(class, def)
         end
     end
 
-    BATTLEBEATS.Nodes[class] = node
-    BATTLEBEATS.NodeCategories[node.category] = BATTLEBEATS.NodeCategories[node.category] or {}
-    BATTLEBEATS.NodeCategories[node.category][class] = node
+    btb.Nodes[class] = node
+    btb.NodeCategories[node.category] = btb.NodeCategories[node.category] or {}
+    btb.NodeCategories[node.category][class] = node
 
     return node
 end
 
-function BATTLEBEATS.GetNode(class)
-    return BATTLEBEATS.Nodes[class]
+function btb.GetNode(class)
+    return btb.Nodes[class]
 end
 
 --MARK: Fire Node
@@ -718,8 +1058,8 @@ local function fireNode(node, outputId, value)
     return true
 end
 
-function BATTLEBEATS.FireNode(nodeId, outputId, value)
-    local ctx = BATTLEBEATS.GetRuntime()
+function btb.FireNode(nodeId, outputId, value)
+    local ctx = btb.GetRuntime()
     if not ctx then
         return false, "missing active runtime"
     end
@@ -730,14 +1070,14 @@ function BATTLEBEATS.FireNode(nodeId, outputId, value)
     return fireNode(node, outputId, value)
 end
 
-function BATTLEBEATS.FireNodeByClass(class, outputId, value)
-    local ctx = BATTLEBEATS.GetRuntime()
+function btb.FireNodeByClass(class, outputId, value)
+    local ctx = btb.GetRuntime()
     if not ctx then return false, "missing active runtime" end
     local count = 0
     local er
     local nodes = ctx.classIndex[class]
     if not nodes then
-        if not BATTLEBEATS.GetNode(class) then
+        if not btb.GetNode(class) then
             return false, "unknown node class: " .. tostring(class)
         else
             return false, "no runtime nodes of class: " .. tostring(class)
@@ -755,8 +1095,8 @@ function BATTLEBEATS.FireNodeByClass(class, outputId, value)
     return false, er or ("missing node class: " .. tostring(class))
 end
 
-function BATTLEBEATS.FireNodeByClassArg(class, outputId, value, argId, argValue)
-    local ctx = BATTLEBEATS.GetRuntime()
+function btb.FireNodeByClassArg(class, outputId, value, argId, argValue)
+    local ctx = btb.GetRuntime()
     if not ctx then return false, "missing active runtime" end
     local count = 0
     local er
@@ -764,7 +1104,7 @@ function BATTLEBEATS.FireNodeByClassArg(class, outputId, value, argId, argValue)
     nodes = nodes and nodes[argId]
     nodes = nodes and nodes[argValue]
     if not nodes then
-        if not BATTLEBEATS.GetNode(class) then
+        if not btb.GetNode(class) then
             return false, "unknown node class: " .. tostring(class)
         else
             return false, "no runtime nodes of class: " .. tostring(class)
@@ -783,8 +1123,8 @@ function BATTLEBEATS.FireNodeByClassArg(class, outputId, value, argId, argValue)
 end
 
 --MARK: Create Instance
-function BATTLEBEATS.CreateNodeInstance(class, id, args)
-    local def = BATTLEBEATS.GetNode(class)
+function btb.CreateNodeInstance(class, id, args)
+    local def = btb.GetNode(class)
     if not def then fuck("unidentified node: " .. tostring(class)) end
 
     local aa = {}

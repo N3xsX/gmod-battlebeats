@@ -12,6 +12,20 @@ BATTLEBEATS.RegisterNode("debug.PRINT", {
         print(ctx:ReadBool(node, "in"))
     end
 })
+--MARK: PRINT STRING
+BATTLEBEATS.RegisterNode("debug.PRINT_STRING", {
+    category = "Debug",
+    title = "Print String",
+    desc = "Prints the node ID and input value to the console",
+
+    inputs = {
+        { id = "in", type = "string" },
+    },
+
+    oninputschanged = function(ctx, node)
+        print(ctx:ReadString(node, "in"))
+    end
+})
 --MARK: COMMAND TRIGGER
 BATTLEBEATS.RegisterNode("debug.COMMAND_TRIGGER", {
     category = "Debug",

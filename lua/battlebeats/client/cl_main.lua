@@ -1,10 +1,6 @@
 BATTLEBEATS = BATTLEBEATS or {}
 local btb = BATTLEBEATS
 
-local targetVolume = 1
-
-local lastCombatState = false
-
 local lastAmbienceLength = 0
 local lastAmbienceTotalLength = nil
 local lastAmbienceTrack = nil
@@ -17,13 +13,8 @@ local lastCombatTrack = nil
 local lastCombatPosition = nil
 local ambienceStartTime = nil
 
-local isAlive = true
-local lastMuteState = false
-local lastAliveState = true
-local fadeStartTime = nil
-local isPreviewing = false
-
-local forceVolume = false
+btb.disableAmbient = false
+btb.disableCombat = false
 
 btb.currentStation = btb.currentStation or nil
 btb.currentPreviewStation = btb.currentPreviewStation or nil
@@ -34,20 +25,24 @@ btb.isInCombat = btb.isInCombat or false
 btb.currentPacks = btb.currentPacks or {}
 btb.musicPacks = btb.musicPacks or {}
 btb.priorityStates = btb.priorityStates or {}
-btb.trackToPack = btb.trackToPack or {}
 btb.packVolume = btb.packVolume or {}
 btb.musicPlaylists = btb.musicPlaylists or {}
 
 btb.trackData = btb.trackData or {}
+btb.trackDataCache = btb.trackDataCache or {}
+
+btb.fadeMul = btb.fadeMul or 1
+btb.globalFade = btb.globalFade or nil
+btb.fades = btb.fades or {}
+btb.fadeStates = btb.fadeStates or {}
+btb.threatLevel = 1
 
 --Dev
-btb.disableFade = btb.disableFade or false
 btb.disableSwitch = btb.disableSwitch or false -- btb.isInCombat will still update
 btb.disableNextTrackTimer = btb.disableNextTrackTimer or false
 btb.disableCheckingTimer = btb.disableCheckingTimer or false
-btb.volumeOverride = btb.volumeOverride or false -- use this to disable fade on death and in menu & periodic sound volume check
 
-btb.currentVersion = "2.9.1"
+btb.currentVersion = "2.9.5"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -60,7 +55,7 @@ local allowSub = GetConVar("battlebeats_server_client_allow_subtitles")
 local maxDistance = GetConVar("battlebeats_server_max_distance")
 
 local volumeSet = CreateClientConVar("battlebeats_volume", "100", true, false, "", 0, 1000)
-local debugMode = CreateClientConVar("battlebeats_debug_mode", "0", true, false, "", 0, 1)
+local debugMode = CreateClientConVar("battlebeats_debug_mode", "0", true, true, "", 0, 1)
 local ambientWaitTime = CreateClientConVar("battlebeats_ambient_wait_time", "40", true, false)
 local combatWaitTime = CreateClientConVar("battlebeats_combat_wait_time", "40", true, false)
 local enableAmbient = CreateClientConVar("battlebeats_enable_ambient", "1", true, false, "", 0, 1)
@@ -73,7 +68,7 @@ local exclusivePlay = CreateClientConVar("battlebeats_exclusive_play", "0", true
 local alwaysContinue = CreateClientConVar("battlebeats_always_continue", "0", true, false, "", 0, 1)
 local continueMode = CreateClientConVar("battlebeats_continue_mode", "0", true, false, "", 0, 1)
 local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_notification", "1", true, false, "", 0, 1)
-local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "0", true, false, "", 0, 1)
+local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "1", true, false, "", 0, 1)
 local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, true, "", 0, 1)
 local disableFade = CreateClientConVar("battlebeats_disable_fade", "0", true, true, "", 0, 1)
 local favMultiplier = CreateClientConVar("battlebeats_favorite_weight", "3", true, false, "", 1, 10)
@@ -83,6 +78,8 @@ local enableSubtitles = CreateClientConVar("battlebeats_subtitles_enabled", "1",
 local ambientVolume = CreateClientConVar("battlebeats_volume_ambient", "100", true, false, "", 0, 100)
 local combatVolume = CreateClientConVar("battlebeats_volume_combat", "100", true, false, "", 0, 100)
 
+local dynamicVolume = CreateClientConVar("battlebeats_dynamic_volume", "1", true, true, "", 0, 1)
+
 local switchOnLower = CreateClientConVar("battlebeats_switch_on_lower_priority", "1", true, false, "", 0, 1)
 local enableAssignedTracks = CreateClientConVar("battlebeats_enable_assigned_tracks", "1", true, false, "", 0, 1)
 --local switchOnNoNPC = CreateClientConVar("battlebeats_switch_on_no_npc_track", "1", true, false, "", 0, 1)
@@ -90,98 +87,79 @@ local excludeMappedTracks = CreateClientConVar("battlebeats_exclude_mapped_track
 local lastCombatTrackPriority = 0
 --local lastCombatPriorityTrack = nil
 
-local muteVolume = nil
-
 local function debugPrint(...)
     if debugMode:GetBool() then print("[BattleBeats Debug] " .. ...) end
 end
 
-function btb.getTrackData(t)
-    return btb.trackData[t] or {}
+local e = {}
+function btb.getTrackData(t, cached)
+    local d = (cached and btb.trackDataCache or btb.trackData)[t]
+    return d or e
 end
-function btb.setTrackData(t, k, v)
+function btb.setTrackData(t, k, v, cached)
+    local x = cached and btb.trackDataCache or btb.trackData
     if v == nil then
-        local d = btb.trackData[t]
+        local d = x[t]
         if not d then return end
         d[k] = nil
-        if next(d) == nil then btb.trackData[t] = nil end
+        if next(d) == nil then x[t] = nil end
         return
     end
-    btb.trackData[t] = btb.trackData[t] or {}
-    btb.trackData[t][k] = v
+    x[t] = x[t] or {}
+    x[t][k] = v
 end
 
 function btb.ValidatePacks()
-    local hasAmbient, hasCombat = false, false
-
-    for packName in pairs(btb.currentPacks) do
-        local pack = btb.musicPacks[packName]
-        if pack then
-            if pack.ambient and #pack.ambient > 0 then hasAmbient = true end
-            if pack.combat and #pack.combat > 0 then hasCombat = true end
+    local ha, hc = false, false
+    for p in pairs(btb.currentPacks) do
+        local pk = btb.musicPacks[p]
+        if pk then
+            if pk.ambient and #pk.ambient > 0 then ha = true end
+            if pk.combat and #pk.combat > 0 then hc = true end
         end
     end
-
-    local wasAmbientAutoDisabled = cookie.GetNumber("battlebeats_auto_disabled_ambient", 0) == 1
-    local wasCombatAutoDisabled  = cookie.GetNumber("battlebeats_auto_disabled_combat", 0) == 1
-
-    if not hasAmbient and enableAmbient:GetBool() then
+    local adis = cookie.GetNumber("battlebeats_auto_disabled_ambient", 0) == 1
+    local cdis = cookie.GetNumber("battlebeats_auto_disabled_combat", 0) == 1
+    if not ha and enableAmbient:GetBool() then
         RunConsoleCommand("battlebeats_enable_ambient", "0")
         cookie.Set("battlebeats_auto_disabled_ambient", "1")
-    elseif hasAmbient and wasAmbientAutoDisabled then
+    elseif ha and adis then
         RunConsoleCommand("battlebeats_enable_ambient", "1")
         cookie.Set("battlebeats_auto_disabled_ambient", "0")
     end
-
-    if not hasCombat and enableCombat:GetBool() then
+    if not hc and enableCombat:GetBool() then
         RunConsoleCommand("battlebeats_enable_combat", "0")
         cookie.Set("battlebeats_auto_disabled_combat", "1")
-    elseif hasCombat and wasCombatAutoDisabled then
+    elseif hc and cdis then
         RunConsoleCommand("battlebeats_enable_combat", "1")
         cookie.Set("battlebeats_auto_disabled_combat", "0")
     end
 end
 
+--MARK:Volume + Fade
+--------------------------------------------------------------------------------------
+
 function btb.adjustVolume(track, baseVolume, isPreview)
-    local volumeType
+    local vt
     if isPreview and track and track ~= "" then
-        local packName = btb.trackToPack[track]
-        local packData = packName and btb.musicPacks and btb.musicPacks[packName]
-        if packData then
-            if packData.ambient then
-                for _, path in ipairs(packData.ambient) do
-                    if path == track then
-                        volumeType = ambientVolume:GetInt()
-                        break
-                    end
-                end
-            end
-            if not volumeType and packData.combat then
-                for _, path in ipairs(packData.combat) do
-                    if path == track then
-                        volumeType = combatVolume:GetInt()
-                        break
-                    end
-                end
-            end
-        end
+        local d = btb.getTrackData(track, true)
+        vt = d.type == "ambient" and ambientVolume:GetInt() or d.type == "combat" and combatVolume:GetInt()
     end
-    if not volumeType then
-        volumeType = btb.isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
+    if not vt then
+        vt = btb.isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
     end
+
     local masterVolume = volumeSet:GetInt() / 100
-    local tgVolume = baseVolume or (volumeType / 100 * masterVolume)
+    local tgVolume = baseVolume or (vt / 100 * masterVolume)
 
     tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
-    --print("[adjustVolume] Base Volume: " .. tostring(tgVolume) .. " | For track: " .. tostring(track))
 
     if not track or track == "" then
-        return math.Round(tgVolume, 2)
+        return math.Clamp(math.Round(tgVolume * (btb.fadeMul or 1), 2), 0, 10)
     end
 
     local finalVol = tgVolume
-    local packName = btb.trackToPack[track]
-
+    local packName = btb.getTrackData(track, true).pack
     if packName and btb.packVolume then
         local packAdj = btb.packVolume[packName]
         if packAdj then
@@ -189,105 +167,162 @@ function btb.adjustVolume(track, baseVolume, isPreview)
             finalVol = finalVol * packMult
         end
     end
-    --debugPrint("[adjustVolume] Pack Volume: " .. tostring(finalVol))
 
     local trackAdj = btb.getTrackData(track).vol or nil
     if trackAdj then
         local trackMult = math.Clamp(trackAdj / 100, 0, 2)
         finalVol = finalVol * trackMult
     end
-    --debugPrint("[adjustVolume] Pack + Track Volume: " .. tostring(finalVol))
 
     finalVol = hook.Run("BattleBeats_PostAdjustVolume", track, finalVol) or finalVol
+    finalVol = finalVol * (btb.fadeMul or 1)
     finalVol = math.Clamp(finalVol, 0, 10)
-    --debugPrint("[adjustVolume] Final Volume: " .. tostring(finalVol))
+
     return math.Round(finalVol, 2)
 end
 
---MARK:Music Fade
---------------------------------------------------------------------------------------
+-- this is used only to start or stop tracks
+local lerp = Lerp
+function btb.FadeMusic(st, fadeIn, fadeTime, isPreview)
+    if not IsValid(st) then return end
+    fadeTime = fadeTime or 2
+
+    local base = btb.adjustVolume(st:GetFileName(), nil, isPreview)
+    if disableFade:GetBool() or fadeTime == 0 then
+        btb.fades[st] = nil
+        if fadeIn then
+            st:SetVolume(base)
+        else
+            st:SetVolume(0)
+            st:Stop()
+        end
+        hook.Run("BattleBeats_PostFade", st, fadeIn)
+        return
+    end
+
+    local old = btb.fades[st]
+    local cur = old and lerp(math.Clamp(old.t / old.time, 0, 1), old.from, old.to) or nil
+
+    if fadeIn then
+        st:SetVolume(0)
+        cur = 0
+    else
+        cur = cur or (base > 0 and st:GetVolume() / base or 1)
+        cur = math.Clamp(cur, 0, 1)
+    end
+
+    btb.fades[st] = {
+        from = cur,
+        to = fadeIn and 1 or 0,
+        time = fadeTime,
+        t = 0,
+        prio = 2,
+        music = true,
+        inn = fadeIn,
+        preview = isPreview
+    }
+
+    debugPrint("[FadeMusic] Start " .. (fadeIn and "IN " or "OUT ") .. (isPreview and "[PREVIEW] " or "[AUTO] ") .. tostring(st) .. " targetVolume: " .. tostring(base))
+end
+
+local function fadeTo(volume, fadeTime)
+    volume = math.Clamp(volume or 1, 0, 10)
+    fadeTime = fadeTime or 2
+    local f = btb.globalFade
+    local from = f and lerp(math.Clamp(f.t / f.time, 0, 1), f.from, f.to) or (btb.fadeMul or 1)
+    if fadeTime <= 0 then
+        btb.fadeMul = volume
+        btb.globalFade = nil
+        local st = btb.currentStation
+        if IsValid(st) and not btb.fades[st] then
+            st:SetVolume(btb.adjustVolume(st:GetFileName()))
+        end
+        local pv = btb.currentPreviewStation
+        if IsValid(pv) and not btb.fades[pv] then
+            pv:SetVolume(btb.adjustVolume(pv:GetFileName(), nil, true))
+        end
+        return
+    end
+    btb.globalFade = {from = from, to = volume, time = fadeTime, t = 0}
+end
+
+function btb.SetFade(id, volume, fadeTime, isBoost)
+    if volume == nil then
+        btb.fadeStates[id] = nil
+    else
+        btb.fadeStates[id] = {volume = volume, boost = isBoost}
+    end
+    local boost = 1
+    local multiplier = 1
+    for _, f in pairs(btb.fadeStates) do
+        if f.boost then
+            boost = math.max(boost, f.volume)
+        else
+            multiplier = math.min(multiplier, f.volume)
+        end
+    end
+    fadeTo(boost * multiplier, fadeTime)
+end
+
+hook.Add("Think", "BattleBeats_FadeSystem", function()
+    local ft = FrameTime()
+
+    if btb.globalFade then
+        local f = btb.globalFade
+        f.t = math.min(f.t + ft, f.time)
+        local p = f.time > 0 and f.t / f.time or 1
+        btb.fadeMul = lerp(p, f.from, f.to)
+        if p >= 1 then
+            btb.fadeMul = f.to
+            btb.globalFade = nil
+        end
+    end
+
+    for st, f in pairs(btb.fades) do
+        if not IsValid(st) then
+            btb.fades[st] = nil
+            continue
+        end
+        f.t = math.min(f.t + ft, f.time)
+        local p = f.time > 0 and f.t / f.time or 1
+        local v = btb.adjustVolume(st:GetFileName(), nil, f.preview)
+        st:SetVolume(v * lerp(p, f.from, f.to))
+        if p >= 1 then
+            btb.fades[st] = nil
+            if f.music then
+                hook.Run("BattleBeats_PostFade", st, f.inn)
+                if not f.inn then
+                    st:SetVolume(0)
+                    st:Stop()
+                end
+            end
+            if f.cb then f.cb(st) end
+        end
+    end
+
+    if not btb.globalFade then return end
+
+    local st = btb.currentStation
+    if IsValid(st) and not btb.fades[st] then
+        st:SetVolume(btb.adjustVolume(st:GetFileName()))
+    end
+    local pv = btb.currentPreviewStation
+    if IsValid(pv) and not btb.fades[pv] then
+        pv:SetVolume(btb.adjustVolume(pv:GetFileName(), nil, true))
+    end
+end)
 
 local function removeSoundTimers()
     if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
     if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
 end
 
-function btb.FadeMusic(station, fadeIn, fadeTime, isPreview)
-    if not IsValid(station) then return end
-    fadeTime = fadeTime or 2
-    local sName = IsValid(station) and station:GetFileName() or nil
-    local tgVolume = btb.adjustVolume(sName, muteVolume, isPreview)
-    local override = hook.Run("BattleBeats_PreFade", station, fadeIn, fadeTime, isPreview)
-    if override == true then
-        forceVolume = true
-        return
-    end
-    if istable(override) then
-        forceVolume = override.volume ~= nil
-        if override.fadeTime ~= nil then
-            fadeTime = math.Clamp(override.fadeTime, 0, 10)
-        end
-        if override.volume ~= nil then
-            tgVolume = math.Clamp(override.volume, 0, 2)
-        end
-    end
-    if disableFade:GetBool() or btb.disableFade or fadeTime == 0 then
-        if fadeIn then
-            station:SetVolume(tgVolume)
-        else
-            station:SetVolume(0)
-        end
-        hook.Run("BattleBeats_PostFade", station, fadeIn)
-        return
-    end
-
-    local startVolume = fadeIn and 0 or station:GetVolume()
-    local endVolume = fadeIn and tgVolume or 0
-    local startTime = CurTime()
-    local timerName = "BattleBeats_Fade_" .. tostring(station)
-
-    debugPrint("[FadeMusic] Start " .. (fadeIn and "IN " or "OUT ") .. (isPreview and "[PREVIEW] " or "[AUTO] ") .. tostring(station) .. " targetVolume: " .. tostring(tgVolume))
-
-    timer.Create(timerName .. CurTime(), fadeTime, 3, function()
-        if not fadeIn and IsValid(station) then
-            debugPrint("[FadeMusic][Failsafe] Stopping station " .. tostring(station))
-            hook.Run("BattleBeats_PostFade", station, fadeIn)
-            station:SetVolume(0)
-            station:Stop()
-            station = nil
-        end
-    end)
-
-    timer.Create(timerName, 0.03, fadeTime / 0.03, function()
-        if not IsValid(station) then
-            debugPrint("[FadeMusic] Station invalid, removing timer " .. tostring(station))
-            timer.Remove(timerName)
-            return
-        end
-        local progress = math.min((CurTime() - startTime) / fadeTime, 1)
-        local vol = Lerp(progress, startVolume, endVolume)
-        station:SetVolume(vol)
-        if progress >= 0.95 and not fadeIn then
-            debugPrint("[FadeMusic] Fade out complete, stopping station " .. tostring(station))
-            hook.Run("BattleBeats_PostFade", station, fadeIn)
-            station:SetVolume(0)
-            station:Stop()
-            station = nil
-            timer.Remove(timerName)
-        elseif progress >= 0.95 and fadeIn then
-            debugPrint("[FadeMusic] Fade in complete, removing timer " .. tostring(station))
-            hook.Run("BattleBeats_PostFade", station, fadeIn)
-            timer.Remove(timerName)
-        end
-    end)
-end
-
 --MARK:Random track
 --------------------------------------------------------------------------------------
 
 local function same(t1, t2)
-    local p1 = btb.trackToPack[t1]
-    local p2 = btb.trackToPack[t2]
+    local p1 = btb.getTrackData(t1, true).pack
+    local p2 = btb.getTrackData(t2, true).pack
     debugPrint("[Same Pack] packA: " .. p1 .. " | packB:" .. p2)
     return p1 ~= nil and p1 == p2
 end
@@ -304,8 +339,8 @@ function btb.GetRandomTrack(packs, isCombat, previousTrack, exclusivePlayOnly)
     packs = hook.Run("BattleBeats_PreBuildTrackList", packs, isCombat) or packs
     local allTracks = {}
     if exclusivePlay:GetBool() and previousTrack and exclusivePlayOnly then
-        local packName = btb.trackToPack[previousTrack] -- restrict to same pack if exclusive play is enabled
-        debugPrint("[GetRandomTrack] Exclusive play enabled. Using pack: " .. packName)
+        local packName = btb.getTrackData(previousTrack, true).pack -- restrict to same pack if exclusive play is enabled
+        debugPrint("[GetRandomTrack] Exclusive play enabled. Using pack: " .. tostring(packName))
         if packName and btb.musicPacks[packName] then
             local selectedTracks = isCombat and btb.musicPacks[packName].combat or btb.musicPacks[packName].ambient
             if selectedTracks and #selectedTracks > 0 then
@@ -407,6 +442,7 @@ end
 --MARK:Music Player
 --------------------------------------------------------------------------------------
 
+local isPreviewing = false
 function btb.PlayNextTrackPreview(track, time, isLooped, errCallback)
     removeSoundTimers()
     if btb.currentStation and IsValid(btb.currentStation) then
@@ -424,7 +460,6 @@ function btb.PlayNextTrackPreview(track, time, isLooped, errCallback)
     if showPreviewNotification:GetBool() and not isLooped then btb.ShowTrackNotification(track, false, true) end
     sound.PlayFile(track, "noplay", function(station, errCode, errStr)
         if IsValid(station) then
-            forceVolume = false
             isPreviewing = true
             btb.currentPreviewStation = station
             station:SetVolume(0)
@@ -527,7 +562,6 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority)
         if IsValid(station) then
             btb.errorCount = 0
             isPreviewing = false
-            forceVolume = false
             btb.currentStation = station
             station:SetVolume(0)
             station:Play()
@@ -666,114 +700,39 @@ end
 --MARK:Client Timers
 --------------------------------------------------------------------------------------
 
-timer.Create("BattleBeats_ClientAliveCheck", 1, 0, function()
+local lastAliveState = true
+local lastMuteState = false
+timer.Create("BattleBeats_ClientAliveCheck", 0.5, 0, function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
-    if forceVolume or btb.volumeOverride then return end
 
-    isAlive = ply:Alive()
+    local isAlive = ply:Alive()
     if isAlive ~= lastAliveState then
         lastAliveState = isAlive
-        if disableMode:GetInt() == 1 then -- fade volume to 0 when dead, restore when alive
-            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
-            local tgVolume = btb.adjustVolume(sName)
-            targetVolume = isAlive and tgVolume or 0
-            fadeStartTime = CurTime()
-            if muteVolume == nil then
-                muteVolume = IsValid(btb.currentStation) and btb.currentStation:GetVolume() or
-                IsValid(btb.currentPreviewStation) and btb.currentPreviewStation:GetVolume()
-                or targetVolume
-            end
-        elseif disableMode:GetInt() == 2 then -- fade volume to 30% when dead, restore when alive
-            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
-            local tgVolume = btb.adjustVolume(sName)
-            targetVolume = isAlive and tgVolume or 0.3
-            fadeStartTime = CurTime()
-            if muteVolume == nil then
-                muteVolume = IsValid(btb.currentStation) and btb.currentStation:GetVolume() or
-                IsValid(btb.currentPreviewStation) and btb.currentPreviewStation:GetVolume()
-                or targetVolume
-            end
+        if isAlive then
+            btb.SetFade("death", nil, 2, false)
+        elseif disableMode:GetInt() == 1 then
+            btb.SetFade("death", 0, 2, false)
+        elseif disableMode:GetInt() == 2 then
+            btb.SetFade("death", 0.3, 2, false)
         end
     end
 
     if isAlive and lowerInMenu:GetBool() then
-        local inGameMenu = gui.IsGameUIVisible()
-        local inSpawnMenu = g_SpawnMenu and g_SpawnMenu:IsVisible()
-        local isMenuOpen = inGameMenu or inSpawnMenu
-
-        local shouldMute = isMenuOpen
-        if shouldMute ~= lastMuteState then
-            lastMuteState = shouldMute
-
-            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
-            local tgVolume = btb.adjustVolume(sName)
-
-            targetVolume = not shouldMute and tgVolume or 0.3
-            fadeStartTime = CurTime()
-            if muteVolume == nil then
-                muteVolume = IsValid(btb.currentStation) and btb.currentStation:GetVolume()
-                    or IsValid(btb.currentPreviewStation) and btb.currentPreviewStation:GetVolume()
-                    or targetVolume
-            end
+        local spawnMenu = g_SpawnMenu and g_SpawnMenu:IsVisible()
+        local isOpen = gui.IsGameUIVisible() or spawnMenu
+        if isOpen ~= lastMuteState then
+            lastMuteState = isOpen
+            btb.SetFade("menu", isOpen and 0.5 or nil, 0.8, false)
         end
-    end
-
-    if fadeStartTime and (IsValid(btb.currentStation) or IsValid(btb.currentPreviewStation)) and targetVolume
-        and not timer.Exists("BattleBeats_SmoothFade")
-        and not (IsValid(btb.currentStation) and timer.Exists("BattleBeats_Fade_" .. tostring(btb.currentStation)))
-        and not (IsValid(btb.currentPreviewStation) and timer.Exists("BattleBeats_Fade_" .. tostring(btb.currentPreviewStation))) then
-        timer.Create("BattleBeats_SmoothFade", 0.1, 0, function()
-            -- abort if a manual fade is already active
-            if (IsValid(btb.currentStation) and timer.Exists("BattleBeats_Fade_" .. tostring(btb.currentStation))) or
-                (IsValid(btb.currentPreviewStation) and timer.Exists("BattleBeats_Fade_" .. tostring(btb.currentPreviewStation))) then
-                timer.Remove("BattleBeats_SmoothFade")
-                if isAlive then muteVolume = nil end
-                return
-            end
-            if not fadeStartTime or (not IsValid(btb.currentStation) and not IsValid(btb.currentPreviewStation)) or not targetVolume then
-                timer.Remove("BattleBeats_SmoothFade")
-                if isAlive then muteVolume = nil end
-                return
-            end
-            local progress = math.min((CurTime() - fadeStartTime) / 2, 1)
-            if muteVolume then
-                muteVolume = Lerp(progress, muteVolume, targetVolume)
-                if IsValid(btb.currentStation) then btb.currentStation:SetVolume(muteVolume) end
-                if IsValid(btb.currentPreviewStation) then btb.currentPreviewStation:SetVolume(muteVolume) end
-            end
-            if progress >= 1 then
-                fadeStartTime = nil
-                if isAlive then muteVolume = nil end
-                timer.Remove("BattleBeats_SmoothFade")
-            end
-        end)
     end
 end)
 
-local volumeFrameOn = false
-timer.Create("BattleBeats_ClientAliveSoundCheck", 5, 0, function() -- sanity check
-    if forceVolume or btb.volumeOverride then return end
+timer.Create("BattleBeats_ClientVolCheck", 5, 0, function()
     if volumeSet:GetInt() > 200 then
         local time = tonumber(cookie.GetString("battlebeats_high_volume_time", "0")) or 0
         time = time + 5
         cookie.Set("battlebeats_high_volume_time", tostring(time))
-    end
-    if isAlive and not lastMuteState and (IsValid(btb.currentStation) or IsValid(btb.currentPreviewStation))
-        and not timer.Exists("BattleBeats_SmoothFade")
-        and not (IsValid(btb.currentStation) and timer.Exists("BattleBeats_Fade_" .. tostring(btb.currentStation)))
-        and not (IsValid(btb.currentPreviewStation) and timer.Exists("BattleBeats_Fade_" .. tostring(btb.currentPreviewStation))) then
-        if volumeFrameOn then return end
-        if IsValid(btb.currentStation) then
-            local sName = btb.currentStation:GetFileName() or nil
-            local tgVolume = btb.adjustVolume(sName)
-            btb.currentStation:SetVolume(tgVolume)
-        end
-        if IsValid(btb.currentPreviewStation) then
-            local sName = btb.currentPreviewStation:GetFileName() or nil
-            local tgVolume = btb.adjustVolume(sName, nil, true)
-            btb.currentPreviewStation:SetVolume(tgVolume)
-        end
     end
 end)
 
@@ -807,10 +766,7 @@ function btb.buildNPCTrackMap()
     for track, d in pairs(btb.trackData) do
         for _, m in ipairs(d.npcMap or {}) do
             npcTrackMap[m.class] = npcTrackMap[m.class] or {}
-            npcTrackMap[m.class][#npcTrackMap[m.class] + 1] = {
-                track = track,
-                priority = m.priority
-            }
+            npcTrackMap[m.class][#npcTrackMap[m.class] + 1] = {track = track, priority = m.priority}
         end
     end
 end
@@ -941,16 +897,61 @@ end
 
 local pendingSwitch = nil
 local pendingTrack = nil
+local lastThreatBoost = nil
+
+local lastCombatState = false
+local lastCombatEnemyState = false
+local combatNoEnemyTime = nil
+local combatFadeLevel = nil
 
 timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
 
-    local isInCombat = ply:GetNWBool("BattleBeats_InCombat", false)
+    btb.isInCombat = ply:GetNWBool("BattleBeats_InCombat", false)
+    local isEnemy = ply:GetNWBool("BattleBeats_HasCombatEnemy", false)
+    btb.threatLevel = ply:GetNWInt("BattleBeats_ThreatLevel", 1)
+
     if forceCombat:GetBool() and enableCombat:GetBool() then
-        isInCombat = true
+        btb.isInCombat = true
     end
-    btb.isInCombat = isInCombat
+
+    if dynamicVolume:GetBool() then
+        local threatBoost = btb.threatLevel == 3 and 1.6 or btb.threatLevel == 2 and 1.3 or nil
+        local threatSwitch = btb.threatLevel == 3 and 1 or btb.threatLevel == 2 and 2 or 3
+
+        if threatBoost ~= lastThreatBoost then
+            lastThreatBoost = threatBoost
+            btb.SetFade("threat", threatBoost, threatSwitch, true)
+        end
+
+        local shouldLower = btb.isInCombat and not isEnemy
+        if shouldLower ~= lastCombatEnemyState then
+            lastCombatEnemyState = shouldLower
+            if shouldLower then
+                combatNoEnemyTime = CurTime()
+                combatFadeLevel = nil
+            else
+                combatNoEnemyTime = nil
+                combatFadeLevel = nil
+                btb.SetFade("combat no enemies", nil, 3, false)
+            end
+        end
+
+        if shouldLower and combatNoEnemyTime then
+            local elapsed = CurTime() - combatNoEnemyTime
+            local newLevel
+            if elapsed >= 6 then
+                newLevel = 0.6
+            elseif elapsed >= 2 then
+                newLevel = 0.8
+            end
+            if newLevel and newLevel ~= combatFadeLevel then
+                combatFadeLevel = newLevel
+                btb.SetFade("combat no enemies", newLevel, 3, false)
+            end
+        end
+    end
 
     if btb.disableSwitch then return end
 
@@ -958,16 +959,29 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
     if btb.isInCombat ~= lastCombatState then
         if ambienceStartTime == nil then ambienceStartTime = curTime end
         lastCombatState = btb.isInCombat
-        btb.FireNodeByClass("condition.IN_COMBAT_BTB", "isincombat", isInCombat and 1 or 0)
+        btb.FireNodeByClass("condition.IN_COMBAT_BTB", "isincombat", btb.isInCombat and 1 or 0)
         if btb.isInCombat then
+            btb.FireNodeByClass("event.COMBAT_START_BTB", "start", 1)
             combatStartTime = curTime
             local npcTrack = getNPCMatchingTrack()
+            if btb.disableCombat then
+                removeSoundTimers()
+                btb.FadeMusic(btb.currentStation)
+                return
+            end
             local success, err = pcall(switchTrack, npcTrack)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
             end
         else
+            btb.FireNodeByClass("event.AMBIENT_START_BTB", "start", 1)
+            btb.SetFade("combat no enemies", nil, 3, false) -- just to be safe
             ambienceStartTime = curTime
+            if btb.disableAmbient then
+                removeSoundTimers()
+                btb.FadeMusic(btb.currentStation)
+                return
+            end
             local success, err = pcall(switchTrack, nil)
             if not success then
                 print("[BattleBeats Client] BattleBeats_ClientCombatCheck error: " .. tostring(err))
@@ -1016,6 +1030,13 @@ end)
 
 --MARK:Misc
 --------------------------------------------------------------------------------------
+
+cvars.AddChangeCallback("battlebeats_dynamic_volume", function(_, _, newValue)
+    if tonumber(newValue) == 0 and btb.isInCombat then
+        btb.SetFade("combat no enemies", nil, 1, false)
+        btb.SetFade("threat", nil, 1, true)
+    end
+end)
 
 cvars.AddChangeCallback("battlebeats_enable_ambient", function(_, _, newValue)
     if tonumber(newValue) == 0 and not btb.isInCombat then
@@ -1117,7 +1138,6 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
     if IsValid(warningBox) then return end
 
     if newVolume > 200 then
-        volumeFrameOn = true
         warningBox = vgui.Create("DFrame")
         warningBox:SetSize(420, 180)
         warningBox:Center()
@@ -1134,9 +1154,6 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
             draw.SimpleText(w2 ..  " (" .. newVolume .. "%)", "DermaDefault", w / 2, 60, color_white, TEXT_ALIGN_CENTER)
             draw.SimpleText("#btb.main.volume_warning_3", "DermaDefault", w / 2, 75, Color(255, 180, 180), TEXT_ALIGN_CENTER)
             draw.SimpleText("#btb.main.volume_warning_4", "DermaDefault", w / 2, 90, Color(200, 200, 255), TEXT_ALIGN_CENTER)
-        end
-        warningBox.OnClose = function ()
-            volumeFrameOn = false
         end
 
         createButton("#btb.main.volume_confirm", 20, 120, function()
@@ -1157,6 +1174,7 @@ end)
 
 concommand.Add("battlebeats_restart", function()
     btb.errorCount = 0
+    btb.fadeStates = {}
     if not table.IsEmpty(btb.currentPacks) then
         local track = btb.GetRandomTrack(btb.currentPacks, btb.isInCombat)
         if track then btb.PlayNextTrack(track) end

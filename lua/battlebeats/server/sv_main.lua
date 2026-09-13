@@ -1,12 +1,15 @@
 BATTLEBEATS_server = BATTLEBEATS_server or {}
 
 util.AddNetworkString("BTB_Change_ConVar")
+util.AddNetworkString("BTB_ThreatDebug")
 
 local lastCombatTime = {}
 local playerCombatTargets = {}
 local incomingShots = {}
+local npcDamage = {}
+local combatThreat = {}
 
-local combatCooldown = GetConVar("battlebeats_server_combat_cooldown")
+--local combatCooldown = GetConVar("battlebeats_server_combat_cooldown")
 local maxDistance = GetConVar("battlebeats_server_max_distance")
 local pvpEnabled = GetConVar("battlebeats_pvp_enable")
 local pvpMode = GetConVar("battlebeats_pvp_mode")
@@ -34,6 +37,7 @@ BATTLEBEATS_server.ignoredNPCs = {
     ["npc_seagull"] = true
 }
 
+local threatCooldown = { [1] = 12, [2] = 15, [3] = 20 }
 local isSinglePlayer = game.SinglePlayer()
 local function CheckCombatState(ply)
     if not IsValid(ply) then return end
@@ -45,11 +49,14 @@ local function CheckCombatState(ply)
     end
     if combatEnabled == 0 then
         ply:SetNWBool("BattleBeats_InCombat", false)
+        ply:SetNWBool("BattleBeats_HasCombatEnemy", false)
+        ply:SetNWInt("BattleBeats_ThreatLevel", 1)
         return
     end
 
     local curTime = CurTime()
     local isInCombat = false
+    local threat = 1
     /*local shotTime = incomingShots[ply]
     if shotTime then
         if (curTime - shotTime) <= 10 then
@@ -109,29 +116,63 @@ local function CheckCombatState(ply)
         local NPCfightTriggersCombat = tobool(ply:GetInfoNum("battlebeats_npc_combat", 0))
         local plyPos = ply:GetPos()
         local nearbyEnts = ents.FindInSphere(plyPos, maxDistance:GetInt())
+        local ec = 0
         for _, ent in ipairs(nearbyEnts) do
             if (ent:IsNPC() or ent:IsNextBot()) and ent.GetEnemy then
                 local enemy = ent:GetEnemy()
                 if IsValid(enemy) and (enemy == ply or (NPCfightTriggersCombat and (enemy:IsNPC() or enemy:IsNextBot() or enemy:IsPlayer()))) then
                     local class = ent:GetClass()
                     if not BATTLEBEATS_server.ignoredNPCs[class] then
-                        if not reqiresLos or ply:IsLineOfSightClear(ent) then
-                            debugPVETrigger(ply, ent)
-                            isInCombat = true
-                            lastCombatTime[ply] = curTime
-                            break
+                        local los = not reqiresLos or ply:IsLineOfSightClear(ent)
+                        if los then
+                            ec = ec + 1
+                            if enemy == ply then
+                                debugPVETrigger(ply, ent)
+                                isInCombat = true
+                                lastCombatTime[ply] = curTime
+                            end
                         end
                     end
                 end
             end
         end
+        if isInCombat and tobool(ply:GetInfoNum("battlebeats_dynamic_volume", 1)) then
+            local hp, mx = math.max(ply:Health(), 0), math.max(ply:GetMaxHealth(), 1)
+            local hpPct = hp / mx
+            local d = npcDamage[ply]
+            local dmg = d and curTime - d.t <= 15 and d.dmg or 0
+            local dmgPct = dmg / mx
+
+            local s = (hpPct <= 0.25 and 3 or hpPct <= 0.5 and 2 or hpPct <= 0.75 and 1 or 0)
+            s = s + (ec >= 15 and 10 or ec >= 10 and 5 or ec >= 5 and 3 or ec >= 1 and 1 or 0)
+            s = s + (dmgPct >= 0.25 and 3 or dmgPct >= 0.1 and 2 or dmgPct > 0 and 1 or 0)
+
+            threat = s >= 10 and 3 or s >= 5 and 2 or 1
+            combatThreat[ply] = ply:Alive() and math.max(combatThreat[ply] or 1, threat) or -1
+
+            /*net.Start("BTB_ThreatDebug")
+            net.WriteUInt(ec or 0, 8)
+            net.WriteUInt(math.Clamp(math.Round(hpPct * 100), 0, 100), 7)
+            net.WriteUInt(math.Clamp(dmg, 0, 65535), 16)
+            net.WriteUInt(math.Clamp(s, 0, 31), 5)
+            net.WriteUInt(combatThreat[ply] or 1, 2)
+            net.WriteBool(isInCombat)
+            net.Send(ply)*/
+        end
     end
+
+    ply:SetNWBool("BattleBeats_HasCombatEnemy", isInCombat)
+    ply:SetNWInt("BattleBeats_ThreatLevel", threat)
 
     if isInCombat then
         ply:SetNWBool("BattleBeats_InCombat", true)
     else
-        if lastCombatTime[ply] and (curTime - lastCombatTime[ply]) >= combatCooldown:GetInt() then
+        local ct = combatThreat[ply] or -1
+        local cd = threatCooldown[ct] or 1
+        if lastCombatTime[ply] and (curTime - lastCombatTime[ply]) >= cd then
             ply:SetNWBool("BattleBeats_InCombat", false)
+            ply:SetNWInt("BattleBeats_ThreatLevel", 1)
+            combatThreat[ply] = nil
             if not isSinglePlayer and pvpMode:GetInt() == 1 then
                 for enemy, lastHit in pairs(playerCombatTargets[ply] or {}) do
                     if (curTime - lastHit) > pvpCombatTime:GetInt() then
@@ -163,6 +204,16 @@ hook.Add("PlayerHurt", "BattleBeats_PVPCombat", function(victim, attacker)
 
     lastCombatTime[victim] = curTime
     lastCombatTime[attacker] = curTime
+end)
+
+hook.Add("PlayerHurt", "BattleBeats_NPCDamage", function(victim, attacker, health, damage)
+    if not IsValid(victim) or not victim:IsPlayer() then return end
+    if not IsValid(attacker) or (not attacker:IsNPC() and not attacker:IsNextBot()) then return end
+    npcDamage[victim] = npcDamage[victim] or { dmg = 0, t = CurTime() }
+    local d = npcDamage[victim]
+    if CurTime() - d.t > 2 then d.dmg = 0 end
+    d.dmg = d.dmg + damage
+    d.t = CurTime()
 end)
 
 /*local rad = math.rad
@@ -210,6 +261,8 @@ hook.Add("PlayerDeath", "BattleBeats_EndCombatOnDeath", function(victim)
         playerCombatTargets[victim] = nil
     end
 
+    npcDamage[victim] = nil
+    combatThreat[victim] = nil
     incomingShots[victim] = nil
 end)
 
@@ -223,6 +276,8 @@ hook.Add("PlayerDisconnected", "BattleBeats_CleanCombatState", function(ply)
         playerCombatTargets[ply] = nil
     end
 
+    npcDamage[ply] = nil
+    combatThreat[ply] = nil
     incomingShots[ply] = nil
     lastCombatTime[ply] = nil
 end)

@@ -445,7 +445,7 @@ local function getStartingTrack()
         for trackPath, data in pairs(btb.trackData) do
             if not data.fav then continue end
             if not trackExists(trackPath) then continue end
-            local packName = btb.trackToPack[trackPath]
+            local packName = btb.getTrackData(trackPath, true).pack
             local pack = packName and btb.musicPacks[packName]
             if pack and pack.ambient and table.HasValue(pack.ambient, trackPath) then
                 validFavorites[#validFavorites + 1] = trackPath
@@ -509,14 +509,16 @@ local function loadSavedPacks()
     end
 end
 
-local function buildTrackMap()
-    btb.trackToPack = {}
-    for packName, pack in pairs(btb.musicPacks) do
-        if not pack or pack.packType == "playlist" then continue end
-        for _, category in ipairs({ pack.combat or {}, pack.ambient or {} }) do
-            for _, track in ipairs(category) do
-                btb.trackToPack[track] = packName
-            end
+local function trackDataCache()
+    for pn, p in pairs(btb.musicPacks) do
+        if not p or p.packType == "playlist" then continue end
+        for _, t in ipairs(p.ambient or {}) do
+            btb.setTrackData(t, "pack", pn, true)
+            btb.setTrackData(t, "type", "ambient", true)
+        end
+        for _, t in ipairs(p.combat or {}) do
+            btb.setTrackData(t, "pack", pn, true)
+            btb.setTrackData(t, "type", "combat", true)
         end
     end
 end
@@ -559,8 +561,8 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- New UI for assigning NPCs to tracks\n",
-            Color(150, 255, 150), "- Improved tooltip readability"
+            Color(150, 255, 150), "- Added dynamic volume option, so combat tracks will now slightly change their volume based on various factors"
+            --Color(150, 255, 150), "- Improved tooltip readability"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
@@ -617,7 +619,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     loadPacks()
     loadPacksDebug()
     loadPlaylists()
-    buildTrackMap()
+    trackDataCache()
     btb.buildNPCTrackMap()
     --
     loadSavedPacks()
@@ -629,7 +631,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         end
     end
     btb.ValidatePacks()
-    --loadPatchNotes()
+    loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
@@ -640,7 +642,7 @@ concommand.Add("battlebeats_reload_packs", function()
     loadPacks()
     loadPacksDebug()
     loadPlaylists()
-    buildTrackMap()
+    trackDataCache()
     btb.ValidatePacks()
 end)
 

@@ -24,3 +24,23 @@ BATTLEBEATS.RegisterNode("event.RUNTIME_START", {
         { id = "out", type = "boolean", pulse = true }
     }
 })
+--MARK: AMBIENT START
+BATTLEBEATS.RegisterNode("event.AMBIENT_START_BTB", {
+    category = "Events",
+    title = "Ambient Start",
+    desc = "Outputs when ambient music should start (BattleBeats)",
+
+    outputs = {
+        { id = "start", type = "boolean", pulse = true }
+    }
+})
+--MARK: COMBAT START
+BATTLEBEATS.RegisterNode("event.COMBAT_START_BTB", {
+    category = "Events",
+    title = "Combat Start",
+    desc = "Outputs when combat music should start (BattleBeats)",
+
+    outputs = {
+        { id = "start", type = "boolean", pulse = true }
+    }
+})

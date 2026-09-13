@@ -452,8 +452,18 @@ BATTLEBEATS.RegisterNode("logic.COMPARATOR", {
     args = {
         {id = "useConstant", title = "Compare with Constant (B)", type = "bool", default = false},
         {id = "constant", title = "Constant", type = "number", default = 0, enabled = "useConstant"},
-        {id = "op", title = "Operator (A -> B)", type = "list", default = "==", choices = {"==", "!=", ">", "<", ">=", "<="}}
+        {id = "op", title = "Operator (A -> B)", type = "list", default = "==", choices = {"==", "!=", ">", "<", ">=", "<="}, show = true}
     },
+
+    visiblePins = function(args)
+        if args.useConstant then
+            return {
+                inputs = {
+                    b = false
+                }
+            }
+        end
+    end,
 
     oninputschanged = function(ctx, node, args)
         local a = ctx:Read(node, "a")
@@ -497,6 +507,28 @@ BATTLEBEATS.RegisterNode("logic.SELECT", {
         else
             ctx:Write(node, "out", ctx:Read(node, "a"))
         end
+    end
+})
+
+--MARK: ON CHANGED
+BATTLEBEATS.RegisterNode("logic.ON_CHANGED", {
+    category = "Logic",
+    title = "On Changed",
+    desc = "Emits a pulse whenever the input value changes",
+
+    inputs = {
+        { id = "in", type = "number" }
+    },
+
+    outputs = {
+        { id = "out", type = "boolean", pulse = true }
+    },
+
+    oninputschanged = function(ctx, node)
+        local v = ctx:Read(node, "in")
+        local old = node.memory.old
+        ctx:Write(node, "out", (old ~= nil and old ~= v) and 1 or 0)
+        node.memory.old = v
     end
 })
 

@@ -9,6 +9,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/nodegraph/cl_runtime.lua")
 
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/logic.lua")
+    AddCSLuaFile("battlebeats/client/nodegraph/nodes/file.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/debug.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/audio.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/event.lua")
@@ -21,6 +22,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/cl_server_enforcer.lua")
     AddCSLuaFile("battlebeats/client/cl_subtitles.lua")
 
+    AddCSLuaFile("battlebeats/client/ui/cl_debug.lua")
     AddCSLuaFile("battlebeats/client/ui/cl_panel_meta.lua")
     AddCSLuaFile("battlebeats/client/ui/cl_pack_selector_misc.lua")
     AddCSLuaFile("battlebeats/client/ui/cl_pack_selector.lua")
@@ -74,6 +76,7 @@ if CLIENT then
     include("battlebeats/client/nodegraph/cl_runtime.lua")
 
     include("battlebeats/client/nodegraph/nodes/logic.lua")
+    include("battlebeats/client/nodegraph/nodes/file.lua")
     include("battlebeats/client/nodegraph/nodes/debug.lua")
     include("battlebeats/client/nodegraph/nodes/audio.lua")
     include("battlebeats/client/nodegraph/nodes/event.lua")
@@ -86,6 +89,7 @@ if CLIENT then
     include("battlebeats/client/cl_server_enforcer.lua")
     include("battlebeats/client/cl_subtitles.lua")
 
+    include("battlebeats/client/ui/cl_debug.lua")
     include("battlebeats/client/ui/cl_panel_meta.lua")
     include("battlebeats/client/ui/cl_pack_selector_misc.lua")
     include("battlebeats/client/ui/cl_pack_selector.lua")

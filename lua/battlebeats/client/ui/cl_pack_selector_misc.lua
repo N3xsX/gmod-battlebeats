@@ -564,7 +564,7 @@ function btb.openVolumeEditor(panel, track, pack, func)
             local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
             if not sName then sName = IsValid(btb.currentPreviewStation) and
                 btb.currentPreviewStation:GetFileName() or nil end
-            if pack == btb.trackToPack[sName] then
+            if pack == btb.getTrackData(sName, true).pack then
                 if IsValid(btb.currentStation) then
                     local targetVolume = btb.adjustVolume(sName)
                     btb.currentStation:SetVolume(targetVolume)

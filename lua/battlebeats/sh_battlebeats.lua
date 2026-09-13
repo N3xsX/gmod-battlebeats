@@ -1,6 +1,6 @@
 local flags = bit.bor(FCVAR_ARCHIVE, FCVAR_REPLICATED, FCVAR_NOTIFY)
 
-CreateConVar("battlebeats_server_combat_cooldown", "5", flags, "", 3, 30)
+--CreateConVar("battlebeats_server_combat_cooldown", "5", flags, "", 3, 30)
 CreateConVar("battlebeats_server_max_distance", "5000", flags, "", 100, 10000)
 CreateConVar("battlebeats_pvp_enable", "1", flags, "", 0, 1)
 CreateConVar("battlebeats_pvp_mode", "1", flags, "", 0, 2)
