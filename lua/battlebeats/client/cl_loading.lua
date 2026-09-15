@@ -427,15 +427,16 @@ local function loadTrackData()
 end
 
 --MARK: Initialization
+local forceCombat = GetConVar("battlebeats_force_combat"):GetBool()
 local function _getRandomTrack()
-    return btb.GetRandomTrack(btb.currentPacks, false)
+    return btb.GetRandomTrack(btb.currentPacks, forceCombat and true or false)
 end
 
 local function getStartingTrack()
     local mode = startMode:GetInt()
 
     --random
-    if mode == 0 then
+    if forceCombat or mode == 0 then
         return _getRandomTrack()
     end
 
@@ -631,7 +632,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
         end
     end
     btb.ValidatePacks()
-    loadPatchNotes()
+    --loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()

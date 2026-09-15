@@ -6,8 +6,6 @@ local notifX = CreateClientConVar("battlebeats_notif_x", defaultX, true, false, 
 local notifY = CreateClientConVar("battlebeats_notif_y", defaultY, true, false, "", 0, ScrH())
 local showNotificationVisualizer = CreateClientConVar("battlebeats_show_notification_visualizer", "1", true, false, "", 0, 1)
 local showNotificationPackName = CreateClientConVar("battlebeats_show_notification_pack_name", "1", true, false, "", 0, 1)
-local notificationVisualizerBoost = CreateClientConVar("battlebeats_visualizer_boost", "6", true, false, "", 1, 20)
-local notificationVisualizerSmooth = CreateClientConVar("battlebeats_visualizer_smooth", "1", true, false, "", 0, 1)
 local skipNombat = CreateClientConVar("battlebeats_skip_nombat_names", "1", true, false, "", 0, 1)
 local showBar = CreateClientConVar("battlebeats_show_status_bar", "1", true, false, "", 0, 1)
 
@@ -266,8 +264,6 @@ function btb.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
         if IsValid(station) and showNotificationVisualizer:GetBool() then
             if station:FFT(fft, 0) then
                 local vol = math.min(station:GetVolume(), 2)
-                local visSmooth = notificationVisualizerSmooth:GetBool()
-                local visBoost = notificationVisualizerBoost:GetInt()
                 surface.SetDrawColor(textColor.r, textColor.g, textColor.b, 100)
                 for i = 1, bars do
                     -- pick FFT index (linear for first half, exponential for second)
@@ -291,16 +287,12 @@ function btb.ShowTrackNotification(trackName, inCombat, isPreviewedTrack)
                     if vol <= 0 then
                         scaled = 0
                     else
-                        local boostedAmp = amp * boost * (visBoost * vol)
+                        local boostedAmp = amp * boost * (6 * vol)
                         scaled = mlog(1 + boostedAmp)
                     end
 
-                    if visSmooth then
-                        lastAmplitudes[i] = lastAmplitudes[i] or 0
-                        lastAmplitudes[i] = Lerp(FrameTime() * 5, lastAmplitudes[i], scaled)
-                    else
-                        lastAmplitudes[i] = scaled
-                    end
+                    lastAmplitudes[i] = lastAmplitudes[i] or 0
+                    lastAmplitudes[i] = Lerp(FrameTime() * 5, lastAmplitudes[i], scaled)
 
                     local height = mClamp(lastAmplitudes[i] * 60, 1, 60)
                     local x = 7 + (i - 1) * (barWidth + 4)

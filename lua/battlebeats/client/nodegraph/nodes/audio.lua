@@ -38,7 +38,14 @@ BATTLEBEATS.RegisterNode("audio.PLAY_TRACK_BTB", {
 
     inputs = {
         { id = "track", type = "string" },
+        { id = "time", type = "number" },
         { id = "play", type = "boolean" }
+    },
+
+    args = {
+        { id = "nonoti", type = "bool", title = "No Track Notification", default = false },
+        { id = "loop", type = "bool", title = "Loop Track", default = false },
+        { id = "fadein", type = "number", title = "Fade in Time", default = 2 },
     },
 
     oninputschanged = function(ctx, node, args)
@@ -49,7 +56,34 @@ BATTLEBEATS.RegisterNode("audio.PLAY_TRACK_BTB", {
         if not ctx:ReadBool(node, "play") then return end
         if node.memory.track == "" then return end
 
-        BATTLEBEATS.PlayNextTrack(node.memory.track)
+        local prop = {
+            noNotification = args.nonoti,
+            loop = args.loop
+        }
+        BATTLEBEATS.PlayNextTrack(node.memory.track, ctx:Read(node, "time"), args.fadein, nil, nil, prop)
+    end
+})
+
+--MARK: GET TIME
+BATTLEBEATS.RegisterNode("audio.GET_TIME_BTB", {
+    category = "Audio (BTB)",
+    title = "Get Channel Current Time",
+    desc = "",
+
+    inputs = {
+        { id = "toogle", type = "boolean" }
+    },
+
+    outputs = {
+        { id = "time", type = "number" }
+    },
+
+    oninputschanged = function(ctx, node, args)
+        if ctx:ReadBool(node, "toogle") then
+            if IsValid(BATTLEBEATS.currentStation) then
+                ctx:Write(node, "time", BATTLEBEATS.currentStation:GetTime())
+            end
+        end
     end
 })
 

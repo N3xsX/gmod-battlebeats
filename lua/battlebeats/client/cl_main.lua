@@ -42,7 +42,7 @@ btb.disableSwitch = btb.disableSwitch or false -- btb.isInCombat will still upda
 btb.disableNextTrackTimer = btb.disableNextTrackTimer or false
 btb.disableCheckingTimer = btb.disableCheckingTimer or false
 
-btb.currentVersion = "2.9.5"
+btb.currentVersion = "2.9.6"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -69,8 +69,8 @@ local alwaysContinue = CreateClientConVar("battlebeats_always_continue", "0", tr
 local continueMode = CreateClientConVar("battlebeats_continue_mode", "0", true, false, "", 0, 1)
 local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_notification", "1", true, false, "", 0, 1)
 local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "1", true, false, "", 0, 1)
-local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, true, "", 0, 1)
-local disableFade = CreateClientConVar("battlebeats_disable_fade", "0", true, true, "", 0, 1)
+local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, false, "", 0, 1)
+local disableFade = CreateClientConVar("battlebeats_disable_fade", "0", true, false, "", 0, 1)
 local favMultiplier = CreateClientConVar("battlebeats_favorite_weight", "3", true, false, "", 1, 10)
 
 local enableSubtitles = CreateClientConVar("battlebeats_subtitles_enabled", "1", true, false, "", 0, 1)
@@ -508,7 +508,8 @@ local function handleTrackEnd(track, reason, priority)
 end
 
 btb.errorCount = 0
-function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority)
+function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, propeties)
+    propeties = propeties or {}
     if not track or track == "" then
         debugPrint("[PlayNextTrack] Attempted to play nil/empty track! Aborting...")
         return
@@ -554,7 +555,9 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority)
 
     if (not time or replayNotification:GetBool() or persistentNotification:GetBool()) and showNotification:GetBool() and volumeSet:GetInt() > 0 then
         if not (allowEnforce:GetBool() and not allowNoti:GetBool()) then
-            btb.ShowTrackNotification(track, btb.isInCombat)
+            if not propeties.noNotification == true then
+                btb.ShowTrackNotification(track, btb.isInCombat)
+            end
         end
     end
 
@@ -592,13 +595,20 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority)
                 lastCombatTotalLength = trackLength
             end
 
+            local loop = propeties.loop == true
             local startTime = time or 0
-            local playDuration = math.max(trackLength - startTime - 1, 1)
+            local playDuration = math.max(trackLength - startTime - 0.5, 1)
 
             debugPrint("[PlayNextTrack] Track length: " .. math.Truncate(trackLength or 0, 1) .. " (s) | Will play for: " .. math.Truncate(playDuration or 0, 1) .. " (s)")
 
             timer.Create("BattleBeats_NextTrack", playDuration, 1, function() -- timer to play next track when current finishes
                 if btb.disableNextTrackTimer then return end
+                    if loop then
+                        debugPrint("[PlayNextTrack] Looping track: " .. tostring(track))
+                        if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
+                        btb.PlayNextTrack(track, nil, 0, nil, priority, propeties)
+                        return
+                    end
                 debugPrint("[PlayNextTrack] Timer reached end. Selecting next track")
                 if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
                 if (btb.isInCombat and not enableCombat:GetBool()) or
@@ -903,10 +913,14 @@ local lastCombatState = false
 local lastCombatEnemyState = false
 local combatNoEnemyTime = nil
 local combatFadeLevel = nil
+local combatPeak = 1
+local combatAfterglowTime = nil
+local combatAfterglowStage = -1
 
 timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
+    local curTime = CurTime()
 
     btb.isInCombat = ply:GetNWBool("BattleBeats_InCombat", false)
     local isEnemy = ply:GetNWBool("BattleBeats_HasCombatEnemy", false)
@@ -914,6 +928,44 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
 
     if forceCombat:GetBool() and enableCombat:GetBool() then
         btb.isInCombat = true
+    end
+
+    if dynamicVolume:GetBool() and not btb.isInCombat and combatAfterglowTime then
+        if combatPeak ~= 1 then
+            local e = curTime - combatAfterglowTime
+            local st, lv
+
+            if combatPeak == 3 then
+                if e >= 10 then
+                    st, lv = 3, nil
+                elseif e >= 6 then
+                    st, lv = 2, 0.7
+                else
+                    st, lv = 1, 0.4
+                end
+            elseif combatPeak == 2 then
+                if e >= 6 then
+                    st, lv = 2, nil
+                else
+                    st, lv = 1, 0.6
+                end
+            end
+
+            if st ~= combatAfterglowStage then
+                combatAfterglowStage = st
+                btb.SetFade("combat afterglow", lv, 1, false)
+            end
+
+            if st == 3 or (combatPeak == 2 and st == 2) then
+                combatAfterglowTime = nil
+                combatPeak = 1
+                combatAfterglowStage = -1
+            end
+        else
+            combatAfterglowTime = nil
+            combatPeak = 1
+            combatAfterglowStage = -1
+        end
     end
 
     if dynamicVolume:GetBool() then
@@ -929,7 +981,7 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
         if shouldLower ~= lastCombatEnemyState then
             lastCombatEnemyState = shouldLower
             if shouldLower then
-                combatNoEnemyTime = CurTime()
+                combatNoEnemyTime = curTime
                 combatFadeLevel = nil
             else
                 combatNoEnemyTime = nil
@@ -939,11 +991,13 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
         end
 
         if shouldLower and combatNoEnemyTime then
-            local elapsed = CurTime() - combatNoEnemyTime
+            local elapsed = curTime - combatNoEnemyTime
+            local t = combatPeak == 3 and 14 or combatPeak == 2 and 10 or 6
+            local t2 = combatPeak == 3 and 8 or combatPeak == 2 and 5 or 2
             local newLevel
-            if elapsed >= 6 then
+            if elapsed >= t then
                 newLevel = 0.6
-            elseif elapsed >= 2 then
+            elseif elapsed >= t2 then
                 newLevel = 0.8
             end
             if newLevel and newLevel ~= combatFadeLevel then
@@ -955,7 +1009,6 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
 
     if btb.disableSwitch then return end
 
-    local curTime = CurTime()
     if btb.isInCombat ~= lastCombatState then
         if ambienceStartTime == nil then ambienceStartTime = curTime end
         lastCombatState = btb.isInCombat
@@ -963,6 +1016,10 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
         if btb.isInCombat then
             btb.FireNodeByClass("event.COMBAT_START_BTB", "start", 1)
             combatStartTime = curTime
+            combatPeak = btb.threatLevel
+            combatAfterglowTime = nil
+            combatAfterglowStage = -1
+            btb.SetFade("combat afterglow", nil, 3, false)
             local npcTrack = getNPCMatchingTrack()
             if btb.disableCombat then
                 removeSoundTimers()
@@ -977,6 +1034,8 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
             btb.FireNodeByClass("event.AMBIENT_START_BTB", "start", 1)
             btb.SetFade("combat no enemies", nil, 3, false) -- just to be safe
             ambienceStartTime = curTime
+            combatAfterglowTime = curTime
+            combatAfterglowStage = -1
             if btb.disableAmbient then
                 removeSoundTimers()
                 btb.FadeMusic(btb.currentStation)
@@ -989,6 +1048,7 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
             lastCombatTrackPriority = 0 
         end
     elseif btb.isInCombat then
+        combatPeak = math.max(combatPeak, btb.threatLevel)
         if pendingSwitch then
             if curTime >= pendingSwitch.time then
                 local success, err = pcall(switchTrack, pendingSwitch.track)
@@ -1031,10 +1091,24 @@ end)
 --MARK:Misc
 --------------------------------------------------------------------------------------
 
+-- day 69420 of asking rubat to add DSP effects to bass channels
+net.Receive("BTB_ExplosionFade", function()
+    if not dynamicVolume:GetBool() then return end
+    btb.SetFade("grenade dsp", 0.15, 0.5, false)
+    timer.Remove("BattleBeats_ExplosionDSP")
+    timer.Create("BattleBeats_ExplosionDSP", 1.5, 1, function()
+        btb.SetFade("grenade dsp", nil, 1, false)
+    end)
+end)
+
 cvars.AddChangeCallback("battlebeats_dynamic_volume", function(_, _, newValue)
     if tonumber(newValue) == 0 and btb.isInCombat then
         btb.SetFade("combat no enemies", nil, 1, false)
         btb.SetFade("threat", nil, 1, true)
+    elseif tonumber(newValue) == 0 and not btb.isInCombat then
+        combatAfterglowTime = nil
+        combatAfterglowStage = -1
+        btb.SetFade("combat afterglow", nil, 3, false)
     end
 end)
 
