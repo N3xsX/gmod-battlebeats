@@ -36,7 +36,10 @@ end
 BATTLEBEATS_server.ignoredNPCs = {
     ["npc_crow"] = true,
     ["npc_pigeon"] = true,
-    ["npc_seagull"] = true
+    ["npc_seagull"] = true,
+    ["npc_cscanner"] = true,
+    ["npc_clawscanner"] = true,
+    ["npc_combine_camera"] = true
 }
 
 local tc = { [1] = 12, [2] = 15, [3] = 20 }

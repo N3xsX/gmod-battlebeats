@@ -7,6 +7,7 @@ if SERVER then
 
     AddCSLuaFile("battlebeats/client/cl_main.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/cl_runtime.lua")
+    AddCSLuaFile("battlebeats/client/cl_environment.lua")
 
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/logic.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/file.lua")
@@ -74,6 +75,7 @@ if CLIENT then
 
     include("battlebeats/client/cl_main.lua")
     include("battlebeats/client/nodegraph/cl_runtime.lua")
+    include("battlebeats/client/cl_environment.lua")
 
     include("battlebeats/client/nodegraph/nodes/logic.lua")
     include("battlebeats/client/nodegraph/nodes/file.lua")

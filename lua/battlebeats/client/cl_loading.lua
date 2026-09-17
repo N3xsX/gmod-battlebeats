@@ -1,5 +1,4 @@
 local autoPopup = CreateClientConVar("battlebeats_autopopup", "1", true, false, "", 0, 1)
---local loadLocalPacks = CreateClientConVar("battlebeats_load_local_packs", "0", true, false, "", 0, 1)
 local loadAMsuspense = CreateClientConVar("battlebeats_load_am_suspense", "0", true, false, "", 0, 1)
 local startMode = CreateClientConVar("battlebeats_start_mode", "0", true, false, "", 0, 3)
 local debugMode = GetConVar("battlebeats_debug_mode")

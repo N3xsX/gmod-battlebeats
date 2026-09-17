@@ -42,7 +42,7 @@ btb.disableSwitch = btb.disableSwitch or false -- btb.isInCombat will still upda
 btb.disableNextTrackTimer = btb.disableNextTrackTimer or false
 btb.disableCheckingTimer = btb.disableCheckingTimer or false
 
-btb.currentVersion = "2.9.6"
+btb.currentVersion = "2.9.7"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -68,7 +68,6 @@ local exclusivePlay = CreateClientConVar("battlebeats_exclusive_play", "0", true
 local alwaysContinue = CreateClientConVar("battlebeats_always_continue", "0", true, false, "", 0, 1)
 local continueMode = CreateClientConVar("battlebeats_continue_mode", "0", true, false, "", 0, 1)
 local showPreviewNotification = CreateClientConVar("battlebeats_show_preview_notification", "1", true, false, "", 0, 1)
-local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "1", true, false, "", 0, 1)
 local forceCombat = CreateClientConVar("battlebeats_force_combat", "0", true, false, "", 0, 1)
 local disableFade = CreateClientConVar("battlebeats_disable_fade", "0", true, false, "", 0, 1)
 local favMultiplier = CreateClientConVar("battlebeats_favorite_weight", "3", true, false, "", 1, 10)
@@ -79,6 +78,8 @@ local ambientVolume = CreateClientConVar("battlebeats_volume_ambient", "100", tr
 local combatVolume = CreateClientConVar("battlebeats_volume_combat", "100", true, false, "", 0, 100)
 
 local dynamicVolume = CreateClientConVar("battlebeats_dynamic_volume", "1", true, true, "", 0, 1)
+local lowerInMenu = CreateClientConVar("battlebeats_lower_volume_in_menu", "1", true, false, "", 0, 1)
+local lowerVC = CreateClientConVar("battlebeats_lower_volume_on_voice_chat", "1", true, false, "", 0, 1)
 
 local switchOnLower = CreateClientConVar("battlebeats_switch_on_lower_priority", "1", true, false, "", 0, 1)
 local enableAssignedTracks = CreateClientConVar("battlebeats_enable_assigned_tracks", "1", true, false, "", 0, 1)
@@ -91,10 +92,9 @@ local function debugPrint(...)
     if debugMode:GetBool() then print("[BattleBeats Debug] " .. ...) end
 end
 
-local e = {}
 function btb.getTrackData(t, cached)
     local d = (cached and btb.trackDataCache or btb.trackData)[t]
-    return d or e
+    return d or {}
 end
 function btb.setTrackData(t, k, v, cached)
     local x = cached and btb.trackDataCache or btb.trackData
@@ -140,23 +140,15 @@ end
 --------------------------------------------------------------------------------------
 
 function btb.adjustVolume(track, baseVolume, isPreview)
-    local vt
-    if isPreview and track and track ~= "" then
-        local d = btb.getTrackData(track, true)
-        vt = d.type == "ambient" and ambientVolume:GetInt() or d.type == "combat" and combatVolume:GetInt()
-    end
-    if not vt then
-        vt = btb.isInCombat and combatVolume:GetInt() or ambientVolume:GetInt()
-    end
-
     local masterVolume = volumeSet:GetInt() / 100
-    local tgVolume = baseVolume or (vt / 100 * masterVolume)
-
-    tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
-
     if not track or track == "" then
-        return math.Clamp(math.Round(tgVolume * (btb.fadeMul or 1), 2), 0, 10)
+        return math.Clamp(math.Round((baseVolume or masterVolume) * (btb.fadeMul or 1), 2), 0, 10)
     end
+
+    local d = btb.getTrackData(track, true)
+    local vt = d.type == "ambient" and ambientVolume:GetInt() or d.type == "combat" and combatVolume:GetInt()
+    local tgVolume = baseVolume or (vt / 100 * masterVolume)
+    tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
 
     local finalVol = tgVolume
     local packName = btb.getTrackData(track, true).pack
@@ -230,6 +222,7 @@ local function fadeTo(volume, fadeTime)
     fadeTime = fadeTime or 2
     local f = btb.globalFade
     local from = f and lerp(math.Clamp(f.t / f.time, 0, 1), f.from, f.to) or (btb.fadeMul or 1)
+    if from == volume then return end
     if fadeTime <= 0 then
         btb.fadeMul = volume
         btb.globalFade = nil
@@ -246,21 +239,25 @@ local function fadeTo(volume, fadeTime)
     btb.globalFade = {from = from, to = volume, time = fadeTime, t = 0}
 end
 
-function btb.SetFade(id, volume, fadeTime, isBoost)
+function btb.SetFade(id, volume, fadeTime, isBoost, stack)
     if volume == nil then
         btb.fadeStates[id] = nil
     else
-        btb.fadeStates[id] = {volume = volume, boost = isBoost}
+        btb.fadeStates[id] = {volume = volume, boost = isBoost, stack = stack}
     end
     local boost = 1
     local multiplier = 1
+    local stack = 1
     for _, f in pairs(btb.fadeStates) do
         if f.boost then
             boost = math.max(boost, f.volume)
+        elseif f.stack then
+            stack = stack * f.volume
         else
             multiplier = math.min(multiplier, f.volume)
         end
     end
+    if multiplier >= 0.5 then multiplier = math.max(multiplier * stack, 0.5) end
     fadeTo(boost * multiplier, fadeTime)
 end
 
@@ -300,7 +297,7 @@ hook.Add("Think", "BattleBeats_FadeSystem", function()
         end
     end
 
-    if not btb.globalFade then return end
+    if not btb.globalFade then return end -- good enough, we dont need to match the volume 1:1 
 
     local st = btb.currentStation
     if IsValid(st) and not btb.fades[st] then
@@ -1099,6 +1096,36 @@ net.Receive("BTB_ExplosionFade", function()
     timer.Create("BattleBeats_ExplosionDSP", 1.5, 1, function()
         btb.SetFade("grenade dsp", nil, 1, false)
     end)
+end)
+
+local voiceActive = false
+local function checkVC()
+    timer.Create("BattleBeats_VoiceCheck", 0.25, 0, function()
+        local lp = LocalPlayer()
+        if not IsValid(lp) then return end
+        local speaking = false
+        for _, ply in ipairs(player.GetAll()) do
+            if ply:IsSpeaking() then
+                speaking = true
+                break
+            end
+        end
+        if speaking == voiceActive then return end
+        voiceActive = speaking
+        btb.SetFade("voice chat", speaking and 0.5 or nil, 0.15, false)
+    end)
+end
+if not game.SinglePlayer() and lowerVC:GetBool() then
+    checkVC()
+end
+
+cvars.AddChangeCallback("battlebeats_lower_volume_on_voice_chat", function(_, _, newValue)
+    if tonumber(newValue) == 0 and not game.SinglePlayer() then
+        timer.Remove("BattleBeats_VoiceCheck")
+        btb.SetFade("voice chat", nil, 1, false)
+    elseif tonumber(newValue) == 1 and not game.SinglePlayer() then
+        checkVC()
+    end
 end)
 
 cvars.AddChangeCallback("battlebeats_dynamic_volume", function(_, _, newValue)

@@ -1,5 +1,7 @@
-BATTLEBEATS.subtitles = BATTLEBEATS.subtitles or {}
-BATTLEBEATS.parsedSubtitles = BATTLEBEATS.parsedSubtitles or {}
+local btb = BATTLEBEATS
+
+btb.subtitles = btb.subtitles or {}
+btb.parsedSubtitles = btb.parsedSubtitles or {}
 
 local defaultY = tostring(ScrH() - 200)
 
@@ -8,13 +10,13 @@ local subtitlesMode = CreateClientConVar("battlebeats_subtitles_mode", 1, true, 
 local staticSubtitles = CreateClientConVar("battlebeats_subtitles_static", 0, true, false)
 local subtitlesYpos = CreateClientConVar("battlebeats_subtitles_y", defaultY, true, false, "", 0, ScrH())
 
-function BATTLEBEATS.RegisterSubtitles(n, d)
+function btb.RegisterSubtitles(n, d)
     assert(isstring(n) and n ~= "", "[BattleBeats Subtitles] Invalid subtitle name")
-    if BATTLEBEATS.subtitles[n] then error("[BattleBeats Subtitles] Duplicate subtitles: " .. n, 2) end
+    if btb.subtitles[n] then error("[BattleBeats Subtitles] Duplicate subtitles: " .. n, 2) end
     if isstring(d) then d = { raw = d } end
     assert(istable(d), "[BattleBeats Subtitles] Invalid subtitle data")
     assert(isstring(d.raw), "[BattleBeats Subtitles] Missing raw subtitles")
-    BATTLEBEATS.subtitles[n] = d
+    btb.subtitles[n] = d
 end
 
 local debugMode = GetConVar("battlebeats_debug_mode")
@@ -87,21 +89,21 @@ local function parseSRTBlock(lines, i)
     return startSec, endSec, text, i
 end
 
-function BATTLEBEATS.parseSRT(songName)
+function btb.parseSRT(songName)
     songName = string.lower(songName)
 
-    if not BATTLEBEATS.subtitles or not BATTLEBEATS.subtitles[songName] then
+    if not btb.subtitles or not btb.subtitles[songName] then
         debugPrint("[parseSRT] No SRT found for: " .. songName)
         return {}
     end
 
-    local raw = BATTLEBEATS.subtitles[songName].raw
+    local raw = btb.subtitles[songName].raw
     local lines = string.Explode("\n", raw)
 
     local subs = parseBlocks(lines, parseSRTBlock)
-    table.Empty(BATTLEBEATS.subtitles[songName])
+    table.Empty(btb.subtitles[songName])
 
-    BATTLEBEATS.parsedSubtitles[songName] = subs
+    btb.parsedSubtitles[songName] = subs
     debugPrint("[parseSRT] Parsed '" .. songName .. "' | Subtitles: " .. #subs .. " | Input Lines: " .. #lines)
     return subs
 end
@@ -132,15 +134,15 @@ local function parse16thBlock(frames)
     return subs
 end
 
-function BATTLEBEATS.parse16thNote(songName)
+function btb.parse16thNote(songName)
     songName = string.lower(songName)
 
-    if not BATTLEBEATS.subtitles or not BATTLEBEATS.subtitles[songName] then
+    if not btb.subtitles or not btb.subtitles[songName] then
         debugPrint("[parse16th] No 16th-note data for: " .. songName)
         return {}
     end
 
-    local data = BATTLEBEATS.subtitles[songName]
+    local data = btb.subtitles[songName]
 
     if not data.keyframes then
         debugPrint("[parse16th] Missing keyframes for: " .. songName)
@@ -149,9 +151,9 @@ function BATTLEBEATS.parse16thNote(songName)
 
     local frames = data.keyframes
     local subs = parse16thBlock(frames)
-    table.Empty(BATTLEBEATS.subtitles[songName])
+    table.Empty(btb.subtitles[songName])
 
-    BATTLEBEATS.parsedSubtitles[songName] = subs
+    btb.parsedSubtitles[songName] = subs
     debugPrint("[parse16th] Parsed '" .. songName .. "' | Blocks: " .. #subs)
     return subs
 end
@@ -323,7 +325,7 @@ local clamp = math.Clamp
 local start = false
 local function drawSubtitles()
     if not enableSubtitles:GetBool() or subtitlesMode:GetInt() == 1 then return end
-    if BATTLEBEATS.currentStation ~= currentChannel and not fadeLine then return end
+    if btb.currentStation ~= currentChannel and not fadeLine then return end
     if not activeSubtitles or not currentLine or not IsValid(currentChannel) then
         if fadeLine then
             local fadeProgress = (CurTime() - fadeStart) / 1
@@ -401,7 +403,7 @@ end
 local lastSpawnedLine = nil
 local function updateSubtitleLine()
     if not enableSubtitles:GetBool() then return end
-    if BATTLEBEATS.currentStation ~= currentChannel then return end
+    if btb.currentStation ~= currentChannel then return end
     if not activeSubtitles or not currentChannel or not IsValid(currentChannel) then return end
 
     elapsed = currentChannel:GetTime()
@@ -471,9 +473,9 @@ cvars.AddChangeCallback("battlebeats_subtitles_mode", function(_, _, newValue)
     end
 end)
 
-function BATTLEBEATS.StartSubtitles(track, channel)
+function btb.StartSubtitles(track, channel)
     local songName = string.lower(track)
-    local subs = BATTLEBEATS.parsedSubtitles and BATTLEBEATS.parsedSubtitles[songName]
+    local subs = btb.parsedSubtitles and btb.parsedSubtitles[songName]
     if not subs or #subs == 0 then
         debugPrint("[StartSubtitles] No subtitles found for: " .. songName)
         return

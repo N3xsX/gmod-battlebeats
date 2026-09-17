@@ -1,7 +1,23 @@
 local btb = BATTLEBEATS
 local debugMode = GetConVar("battlebeats_debug_mode"):GetBool()
 
+btb.Debug = btb.Debug or {}
+btb.Debug.f = btb.Debug.f or {}
+
 local ext = false
+
+function btb.Debug.Add(id, f)
+    if not isstring(id) or not isfunction(f) then return end
+    btb.Debug.f[id] = f
+end
+
+function btb.Debug.Remove(id)
+    btb.Debug.f[id] = nil
+end
+
+function btb.Debug.Clear()
+    btb.Debug.f = {}
+end
 
 local td = { ec = 0, hp = 100, dmg = 0, s = 0, pt = 1, c = false }
 net.Receive("BTB_ThreatDebug", function()
@@ -13,6 +29,9 @@ net.Receive("BTB_ThreatDebug", function()
     td.c = net.ReadBool()
 end)
 
+local volumeSet = GetConVar("battlebeats_volume")
+local ambientVolume = GetConVar("battlebeats_volume_ambient")
+local combatVolume = GetConVar("battlebeats_volume_combat")
 hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
     if not debugMode then return end
     local x, y = 20, 200
@@ -28,11 +47,8 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
     end
 
     local function debugVolume(isCombat)
-        local old = btb.isInCombat
-        btb.isInCombat = isCombat
-        local v = btb.adjustVolume(nil)
-        btb.isInCombat = old
-        return v
+        local mv = volumeSet:GetInt() / 100
+        return btb.adjustVolume(nil, ((isCombat and combatVolume or ambientVolume):GetInt() / 100) * mv)
     end
 
     draw.SimpleText("BattleBeats Debug", "CloseCaption_Bold", x, y)
@@ -45,7 +61,6 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
 
     if gf then
         local p = gf.time > 0 and math.Clamp(gf.t / gf.time, 0, 1) or 1
-
         txt("  from", math.Round(gf.from, 3))
         txt("  to", math.Round(gf.to, 3))
         txt("  progress", math.Round(p * 100, 1) .. "%")
@@ -56,6 +71,7 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
 
     local boost = 1
     local multiplier = 1
+    local stack = 1
 
     txt("fade states", "")
 
@@ -65,6 +81,9 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
         if f.boost then
             boost = math.max(boost, v)
             txt("  BOOST " .. id, math.Round(v, 3))
+        elseif f.stack then
+            stack = stack * v
+            txt("  REDUCTION STACK " .. id, math.Round(v, 3))
         else
             multiplier = math.min(multiplier, v)
             txt("  REDUCTION " .. id, math.Round(v, 3))
@@ -73,30 +92,30 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
 
     txt("boost result", math.Round(boost, 3))
     txt("mult result", math.Round(multiplier, 3))
-    txt("calculated target", math.Round(boost * multiplier, 3))
+    txt("stack result", math.Round(stack, 3))
+    txt("calculated target", math.Round(boost * multiplier * stack, 3))
 
     sep()
 
-    local ambient = debugVolume(false)
-    local combat = debugVolume(true)
+    txt("ambient volume", debugVolume(false))
+    txt("combat volume", debugVolume(true))
 
-    txt("ambient volume", ambient)
-    txt("combat volume", combat)
     local st = btb.currentStation
     local stn = IsValid(st) and st:GetFileName()
     local pb = btb.packVolume[btb.getTrackData(stn, true).pack]
     local tb = btb.getTrackData(stn).vol
+
     txt("track vol boost", tb and (tb / 100) or "NONE")
     txt("pack vol boost", pb and (pb / 100) or "NONE")
 
     if ext then
         sep()
         txt("threat level", btb.threatLevel)
-        txt("  threat peak: ", td.pt)
-        txt("  threat score: ", td.s)
-        txt("enemies: ", td.ec)
-        txt("player hp: ", td.hp)
-        txt("dmg taken: ", td.dmg)
+        txt("  threat peak", td.pt)
+        txt("  threat score", td.s)
+        txt("enemies", td.ec)
+        txt("player hp", td.hp)
+        txt("dmg taken", td.dmg)
     end
 
     sep()
@@ -105,21 +124,26 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
     txt("station volume", IsValid(st) and math.Round(st:GetVolume(), 3) or "NONE")
 
     local pv = btb.currentPreviewStation
-
     txt("preview station", IsValid(pv) and pv:GetFileName() or "NONE")
     txt("preview volume", IsValid(pv) and math.Round(pv:GetVolume(), 3) or "NONE")
 
     sep()
 
     local fadeCount = 0
-
     for station, f in pairs(btb.fades or {}) do
         fadeCount = fadeCount + 1
         local p = f.time > 0 and math.Clamp(f.t / f.time, 0, 1) or 1
-        txt("station fade", (IsValid(station) and station:GetFileName() or "INVALID") .. " " .. (f.inn and "IN" or "OUT") .. " " .. math.Round(p * 100, 1) .. "%")
+        txt("station fade",(IsValid(station) and station:GetFileName() or "INVALID") .. " " .. (f.inn and "IN" or "OUT") .. " " .. math.Round(p * 100, 1) .. "%")
     end
 
     txt("station fades", fadeCount)
+
+    for id, f in pairs(btb.Debug.f) do
+        sep()
+        --txt("[" .. id .. "]", "")
+        local ok, err = pcall(f, { txt = txt, sep = sep, btb = btb, td = td })
+        if not ok then txt("ERROR", err) end
+    end
 end)
 
 cvars.AddChangeCallback("battlebeats_debug_mode", function(_, _, newValue)
