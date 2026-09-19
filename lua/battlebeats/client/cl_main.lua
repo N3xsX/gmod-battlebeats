@@ -16,6 +16,8 @@ local ambienceStartTime = nil
 btb.disableAmbient = false
 btb.disableCombat = false
 
+btb.serverTrack = btb.serverTrack or nil
+
 btb.currentStation = btb.currentStation or nil
 btb.currentPreviewStation = btb.currentPreviewStation or nil
 btb.currentPreviewPosition = btb.currentPreviewPosition or nil
@@ -42,7 +44,7 @@ btb.disableSwitch = btb.disableSwitch or false -- btb.isInCombat will still upda
 btb.disableNextTrackTimer = btb.disableNextTrackTimer or false
 btb.disableCheckingTimer = btb.disableCheckingTimer or false
 
-btb.currentVersion = "2.9.7"
+btb.currentVersion = "2.9.7v1"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -151,7 +153,7 @@ function btb.adjustVolume(track, baseVolume, isPreview)
     tgVolume = hook.Run("BattleBeats_PreAdjustVolume", track, tgVolume) or tgVolume
 
     local finalVol = tgVolume
-    local packName = btb.getTrackData(track, true).pack
+    local packName = d.pack
     if packName and btb.packVolume then
         local packAdj = btb.packVolume[packName]
         if packAdj then
@@ -552,7 +554,7 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, propeties)
 
     if (not time or replayNotification:GetBool() or persistentNotification:GetBool()) and showNotification:GetBool() and volumeSet:GetInt() > 0 then
         if not (allowEnforce:GetBool() and not allowNoti:GetBool()) then
-            if not propeties.noNotification == true then
+            if not propeties.noNotification then
                 btb.ShowTrackNotification(track, btb.isInCombat)
             end
         end
@@ -565,7 +567,10 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, propeties)
             btb.currentStation = station
             station:SetVolume(0)
             station:Play()
-            local trimData = btb.getTrackData(track).trim
+            local trimData
+            if not propeties.isServer then
+                trimData = btb.getTrackData(track).trim
+            end
             local offset = trimData and trimData.start or 0
             station:SetTime(time or offset, true)
             hook.Run("BattleBeats_OnTrackStarted", station, track, btb.isInCombat, priority)
@@ -592,7 +597,6 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, propeties)
                 lastCombatTotalLength = trackLength
             end
 
-            local loop = propeties.loop == true
             local startTime = time or 0
             local playDuration = math.max(trackLength - startTime - 0.5, 1)
 
@@ -600,7 +604,7 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, propeties)
 
             timer.Create("BattleBeats_NextTrack", playDuration, 1, function() -- timer to play next track when current finishes
                 if btb.disableNextTrackTimer then return end
-                    if loop then
+                    if propeties.loop then
                         debugPrint("[PlayNextTrack] Looping track: " .. tostring(track))
                         if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
                         btb.PlayNextTrack(track, nil, 0, nil, priority, propeties)
@@ -694,14 +698,17 @@ function btb.ValidateTrack(track, errCallback)
         end
         return
     end
+    local tt = nil
     sound.PlayFile(track, "noplay", function(station, errCode, errStr)
         if errCode or errStr then
             errCallback(track, errCode, errStr)
         end
         if station then
             station:Stop()
+            tt = station:GetLength()
         end
     end)
+    return tt
 end
 
 --MARK:Client Timers

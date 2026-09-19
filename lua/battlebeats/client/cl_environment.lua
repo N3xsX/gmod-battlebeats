@@ -127,11 +127,13 @@ local function checkEnvironment()
         btb.SetFade("environment", envFadeVolume[envOpenness], 1, false, true)
     end
 
-    btb.Debug.Add("environment", function(d)
-        d.txt("environment openess", envOpenness)
-        d.txt("view score", viewScore)
-        d.txt("light score", lightFactor)
-        d.txt("final score", math.Round(envScore, 2))
+    btb.Debug.Add("environment", false, function(d)
+        d.sep()
+        d.section("ENVIRONMENT")
+        d.row("environment openess", envOpenness)
+        d.row("view score", viewScore)
+        d.row("light score", lightFactor)
+        d.row("final score", math.Round(envScore, 2))
     end)
 end
 

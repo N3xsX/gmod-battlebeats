@@ -28,7 +28,7 @@ local function scan(p, src, out, rel)
     for _, d in ipairs(ds or {}) do scan(p .. d .. "/", src, out, rel .. d .. "/") end
 end
 
-btb.baseDirs = {"battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus", "gmmp"}
+btb.baseDirs = {"battlebeats", "nombat", "battlemusic", "16thnote", "am_music", "ayykyu_dynmus", "gmmp", "recordplayer"}
 btb.dirHandlers = {
     nombat = {
         packType = "nombat",
@@ -69,6 +69,12 @@ btb.dirHandlers = {
     },
     gmmp = {
         packType = "mp3p",
+        handle = function()
+            return true, false
+        end
+    },
+    recordplayer = {
+        packType = "recordplayer",
         handle = function()
             return true, false
         end

@@ -20,6 +20,7 @@ btb.packPrefixes = {
     "Dynamo Pack",
     "Dynamo",
     "MP3 Radio",
+    "Working Record Player"
 }
 
 local stripCache = {}

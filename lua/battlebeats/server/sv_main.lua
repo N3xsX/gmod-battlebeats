@@ -128,11 +128,9 @@ local function CheckCombatState(ply)
                         local los = not reqiresLos or ply:IsLineOfSightClear(ent)
                         if los then
                             ec = ec + 1
-                            if enemy == ply then
-                                debugPVETrigger(ply, ent)
-                                isInCombat = true
-                                lastCombatTime[ply] = curTime
-                            end
+                            debugPVETrigger(ply, ent)
+                            isInCombat = true
+                            lastCombatTime[ply] = curTime
                         end
                     end
                 end
