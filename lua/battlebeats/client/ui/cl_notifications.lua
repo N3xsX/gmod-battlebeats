@@ -359,5 +359,10 @@ local function addNotificationPreview() -- shows outline box when adjusting noti
     end)
 end
 
+hook.Add("OnScreenSizeChanged", "BattleBeats_NotifResize", function(_, _, nw, nh)
+    RunConsoleCommand("battlebeats_notif_x", tostring(mClamp(nw - 310, 0, nw)))
+    RunConsoleCommand("battlebeats_notif_y", tostring(mClamp(nh / 6, 0, nh)))
+end)
+
 cvars.AddChangeCallback("battlebeats_notif_x", function() addNotificationPreview() end, "BattleBeatsNotifX")
 cvars.AddChangeCallback("battlebeats_notif_y", function() addNotificationPreview() end, "BattleBeatsNotifY")

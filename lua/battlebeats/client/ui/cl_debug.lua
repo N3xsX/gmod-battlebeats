@@ -94,11 +94,11 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
     local st = btb.currentStation
     local pv = btb.currentPreviewStation
     local stn = IsValid(st) and st:GetFileName() or IsValid(pv) and pv:GetFileName() or nil
-    local tb = btb.getTrackData(stn).vol
+    local tdd = btb.getTrackData(stn)
     local tdc = btb.getTrackData(stn, true)
     local pb = btb.packVolume[tdc.pack]
 
-    l.row("track boost", tb and rnd(tb / 100) or "NONE")
+    l.row("track boost", tdd.vol and rnd(tdd.vol / 100) or "NONE")
     l.row("pack boost", pb and rnd(pb / 100) or "NONE")
     --l.sep()
     --l.row("fadeMul", rnd(btb.fadeMul))
@@ -108,16 +108,17 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
     l.row("current", vol)
 
     l.sep()
-    l.section("STATIONS")
+    l.section("STATION")
 
     l.row("track", IsValid(st) and btb.FormatTrackName(stn) or IsValid(pv) and btb.FormatTrackName(stn) or "NONE")
     l.row("pack", tdc.pack and btb.stripPackPrefix(tdc.pack) or "NONE")
     l.sep()
     l.row("is combat?", tdc.type == "combat" and "YES" or "NO")
+    l.row("is favorited?", tdd.fav and "YES" or "NO")
     l.row("is preview?", IsValid(pv) and "YES" or "NO")
     l.sep()
-    l.row("total length", IsValid(st) and btb.FormatTime(st:GetLength()) or IsValid(pv) and btb.FormatTime(st:GetLength()) or "NONE")
-    l.row("cur time", IsValid(st) and btb.FormatTime(st:GetTime()) or IsValid(pv) and btb.FormatTime(st:GetTime()) or "NONE")
+    l.row("total length", IsValid(st) and btb.FormatTime(st:GetLength()) or IsValid(pv) and btb.FormatTime(pv:GetLength()) or "NONE")
+    l.row("cur time", IsValid(st) and btb.FormatTime(st:GetTime()) or IsValid(pv) and btb.FormatTime(pv:GetTime()) or "NONE")
 
     -- DYNAMIC
     r.section("FADE STATES")

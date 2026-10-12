@@ -44,6 +44,8 @@ if CLIENT then
     file.CreateDir("battlebeats")
     file.CreateDir("battlebeats_graphs")
     file.CreateDir("battlebeats_zones")
+    file.CreateDir("battlebeats/subtitles")
+    file.CreateDir("battlebeats/subtitles/cache")
 
     local function includeF(path)
         local files, dirs = file.Find(path .. "/*", "LUA")

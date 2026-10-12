@@ -7,6 +7,7 @@ local panelMenu = nil
 local isLooping = false
 local skipExcluded = false
 local isSingle = game.SinglePlayer()
+local btb = BATTLEBEATS
 
 local activeTextEntries = {}
 
@@ -97,6 +98,21 @@ local packButtons = {
         workshop = "3588540579"
     }
 }
+
+local ls = { "Bulgarian (Български)", "Czech (Čeština)", "Danish (Dansk)", "German (Deutsch)",
+    "Greek (Ελληνικά)", "English (English)", "Pirate English (Pirate English)", "Spanish (Español)",
+    "Estonian (Eesti)", "Finnish (Suomi)", "French (Français)", "Hebrew (עברית)", "Croatian (Hrvatski)",
+    "Hungarian (Magyar)", "Italian (Italiano)", "Japanese (日本語)", "Korean (한국어)", "Lithuanian (Lietuvių)",
+    "Dutch (Nederlands)", "Norwegian (Norsk)", "Polish (Polski)", "Portuguese (Brazil) (Português do Brasil)",
+    "Portuguese (Portugal) (Português)", "Russian (Русский)", "Slovak (Slovenčina)", "Swedish (Svenska)",
+    "Thai (ไทย)", "Turkish (Türkçe)", "Ukrainian (Українська)", "Vietnamese (Tiếng Việt)",
+    "Chinese Simplified (简体中文)", "Chinese Traditional (繁體中文)" }
+local lv = { "bg", "cs", "da", "de", "el", "en", "en-tp", "es-es", "et", "fi", "fr", "he", "hr", "hu", "it",
+    "ja", "ko", "lt", "nl", "no", "pl", "pt-br", "pt-pt", "ru", "sk", "sv-se", "th", "tr", "uk", "vi", "zh-cn",
+    "zh-tw" }
+
+local lm = {}
+for i, v in ipairs(lv) do lm[v] = ls[i] end
 
 local clr = {}
 clr.c606060 = Color(60, 60, 60)
@@ -1049,11 +1065,7 @@ local function openBTBmenu()
     end
 
     playPause.DoClick = function()
-        if not IsValid(BATTLEBEATS.currentPreviewStation) then
-            print("[BattleBeats Debug] No track loaded on play/pause!")
-            return
-        end
-
+        if not IsValid(BATTLEBEATS.currentPreviewStation) then return end
         if BATTLEBEATS.currentPreviewStation:GetState() == GMOD_CHANNEL_PLAYING then
             BATTLEBEATS.currentPreviewStation:Pause()
             playPause:SetText("▶")
@@ -1190,15 +1202,24 @@ local function openBTBmenu()
                 textWidth = textWidth + surface.GetTextSize("   " .. trackName)
             end
             surface.SetFont("BattleBeats_Font")
-            local npcs = BATTLEBEATS.getTrackData(track).npcMap
+            local npcs = td.npcMap
             local count = istable(npcs) and #npcs or 0
             local startTrack = cookie.GetString("battlebeats_start_track", "") == track
+
+            local sd = btb.getTrackData(string.lower(trackName), true)
+            local sl = sd.hasSub and btb.GetSubtitleLanguages(trackName) or {}
+            local sc = #sl
+            local sn = {}
+            for _, v in ipairs(sl) do sn[#sn + 1] = lm[v] or v end
+            local st = #sn > 0 and "\n" .. table.concat(sn, ", ") or ""
+            local lgp = language.GetPhrase("btb.ps.ts.icon_subtitle") .. st
 
             local iconData = {
                 {check = count == 1, tooltip = "#btb.ps.ts.icon_assigned", image = "icon16/user.png"},
                 {check = count >= 2, tooltip = "#btb.ps.ts.icon_assigned_multiple", image = "icon16/group.png"},
                 {check = td.trim ~= nil, tooltip = "#btb.ps.ts.icon_trim", image = "icon16/time.png"},
-                {check = BATTLEBEATS.parsedSubtitles[string.lower(trackName)] ~= nil, tooltip = "#btb.ps.ts.icon_subtitle", image = "icon16/comments.png"},
+                {check = sc == 1, tooltip = lgp, image = "icon16/comment.png" },
+                {check = sc >= 2, tooltip = lgp, image = "icon16/comments.png" },
                 {check = startTrack, tooltip = "#btb.ps.ts.icon_start", image = "icon16/door_in.png"},
                 {check = td.vol ~= nil, tooltip = "#btb.ps.ts.icon_volume", image = "icon16/sound.png"},
             }
@@ -1368,7 +1389,7 @@ local function openBTBmenu()
                             end)
                         end
                     else
-                        print("[BattleBeats Client] Cannot preview sound while the game is paused")
+                        btb.print(1, "UI", "Cannot preview sound while the game is paused")
                     end
                 elseif keyCode == MOUSE_RIGHT then
                     local menu = DermaMenu()
@@ -1708,13 +1729,23 @@ local function openBTBmenu()
                     end
 
                     --MARK:RMB subtitles
-                    local subs = BATTLEBEATS.parsedSubtitles[string.lower(trackName)]
-                    if subs and #subs > 0 then
-                        local lyricsOption = menu:AddOption("#btb.ps.ts.rmb.show_lyrics", function()
-                            BATTLEBEATS.openSubtitles(frame, trackName, subs)
-                        end)
-                        lyricsOption:SetImage("icon16/text_align_left.png")
-                        lyricsOption:BTB_PaintProperties()
+                    if #sl > 0 then
+                        local sub, option = menu:AddSubMenu("#btb.ps.ts.rmb.show_lyrics")
+                        option:SetImage("icon16/text_align_left.png")
+                        option:BTB_PaintProperties()
+                        sub.Paint = function(self, w, h)
+                            draw.RoundedBox(10, 0, 0, w, h, clr.c2552100)
+                            draw.RoundedBox(9, 1, 1, w - 2, h - 2, clr.c505050)
+                        end
+                        for _, lang in ipairs(sl) do
+                            local name = lm[lang] or lang
+                            local opt = sub:AddOption(name, function()
+                                local subs = btb.readCache(string.lower(trackName))
+                                if subs and subs[lang] then btb.openSubtitles(frame, trackName, subs[lang].cues) end
+                            end)
+                            opt:SetImage("icon16/page_white_text.png")
+                            opt:BTB_PaintProperties()
+                        end
                     end
 
                     --MARK:RMB Rename
@@ -2450,18 +2481,18 @@ local function openBTBmenu()
             if override then
                 local ok = true
                 if not IsValid(override) then
-                    print("[BattleBeats] Hook returned invalid panel for pack:", packName)
+                    btb.print(2, "UI", "Hook returned invalid panel for pack:", packName)
                     ok = false
                 end
                 if ok and override.fadeTargets == nil then
-                    print("[BattleBeats] Missing field 'fadeTargets' in hook panel:", packName)
+                    btb.print(2, "UI", "Missing field 'fadeTargets' in hook panel:", packName)
                     ok = false
                 end
                 if ok then
                     table.insert(allPackPanels, override)
                     continue
                 else
-                    print("[BattleBeats] Hook panel rejected:", packName)
+                    btb.print(2, "UI", "Hook panel rejected:", packName)
                 end
             end
             panel:SetSize(900, 80)

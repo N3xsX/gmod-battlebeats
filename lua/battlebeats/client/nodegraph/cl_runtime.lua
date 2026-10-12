@@ -382,7 +382,7 @@ function btb.CreateRuntime(data)
     end
 
     function ctx:ReadString(node, inputId, default)
-        local v = ctx:Read(node, inputId, default)
+        local v = self:Read(node, inputId, default)
         return v == nil and "" or tostring(v)
     end
 
@@ -445,6 +445,7 @@ function btb.CreateRuntime(data)
     function ctx:Dbg(event, data, parent)
         if not self.debugEnabled then return end
         local d = self.debug
+        if not d.cur then return end
         if event == "read" and not d.reads then return end
         if event == "write" and not d.writes then return end
         if event == "propagate" and not d.propagation then return end
@@ -1125,7 +1126,7 @@ end
 --MARK: Create Instance
 function btb.CreateNodeInstance(class, id, args)
     local def = btb.GetNode(class)
-    if not def then fuck("unidentified node: " .. tostring(class)) end
+    if not def then fuck("unidentified node: " .. tostring(class)) return end
 
     local aa = {}
 

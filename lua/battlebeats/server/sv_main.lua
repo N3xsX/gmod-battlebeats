@@ -96,7 +96,7 @@ local function CheckCombatState(ply)
                 end
             end
         elseif mode == 2 then -- visible/near
-            for _, other in ipairs(player.GetAll()) do
+            for _, other in player.Iterator() do
                 if other ~= ply and IsValid(other) and other:IsPlayer() then
                     if ply:Team() ~= other:Team() then
                         local dist = ply:GetPos():DistToSqr(other:GetPos())
@@ -250,7 +250,7 @@ hook.Add("EntityFireBullets", "BattleBeats_NearbyBullets", function(attacker, bu
     local maxDist = maxDistance:GetInt()
     local maxDistSqr = maxDist * maxDist
 
-    for _, ply in ipairs(player.GetAll()) do
+    for _, ply in player.Iterator() do
         if ply == attacker then continue end
         if not IsValid(ply) or not ply:Alive() then continue end
         if IsValid(attacker) and attacker:IsPlayer() then
@@ -308,7 +308,7 @@ hook.Add("PlayerDisconnected", "BattleBeats_CleanCombatState", function(ply)
 end)
 
 timer.Create("BattleBeats_CombatCheck", 0.5, 0, function()
-    for _, ply in ipairs(player.GetAll()) do
+    for _, ply in player.Iterator() do
         local success, err = pcall(function() CheckCombatState(ply) end)
         if not success then
             print("[BattleBeats] BattleBeats_CombatCheck error: " .. tostring(err))
