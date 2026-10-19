@@ -592,6 +592,7 @@ local function openBTBmenu()
         changesMade = false,
     }
     frame = vgui.Create("DFrame")
+    btb.uiframe = frame
     BATTLEBEATS.frame = frame
     frame:SetSize(1000, 700)
     frame:SetSizable(false)
@@ -668,14 +669,31 @@ local function openBTBmenu()
     settingsIcon:SetPos(12, 4)
     settingsIcon:SetImage("btbsettings.png")
 
+    --MARK:Eq button
+    local eqButton = vgui.Create("DButton", frame)
+    eqButton:SetSize(55, 40)
+    eqButton:SetPos(10, 650)
+    eqButton:SetText("")
+    eqButton:BTB_SetButton(clr.c2552100, clr.c707070255, clr.c808080255)
+    eqButton.DoClick = function()
+        surface.PlaySound(btbClickSnd)
+        RunConsoleCommand("battlebeats_equalizer_menu")
+    end
+    eqButton:SetTooltip("#btb.ps.button.options")
+    eqButton:SetTooltipPanelOverride("BattleBeatsTooltip")
+    local eqIcon = vgui.Create("DImage", eqButton)
+    eqIcon:SetSize(32, 32)
+    eqIcon:SetPos(12, 4)
+    eqIcon:SetImage("btbeq.png")
+
     --MARK:Volume bar
     local collapsedWidth = 55
-    local expandedWidth = 330
+    local expandedWidth = 270
     volumePanel = vgui.Create("DPanel", frame)
     volumePanel.expanded = cookie.GetNumber("battlebeats_vol_expanded", 0) == 1
     volumePanel:SetSize(collapsedWidth, 40)
     volumePanel:SetWide(volumePanel.expanded and expandedWidth or collapsedWidth)
-    volumePanel:SetPos(10, 650)
+    volumePanel:SetPos(70, 650)
     volumePanel.progress = volumeSet:GetInt() / 200
     volumePanel.Paint = function(self, w, h)
         draw.RoundedBox(10, 0, 0, w, h, clr.c2552100)
@@ -687,7 +705,7 @@ local function openBTBmenu()
     volumeLabel:SetTextColor(color_white)
     volumeLabel:SizeToContents()
     local volumeBar = vgui.Create("DPanel", volumePanel)
-    volumeBar:SetSize(250, 8)
+    volumeBar:SetSize(190, 8)
     volumeBar:SetPos(65, 22)
     volumeBar:SetCursor("hand")
     volumeBar.Paint = function(self, w, h)
@@ -1093,6 +1111,7 @@ local function openBTBmenu()
         return rowBottom > cachedScrollOffset - 100 and y < cachedScrollOffset + cachedScrollH + 100
     end
     ui.scrollPanel.Think = function(self)
+        if not ui.isTrackSelectorOpen then return end
         local ct = CurTime()
         if trackMenu and IsValid(trackMenu) then
             local currentScroll = self:GetVBar():GetScroll()
@@ -2326,6 +2345,7 @@ local function openBTBmenu()
                 override = hook.Run("BattleBeats_BuildPackPanel", panel, packName, packData)
             end
             local targetPanel = override or panel
+            targetPanel.OnMousePressed = function(self, code) end
             if IsValid(targetPanel) then
                 targetPanel.OnMouseReleased = function(self, keyCode)
                     if keyCode == MOUSE_RIGHT then
@@ -2475,7 +2495,7 @@ local function openBTBmenu()
                         surface.PlaySound("buttons/button10.wav")
                         return
                     end
-                    ui.scrollPanel:ScrollToChild(panel)
+                    if IsValid(wrapper) and IsValid(ui.scrollPanel) then ui.scrollPanel:ScrollToChild(wrapper) end
                 end
             end
             if override then
@@ -2967,6 +2987,17 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, _, newValue)
     end
 end)
 
+hook.Add("VGUIMousePressed", "BattleBeats_KeepFront", function(pnl, code)
+    if not IsValid(frame) or not frame:IsVisible() then return end
+    if not (IsValid(g_ContextMenu) and g_ContextMenu:IsVisible()) then return end
+    if pnl ~= g_ContextMenu then return end
+    timer.Simple(0, function()
+        if IsValid(frame) and frame:IsVisible() then
+            frame:MoveToFront()
+        end
+    end)
+end)
+
 hook.Add("OnContextMenuOpen", "BattleBeats_OpenUI", function()
     if IsValid(frame) and not frame.isMinimalized then
         frame:SetVisible(true)
@@ -2991,7 +3022,7 @@ hook.Add("OnContextMenuClose", "BattleBeats_HideUI", function()
     end
 end)
 
-list.Set("DesktopWindows", "BattleBeatsContextMenu", {
+list.Set("DesktopWindows", "BattleBeats_ContextMenu", {
     title = "BattleBeats",
     icon = "packicons/btb.png",
     init = function()

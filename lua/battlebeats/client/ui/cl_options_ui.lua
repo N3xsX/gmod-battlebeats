@@ -76,6 +76,71 @@ local function valueText(val, suffix)
     return val .. (suffix == "%" and "" or " ") .. suffix
 end
 
+local function getDisabled(o)
+    local d = o.disabledIf
+    if not d then return false end
+    if isfunction(d) then
+        local off, reason = d()
+        return off and true or false, reason
+    end
+    local cv = GetConVar(d.cvar)
+    if not cv then return false end
+    local cur = cv:GetString()
+    local match
+    if d.not_value ~= nil then
+        match = cur ~= tostring(d.not_value)
+    else
+        match = cur == tostring(d.value)
+    end
+    return match, d.reason
+end
+
+local cDisabledTint = Color(0, 0, 0, 150)
+local function applyDisable(panel, o)
+    if not o.disabledIf then return end
+
+    local overlay = vgui.Create("DPanel", panel)
+    overlay:SetZPos(100)
+    overlay:SetPos(0, 0)
+    overlay:SetSize(panel:GetSize())
+    overlay:SetMouseInputEnabled(false)
+    overlay.Anim = 0
+    helpCursor(overlay)
+
+    overlay.OnMousePressed = function()
+        surface.PlaySound("buttons/button8.wav")
+    end
+
+    overlay.Think = function(self)
+        local off, reason = getDisabled(o)
+        local w, h = panel:GetSize()
+        if self:GetWide() ~= w or self:GetTall() ~= h then
+            self:SetSize(w, h)
+        end
+
+        if off ~= self.WasOff then
+            self.WasOff = off
+            self:SetMouseInputEnabled(off)
+            self:SetCursor(off and "no" or "arrow")
+        end
+
+        if off then
+            local tip = language.GetPhrase(reason or "btb.options.disabled_generic")
+            if self.CurTip ~= tip then
+                self.CurTip = tip
+                self:SetTooltip(tip)
+                self:SetTooltipPanelOverride("BattleBeatsTooltip")
+            end
+        end
+    end
+
+    overlay.Paint = function(self, w, h)
+        self.Anim = Lerp(FrameTime() * 10, self.Anim, self.WasOff and 1 or 0)
+        if self.Anim < 0.01 then return end
+        draw.RoundedBox(6, 0, 0, w, h, ColorAlpha(cDisabledTint, cDisabledTint.a * self.Anim))
+    end
+end
+
 local function LerpColor(t, from, to)
     return Color(
         Lerp(t, from.r, to.r),
@@ -125,6 +190,7 @@ builders.toggle = function(parent, o)
     end
 
     switch.OnMousePressed = function()
+        if getDisabled(o) then return end
         local enable = not cvar:GetBool()
         surface.PlaySound(enable and "btb_switch_on.mp3" or "btb_switch_off.mp3")
         sendCvar(o.cvar, enable and 1 or 0, isServer)
@@ -148,7 +214,7 @@ builders.toggle = function(parent, o)
 
     handCursor(switch)
     panel.OnMousePressed = switch.OnMousePressed
-
+    applyDisable(panel, o, switch, label)
     return panel
 end
 
@@ -195,6 +261,7 @@ builders.slider = function(parent, o)
 
     local lastSent, lastSentAt = nil, 0
     local function sendValue(newVal)
+        if getDisabled(o) then return end
         newVal = math.Clamp(math.Round(newVal), min, max)
         if newVal == cvar:GetInt() then return end
         if newVal == lastSent and CurTime() < lastSentAt + 0.5 then return end
@@ -329,7 +396,7 @@ builders.slider = function(parent, o)
     end
 
     handCursor(bar)
-
+    applyDisable(panel, o, bar, valueLabel)
     return panel
 end
 
@@ -437,6 +504,7 @@ builders.combo = function(parent, o)
     end
 
     combo.OnMousePressed = function(self, code)
+        if getDisabled(o) then return end
         if code ~= MOUSE_LEFT then return end
         if isOpen then
             close()
@@ -450,6 +518,7 @@ builders.combo = function(parent, o)
         dropdown:SizeTo(W, dropH, 0.2, 0, -1)
     end
 
+    applyDisable(panel, o, combo)
     return panel
 end
 
@@ -460,6 +529,7 @@ builders.button = function(parent, o)
     button:SetFont("DermaDefaultBold")
     button:SetTextColor(color_white)
     button.Paint = function(self, w, h)
+        if getDisabled(o) then draw.RoundedBox(10, 0, 0, w, h, cDisabledTint) end
         local hov = animHover(self, "Hov", self:IsHovered())
         local bg = self:IsDown() and c505050 or LerpColor(hov, c909090, c100100100)
         draw.RoundedBox(10, 0, 0, w, h, LerpColor(hov * 0.35, c2552100, color_white))
@@ -472,6 +542,7 @@ builders.button = function(parent, o)
     end
 
     button.DoClick = function()
+        if getDisabled(o) then return end
         RunConsoleCommand(o.cmd)
     end
 
@@ -592,24 +663,24 @@ local lv = { "auto", "original", "bg", "cs", "da", "de", "el", "en", "en-PT", "e
     "ja", "ko", "lt", "nl", "no", "pl", "pt-BR", "pt-PT", "ru", "sk", "sv-SE", "th", "tr", "uk", "vi", "zh-CN",
     "zh-TW" }
 
-local function toggle(label, cvar, tip, img)
-    return { type = "toggle", label = label, cvar = cvar, tip = tip, img = img }
+local function toggle(label, cvar, tip, img, disabledIf)
+    return { type = "toggle", label = label, cvar = cvar, tip = tip, img = img, disabledIf = disabledIf }
 end
 
-local function slider(label, cvar, min, max, tip, suffix)
-    return { type = "slider", label = label, cvar = cvar, min = min, max = max, tip = tip, suffix = suffix }
+local function slider(label, cvar, min, max, tip, suffix, disabledIf)
+    return { type = "slider", label = label, cvar = cvar, min = min, max = max, tip = tip, suffix = suffix, disabledIf = disabledIf }
 end
 
-local function stepper(label, cvar, min, max, tip, suffix)
-    return { type = "slider", arrows = true, label = label, cvar = cvar, min = min, max = max, tip = tip, suffix = suffix }
+local function stepper(label, cvar, min, max, tip, suffix, disabledIf)
+    return { type = "slider", arrows = true, label = label, cvar = cvar, min = min, max = max, tip = tip, suffix = suffix, disabledIf = disabledIf }
 end
 
-local function combo(label, cvar, options, tip, values)
-    return { type = "combo", label = label, cvar = cvar, options = options, tip = tip, values = values }
+local function combo(label, cvar, options, tip, values, disabledIf)
+    return { type = "combo", label = label, cvar = cvar, options = options, tip = tip, values = values, disabledIf = disabledIf }
 end
 
-local function button(label, cmd, tip)
-    return { type = "button", label = label, cmd = cmd, tip = tip }
+local function button(label, cmd, tip, disabledIf)
+    return { type = "button", label = label, cmd = cmd, tip = tip, disabledIf = disabledIf }
 end
 
 local function group(title, rows)
@@ -622,6 +693,11 @@ end
 
 local function server(opt)
     opt.server = true
+    return opt
+end
+
+local function disabledWhen(opt, cvar, value, reason)
+    opt.disabledIf = { cvar = cvar, value = value, reason = reason }
     return opt
 end
 
@@ -647,14 +723,16 @@ local function buildSpec()
                             slider("#btb.options.snd.combat_volume", "battlebeats_volume_combat", 0, 100, nil, "%"),
                             toggle("#btb.options.snd.enable_ambient", "battlebeats_enable_ambient"),
                             toggle("#btb.options.snd.enable_combat", "battlebeats_enable_combat"),
-                            toggle("#btb.spawnmenu.general.force_combat", "battlebeats_force_combat", "#btb.spawnmenu.general.force_combat_tip"),
+                            disabledWhen(toggle("#btb.spawnmenu.general.force_combat", "battlebeats_force_combat", "#btb.spawnmenu.general.force_combat_tip"),
+                                "battlebeats_enable_combat", "0", "#btb.options.disabled.enable_combat")
                         }
                     },
                     {
                         name = L("btb.options.tab.advanced"),
                         rows = {
                             toggle("#btb.options.snd.dynamic_volume", "battlebeats_dynamic_volume", "#btb.options.snd.dynamic_volume_tip"),
-                            toggle("#btb.options.snd.dynamic_volume_env", "battlebeats_dynamic_volume_env", "#btb.options.snd.dynamic_volume_env_tip"),
+                            disabledWhen(toggle("#btb.options.snd.dynamic_volume_env", "battlebeats_dynamic_volume_env", "#btb.options.snd.dynamic_volume_env_tip"),
+                                "battlebeats_dynamic_volume", "0", "#btb.options.disabled.dynamic_volume"),
                             {
                                 colW = 230,
                                 combo("#btb.spawnmenu.general.combo", "battlebeats_disable_mode", {"#btb.spawnmenu.general.combo_1", "#btb.spawnmenu.general.combo_2", "#btb.spawnmenu.general.combo_3"}),
@@ -714,8 +792,10 @@ local function buildSpec()
                     {
                         name = L("btb.options.tab.advanced"),
                         rows = {
-                            stepper("#btb.options.mplayer.a_wait_time", "battlebeats_ambient_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip", "s"),
-                            stepper("#btb.options.mplayer.c_wait_time", "battlebeats_combat_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip", "s"),
+                            disabledWhen(stepper("#btb.options.mplayer.a_wait_time", "battlebeats_ambient_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip", "s"),
+                                "battlebeats_always_continue", "1", "#btb.options.disabled.always_continue"),
+                            disabledWhen(stepper("#btb.options.mplayer.c_wait_time", "battlebeats_combat_wait_time", 1, 120, "#btb.options.mplayer.wait_time_tip", "s"),
+                                "battlebeats_always_continue", "1", "#btb.options.disabled.always_continue"),
                             toggle("#btb.options.mplayer.always_continue", "battlebeats_always_continue", "#btb.options.mplayer.always_continue_tip"),
                             toggle("#btb.options.mplayer.exclude_assigned", "battlebeats_exclude_mapped_tracks", "#btb.options.mplayer.exclude_assigned_tip"),
                             toggle("#btb.options.mplayer.switch_to_lower", "battlebeats_switch_on_lower_priority", "#btb.options.mplayer.switch_to_lower_tip"),

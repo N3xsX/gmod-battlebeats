@@ -6,6 +6,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/ui/cl_fonts.lua")
 
     AddCSLuaFile("battlebeats/client/cl_main.lua")
+    AddCSLuaFile("battlebeats/client/bass.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/cl_runtime.lua")
 
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/logic.lua")
@@ -23,6 +24,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/cl_environment.lua")
     AddCSLuaFile("battlebeats/client/cl_subtitles.lua")
 
+    AddCSLuaFile("battlebeats/client/ui/bassfx_menu.lua")
     AddCSLuaFile("battlebeats/client/ui/cl_debug.lua")
     AddCSLuaFile("battlebeats/client/ui/cl_panel_meta.lua")
     AddCSLuaFile("battlebeats/client/ui/cl_pack_selector_misc.lua")
@@ -31,7 +33,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/ui/cl_playlists.lua")
 
     AddCSLuaFile("battlebeats/client/cl_spawnmenu.lua")
-    --AddCSLuaFile("battlebeats/client/cl_spawnmenu_nodegraph.lua")
+    AddCSLuaFile("battlebeats/client/cl_spawnmenu_nodegraph.lua")
     AddCSLuaFile("battlebeats/client/cl_loading.lua")
 
     include("battlebeats/server/sv_main.lua")
@@ -76,6 +78,7 @@ if CLIENT then
     include("battlebeats/client/ui/cl_fonts.lua")
 
     include("battlebeats/client/cl_main.lua")
+    include("battlebeats/client/bass.lua")
     include("battlebeats/client/nodegraph/cl_runtime.lua")
 
     include("battlebeats/client/nodegraph/nodes/logic.lua")
@@ -93,6 +96,7 @@ if CLIENT then
     include("battlebeats/client/cl_environment.lua")
     include("battlebeats/client/cl_subtitles.lua")
 
+    include("battlebeats/client/ui/bassfx_menu.lua")
     include("battlebeats/client/ui/cl_debug.lua")
     include("battlebeats/client/ui/cl_panel_meta.lua")
     include("battlebeats/client/ui/cl_pack_selector_misc.lua")
@@ -101,7 +105,7 @@ if CLIENT then
     include("battlebeats/client/ui/cl_playlists.lua")
 
     include("battlebeats/client/cl_spawnmenu.lua")
-    --include("battlebeats/client/cl_spawnmenu_nodegraph.lua")
+    include("battlebeats/client/cl_spawnmenu_nodegraph.lua")
     include("battlebeats/client/cl_loading.lua")
 
     includeNF("battlebeats", "subtitles")

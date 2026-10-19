@@ -501,7 +501,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     --
     loadSavedPacks()
     btb.ValidatePacks()
-    loadPatchNotes()
+    --loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
