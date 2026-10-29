@@ -44,7 +44,7 @@ btb.disableSwitch = btb.disableSwitch or false -- btb.isInCombat will still upda
 btb.disableNextTrackTimer = btb.disableNextTrackTimer or false
 btb.disableCheckingTimer = btb.disableCheckingTimer or false
 
-btb.currentVersion = "2.9.8v1"
+btb.currentVersion = "3.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -491,6 +491,15 @@ function btb.PlayNextTrackPreview(track, time, isLooped, errCallback)
             end
             station:SetTime(time or 0, true)
             btb.FadeMusic(station, true, inst and 0 or 2, true)
+
+            if enableSubtitles:GetBool() then
+                local subtitleTrack = btb.FormatTrackName(track)
+                if btb.getTrackData(string.lower(subtitleTrack), true).hasSub then
+                    if not (allowEnforce:GetBool() and not allowSub:GetBool()) then
+                        btb.StartSubtitles(subtitleTrack, station)
+                    end
+                end
+            end
         else
             timer.Simple(2, function ()
                 btb.HideNotification()
@@ -773,14 +782,6 @@ timer.Create("BattleBeats_ClientAliveCheck", 0.5, 0, function()
             lastMuteState = isOpen
             btb.SetFade("menu", isOpen and 0.5 or nil, 0.8, false)
         end
-    end
-end)
-
-timer.Create("BattleBeats_ClientVolCheck", 5, 0, function()
-    if volumeSet:GetInt() > 200 then
-        local time = tonumber(cookie.GetString("battlebeats_high_volume_time", "0")) or 0
-        time = time + 5
-        cookie.Set("battlebeats_high_volume_time", tostring(time))
     end
 end)
 
@@ -1309,8 +1310,6 @@ cvars.AddChangeCallback("battlebeats_volume", function(_, oldValue, newValue)
             warningBox:Close()
         end, true)
     else
-        cookie.Set("battlebeats_high_volume_warn", "0")
-        cookie.Set("battlebeats_high_volume_time", "0")
         applyVolume()
     end
 end)

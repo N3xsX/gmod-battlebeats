@@ -1,4 +1,94 @@
 local defColor = Color(255, 210, 0)
+local btb = BATTLEBEATS
+
+local DrawRect, SetDrawColor = surface.DrawRect, surface.SetDrawColor
+local sqrt, floor = math.sqrt, math.floor
+
+local cache = {}
+local function buildCorner(R, t)
+    local inner = R - t
+    local rows = {}
+
+    for j = 0, R - 1 do
+        local dy = R - j - 0.5
+        local i0, len
+        for i = 0, R - 1 do
+            local dx = R - i - 0.5
+            local d = sqrt(dx * dx + dy * dy)
+            if d >= inner and d < R then
+                if not i0 then i0, len = i, 1 else len = len + 1 end
+            elseif i0 then
+                rows[#rows + 1] = { i0, j, len, 1 }
+                i0 = nil
+            end
+        end
+        if i0 then rows[#rows + 1] = { i0, j, len, 1 } end
+    end
+
+    local out = {}
+    for _, r in ipairs(rows) do
+        local merged = false
+        for _, o in ipairs(out) do
+            if o[1] == r[1] and o[3] == r[3] and o[2] + o[4] == r[2] then
+                o[4] = o[4] + 1
+                merged = true
+                break
+            end
+        end
+        if not merged then out[#out + 1] = r end
+    end
+    return out
+end
+
+function btb.drawRoundedOutline(radius, x, y, w, h, thickness, col)
+    local half = (w < h and w or h) * 0.5
+    if radius > half then radius = half end
+
+    local R = floor(radius + 0.5)
+    local t = floor(thickness + 0.5)
+    if t < 1 then t = 1 end
+
+    local r = col.r
+    if r then
+        SetDrawColor(r, col.g, col.b, col.a or 255)
+    else
+        SetDrawColor(col[1], col[2], col[3], col[4] or 255)
+    end
+
+    if R < 1 then
+        DrawRect(x, y, w, t)
+        DrawRect(x, y + h - t, w, t)
+        DrawRect(x, y + t, t, h - t * 2)
+        DrawRect(x + w - t, y + t, t, h - t * 2)
+        return
+    end
+
+    local sw, sh = w - R * 2, h - R * 2
+    DrawRect(x + R, y, sw, t)
+    DrawRect(x + R, y + h - t, sw, t)
+    DrawRect(x, y + R, t, sh)
+    DrawRect(x + w - t, y + R, t, sh)
+
+    local key = R * 1024 + t
+    local rects = cache[key]
+    if not rects then
+        rects = buildCorner(R, t)
+        cache[key] = rects
+    end
+
+    local rx, by = x + w - R, y + h - R
+    for i = 1, #rects do
+        local rc = rects[i]
+        local ci, cj, cw, ch = rc[1], rc[2], rc[3], rc[4]
+        local mx = R - ci - cw
+        local my = R - cj - ch
+        DrawRect(x + ci, y + cj, cw, ch)
+        DrawRect(rx + mx, y + cj, cw, ch)
+        DrawRect(x + ci, by + my, cw, ch)
+        DrawRect(rx + mx, by + my, cw, ch)
+    end
+end
+
 local function parseSegmentColor(segmentText)
     local textPart, r, g, b = string.match(segmentText, "^(.-)<(%d+),(%d+),(%d+)>$")
     if textPart then
@@ -241,6 +331,150 @@ function PANEL:BTB_SetImageTooltip(imagePath, text, width, maxImageHeight)
     end
 end
 
+--MARK:UI SHARED
+btb.uiShared = btb.uiShared or {}
+
+local C = {
+    Yellow = Color(255, 210, 0),
+    Bg = Color(20, 20, 20, 215),
+    Card = Color(45, 45, 45),
+    CardIn = Color(56, 56, 56),
+    C40 = Color(40, 40, 40),
+    C50 = Color(50, 50, 50),
+    C70 = Color(70, 70, 70),
+    C90 = Color(90, 90, 90),
+    C100 = Color(100, 100, 100),
+    C200 = Color(200, 200, 200),
+    Track = Color(22, 22, 22),
+    Text = Color(230, 230, 230),
+    Dim = Color(140, 140, 140),
+    Good = Color(120, 210, 120),
+    Warn = Color(255, 110, 110),
+    Cut = Color(110, 170, 255),
+    Missing = Color(80, 38, 38),
+    MissingHov = Color(110, 48, 48),
+    Select = Color(255, 210, 0, 90),
+    Start = Color(100, 255, 100),
+    End = Color(255, 100, 100),
+    Shadow = Color(0, 0, 0, 70),
+    Ambient = Color(120, 210, 120),
+    Combat = Color(230, 120, 120),
+    Off = Color(0, 0, 0, 200),
+    Outline = Color(0, 0, 0, 120)
+}
+local TL, TC, TR, TT = TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP
+
+local function LerpColor(t, from, to)
+    return Color(
+        Lerp(t, from.r, to.r),
+        Lerp(t, from.g, to.g),
+        Lerp(t, from.b, to.b),
+        Lerp(t, from.a or 255, to.a or 255)
+    )
+end
+
+local function ColA(col, a)
+    return Color(col.r, col.g, col.b, a)
+end
+
+local function animHover(self, key, active, speed)
+    self[key] = Lerp(FrameTime() * (speed or 12), self[key] or 0, active and 1 or 0)
+    return self[key]
+end
+
+local blur = Material("pp/blurscreen")
+local function drawBlur(panel, amount)
+    local x, y = panel:LocalToScreen(0, 0)
+    surface.SetMaterial(blur)
+    surface.SetDrawColor(255, 255, 255)
+    for i = 1, 3 do
+        blur:SetFloat("$blur", (i / 3) * (amount or 6))
+        blur:Recompute()
+        render.UpdateScreenEffectTexture()
+        surface.DrawTexturedRect(-x, -y, ScrW(), ScrH())
+    end
+end
+
+local function makeSwitch(parent, x, y, getState, onClick)
+    local sw = vgui.Create("DPanel", parent)
+    sw:SetPos(x, y)
+    sw:SetSize(40, 20)
+    sw:SetCursor("hand")
+    sw.Anim = getState() and 1 or 0
+
+    sw.Paint = function(self, w, h)
+        local target = getState() and 1 or 0
+        self.Anim = Lerp(FrameTime() * 10, self.Anim, target)
+        if math.abs(self.Anim - target) < 0.002 then self.Anim = target end
+        local t = self.Anim
+
+        local hov = animHover(self, "Hov", self:IsHovered())
+        local ks = 16 + hov * 2
+        local knobX = Lerp(t, 2, w - ks - 2)
+        local knobY = (h - ks) / 2
+
+        local track = LerpColor(t, C.C90, C.Yellow)
+        draw.RoundedBox(h / 2, 0, 0, w, h, LerpColor(hov * 0.3, track, color_white))
+        draw.RoundedBox(ks / 2, knobX, knobY + 1, ks, ks, C.Shadow)
+        draw.RoundedBox(ks / 2, knobX, knobY, ks, ks, LerpColor(t, C.Text, C.C90))
+    end
+
+    sw.OnMousePressed = function(self, code)
+        if code ~= MOUSE_LEFT then return end
+        local new = not getState()
+        surface.PlaySound(new and "btb_switch_on.mp3" or "btb_switch_off.mp3")
+        onClick(new)
+    end
+
+    return sw
+end
+
+local function makeSearch(parent, x, y, w, h, placeholder, onChange, font)
+    local e = vgui.Create("DTextEntry", parent)
+    if x and y and w and h then
+        e:SetPos(x, y)
+        e:SetSize(w, h)
+    else
+        e:Dock(FILL)
+    end
+    e:SetFont(font or "BattleBeats_Font")
+    e.OnChange = function(self) onChange(self:GetValue()) end
+    e.Paint = function(self, pw, ph)
+        local f = animHover(self, "Foc", self:HasFocus())
+        draw.RoundedBox(8, 0, 0, pw, ph, LerpColor(f, C.C70, C.Yellow))
+        draw.RoundedBox(7, 1, 1, pw - 2, ph - 2, C.C50)
+        self:DrawTextEntryText(color_white, C.Yellow, color_white)
+        if self:GetText() == "" and not self:HasFocus() then
+            draw.SimpleText(placeholder, font or "BattleBeats_Font", 8, ph / 2, C.Dim, TL, TC)
+        end
+    end
+    return e
+end
+
+local function makeScroll(parent)
+    local s = vgui.Create("DScrollPanel", parent)
+    local vbar = s:GetVBar()
+    vbar:SetWide(6)
+    vbar:SetHideButtons(true)
+    vbar.Paint = function(self, w, h) draw.RoundedBox(3, 0, 0, w, h, C.Track) end
+    vbar.btnGrip.Paint = function(self, w, h)
+        local hov = animHover(self, "Hov", self:IsHovered() or self.Depressed)
+        draw.RoundedBox(3, 0, 0, w, h, LerpColor(hov, C.C100, C.Yellow))
+    end
+    return s
+end
+
+btb.uiShared = {
+    Colors = C,
+    ColA = ColA,
+    LerpColor = LerpColor,
+    animHover = animHover,
+    drawBlur = drawBlur,
+    makeSwitch = makeSwitch,
+    makeSearch = makeSearch,
+    makeScroll = makeScroll
+}
+
 local c1003030200 = Color(100, 30, 30, 200)
 local c602020200 = Color(60, 20, 20, 200)
 local c707070200 = Color(70, 70, 70, 200)
@@ -296,41 +530,18 @@ function PANEL:BTB_SetButtons(showMin, cX, cY, noSound)
     end
 end
 
-function PANEL:BTB_SetFocus()
-    local bg = vgui.Create("DPanel")
-    bg:SetSize(ScrW(), ScrH())
-    bg:Center()
-    bg:MakePopup()
-    bg.OnMousePressed = function()
-        self:MakePopup()
-    end
-    bg.Paint = function(self, w, h)
-        draw.RoundedBox(0, 0, 0, w, h, color_transparent)
-    end
-    bg.Think = function()
-        if not IsValid(self) then bg:Remove() end
-    end
-end
-
 local c202020215 = Color(20, 20, 20, 215)
 local c505050 = Color(50, 50, 50)
 function PANEL:BTB_PaintProperties()
+    self:SetFont("ChatFont")
+    self:SetTextColor(color_white)
+    self:InvalidateLayout(true)
     self.Paint = function(self, w, h)
-        self:SetFontInternal("ChatFont")
-        self:SetTextColor(color_white)
         local color = self:IsHovered() and c202020215 or c505050
         draw.RoundedBox(12, 2, 2, w - 4, h - 4, color)
     end
 end
 
-local function LerpColor(t, from, to)
-    return Color(
-        Lerp(t, from.r, to.r),
-        Lerp(t, from.g, to.g),
-        Lerp(t, from.b, to.b),
-        Lerp(t, from.a or 255, to.a or 255)
-    )
-end
 local hoveringButtons = {}
 hook.Add("Think", "BTB_UniversalButtonHoverLerp", function()
     local ft = FrameTime() * 12
@@ -372,35 +583,6 @@ function PANEL:BTB_SetButton(outline, normalCol, hoverCol, noHover)
     self.Paint = function(s, w, h)
         draw.RoundedBox(10, 0, 0, w, h, outline)
         draw.RoundedBox(9, 1, 1, w - 2, h - 2, s.currentColor)
-    end
-end
-
-function PANEL:BTB_SetButtonOutline(outline, normalCol, hoverCol, noHover)
-    self.currentColor = normalCol
-    if not noHover then
-        self.normalColor = normalCol
-        self.hoverColor = hoverCol
-        self.targetColor = normalCol
-        local oldEnter = self.OnCursorEntered
-        local oldExit = self.OnCursorExited
-        self.OnCursorEntered = function(s, ...)
-            s.targetColor = s.hoverColor
-            hoveringButtons[s] = true
-            if oldEnter then
-                oldEnter(s, ...)
-            end
-        end
-        self.OnCursorExited  = function(s, ...)
-            s.targetColor = s.normalColor
-            hoveringButtons[s] = true
-            if oldExit then
-                oldExit(s, ...)
-            end
-        end
-    end
-    self.Paint = function(s, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, s.currentColor)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, outline)
     end
 end
 

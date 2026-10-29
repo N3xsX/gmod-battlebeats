@@ -1,11 +1,13 @@
 local btb = BATTLEBEATS
 
-local c2552100 = Color(255, 210, 0)
-local c909090 = Color(90, 90, 90)
-local c230230230 = Color(230, 230, 230)
-local c505050 = Color(50, 50, 50)
-local c100100100 = Color(100, 100, 100)
-local cOutline = Color(0, 0, 0, 120)
+local shared = btb.uiShared
+local LerpColor = shared.LerpColor
+local ColA = shared.ColA
+local animHover = shared.animHover
+
+local C = shared.Colors
+local TL, TC, TR, TT = TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP
+local L = language.GetPhrase
 
 local function sendCvar(name, value, sv)
     if sv then
@@ -19,8 +21,8 @@ local function sendCvar(name, value, sv)
 end
 
 local function makeTip(helpText, defaultPart)
-    local defLabel = language.GetPhrase("btb.options.noti.default_pos")
-    return language.GetPhrase(helpText) .. "\n" .. "|" .. defLabel .. "<200,200,50>|" .. defaultPart
+    local defLabel = L("btb.options.noti.default_pos")
+    return L(helpText) .. "\n" .. "|" .. defLabel .. "<200,200,50>|" .. defaultPart
 end
 
 local helpPanel
@@ -30,7 +32,7 @@ hook.Add("PostRenderVGUI", "BTB_HelpCursor", function()
         return
     end
     local x, y = input.GetCursorPos()
-    draw.SimpleTextOutlined("?", "DermaLarge", x + 14, y + 10, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, 1, color_black)
+    draw.SimpleTextOutlined("?", "DermaLarge", x + 14, y + 10, color_white, TL, TT, 1, color_black)
 end)
 
 local function helpCursor(p)
@@ -125,7 +127,7 @@ local function applyDisable(panel, o)
         end
 
         if off then
-            local tip = language.GetPhrase(reason or "btb.options.disabled_generic")
+            local tip = L(reason or "btb.options.disabled_generic")
             if self.CurTip ~= tip then
                 self.CurTip = tip
                 self:SetTooltip(tip)
@@ -137,27 +139,13 @@ local function applyDisable(panel, o)
     overlay.Paint = function(self, w, h)
         self.Anim = Lerp(FrameTime() * 10, self.Anim, self.WasOff and 1 or 0)
         if self.Anim < 0.01 then return end
-        draw.RoundedBox(6, 0, 0, w, h, ColorAlpha(cDisabledTint, cDisabledTint.a * self.Anim))
+        draw.RoundedBox(6, 0, 0, w, h, ColA(cDisabledTint, cDisabledTint.a * self.Anim))
     end
-end
-
-local function LerpColor(t, from, to)
-    return Color(
-        Lerp(t, from.r, to.r),
-        Lerp(t, from.g, to.g),
-        Lerp(t, from.b, to.b),
-        Lerp(t, from.a or 255, to.a or 255)
-    )
-end
-
-local function animHover(self, key, active, speed)
-    self[key] = Lerp(FrameTime() * (speed or 12), self[key] or 0, active and 1 or 0)
-    return self[key]
 end
 
 local builders = {}
 local layoutRows
-local cShadow = Color(0, 0, 0, 70)
+local c230230230 = Color(230, 230, 230)
 builders.toggle = function(parent, o)
     local cvar = GetConVar(o.cvar)
     local isServer = o.server or false
@@ -183,10 +171,10 @@ builders.toggle = function(parent, o)
         local knobX = Lerp(t, 2, w - ks - 2)
         local knobY = (h - ks) / 2
 
-        local track = LerpColor(t, c909090, c2552100)
+        local track = LerpColor(t, C.C90, C.Yellow)
         draw.RoundedBox(h / 2, 0, 0, w, h, LerpColor(hov * 0.3, track, color_white))
-        draw.RoundedBox(ks / 2, knobX, knobY + 1, ks, ks, cShadow)
-        draw.RoundedBox(ks / 2, knobX, knobY, ks, ks, LerpColor(t, c230230230, c909090))
+        draw.RoundedBox(ks / 2, knobX, knobY + 1, ks, ks, C.Shadow)
+        draw.RoundedBox(ks / 2, knobX, knobY, ks, ks, LerpColor(t, c230230230, C.C90))
     end
 
     switch.OnMousePressed = function()
@@ -205,8 +193,8 @@ builders.toggle = function(parent, o)
     label:SetMouseInputEnabled(true)
 
     if o.tip then
-        local on = "||" .. language.GetPhrase("btb.ps.pack_enabled") .. "<0,255,50>||"
-        local off = "||" .. language.GetPhrase("btb.ps.pack_disabled") .. "<220,0,0>||"
+        local on = "||" .. L("btb.ps.pack_enabled") .. "<0,255,50>||"
+        local off = "||" .. L("btb.ps.pack_disabled") .. "<220,0,0>||"
         applyTip(makeTip(o.tip, cvar:GetDefault() == "1" and on or off), o.img, label)
     end
 
@@ -251,11 +239,11 @@ builders.slider = function(parent, o)
     bar.Paint = function(self, w, h)
         local hov = animHover(self, "Hov", self:IsHovered() or self.IsDragging)
         local progress = math.Clamp((cvar:GetInt() - min) / (max - min), 0, 1)
-        draw.RoundedBox(4, 0, 0, w, h, LerpColor(hov * 0.12, c909090, color_white))
-        draw.RoundedBox(4, 0, 0, w * progress, h, LerpColor(hov * 0.3, c2552100, color_white))
+        draw.RoundedBox(4, 0, 0, w, h, LerpColor(hov * 0.12, C.C90, color_white))
+        draw.RoundedBox(4, 0, 0, w * progress, h, LerpColor(hov * 0.3, C.Yellow, color_white))
         if stepper and hov > 0.01 then
             local x = math.Clamp(w * progress, h / 2, w - h / 2)
-            draw.RoundedBox(h / 2, x - h / 2, 0, h, h, ColorAlpha(color_white, 255 * hov))
+            draw.RoundedBox(h / 2, x - h / 2, 0, h, h, ColA(color_white, 255 * hov))
         end
     end
 
@@ -286,8 +274,8 @@ builders.slider = function(parent, o)
             btn:SetPos(x, 18)
             btn.Paint = function(self, w, h)
                 local hov = animHover(self, "Hov", self:IsHovered())
-                local col = LerpColor(hov, color_white, c2552100)
-                if self:IsDown() then col = c909090 end
+                local col = LerpColor(hov, color_white, C.Yellow)
+                if self:IsDown() then col = C.C90 end
                 self:SetTextColor(col)
             end
             return btn
@@ -348,7 +336,7 @@ builders.slider = function(parent, o)
             entry:RequestFocus()
             entry:SetCaretPos(string.len(tostring(cvar:GetInt())))
             entry.Paint = function(e, w, h)
-                draw.RoundedBox(4, 0, 0, w, h, c909090)
+                draw.RoundedBox(4, 0, 0, w, h, C.C90)
                 e:DrawTextEntryText(color_white, color_white, color_white)
             end
 
@@ -368,14 +356,13 @@ builders.slider = function(parent, o)
             entry.OnLoseFocus = finish
         end
         valueLabel.Paint = function(self)
-            self:SetTextColor(LerpColor(animHover(self, "Hov", self:IsHovered()), color_white, c2552100))
+            self:SetTextColor(LerpColor(animHover(self, "Hov", self:IsHovered()), color_white, C.Yellow))
         end
     else
         panel.PaintOver = function()
             local xx = bar.x + bar:GetWide() / 2
             local yy = bar.y + bar:GetTall() / 2 - 1
-            draw.SimpleTextOutlined(valueText(cvar:GetInt(), suffix), "DermaDefaultBold", xx, yy, color_white,
-                TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, cOutline)
+            draw.SimpleTextOutlined(valueText(cvar:GetInt(), suffix), "DermaDefaultBold", xx, yy, color_white, TC, TC, 1, C.Outline)
         end
     end
 
@@ -427,8 +414,8 @@ builders.combo = function(parent, o)
     combo.Paint = function(self, w, h)
         local hov = animHover(self, "Hov", self:IsHovered() or isOpen)
         local open = animHover(self, "Open", isOpen, 14)
-        draw.RoundedBox(10, 0, 0, w, h, LerpColor(hov * 0.35, c2552100, color_white))
-        draw.RoundedBox(9, 1, 1, w - 2, h - 2, LerpColor(hov, c909090, c100100100))
+        draw.RoundedBox(10, 0, 0, w, h, LerpColor(hov * 0.35, C.Yellow, color_white))
+        draw.RoundedBox(9, 1, 1, w - 2, h - 2, LerpColor(hov, C.C90, C.C100))
 
         local i
         if values then
@@ -443,7 +430,7 @@ builders.combo = function(parent, o)
             i = math.Clamp(cvar:GetInt() + 1, 1, #options)
         end
 
-        draw.SimpleText(options[i or 1] or "Unknown", "DermaDefaultBold", w / 2, h / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+        draw.SimpleText(options[i or 1] or "Unknown", "DermaDefaultBold", w / 2, h / 2, color_white, TC, TC)
 
         local ax, ay, s = w - 18, h / 2, 3 * (1 - 2 * open)
         surface.SetDrawColor(255, 255, 255, 120 + 135 * hov)
@@ -462,7 +449,7 @@ builders.combo = function(parent, o)
     dropdown:SetSize(W, 0)
     dropdown:SetPos(0, c)
     dropdown:SetVisible(false)
-    dropdown.Paint = function(self, w, h) draw.RoundedBox(4, 0, 0, w, h, c505050) end
+    dropdown.Paint = function(self, w, h) draw.RoundedBox(4, 0, 0, w, h, C.C50) end
 
     local scroll = vgui.Create("DScrollPanel", dropdown)
     scroll:Dock(FILL)
@@ -473,7 +460,7 @@ builders.combo = function(parent, o)
     vbar.Paint = function() end
     vbar.btnUp.Paint = function() end
     vbar.btnDown.Paint = function() end
-    vbar.btnGrip.Paint = function(self, w, h) draw.RoundedBox(3, 0, 0, w, h, c100100100) end
+    vbar.btnGrip.Paint = function(self, w, h) draw.RoundedBox(3, 0, 0, w, h, C.C100) end
 
     local function close()
         isOpen = false
@@ -492,8 +479,8 @@ builders.combo = function(parent, o)
         btn:Dock(TOP)
         btn.Paint = function(self, w, h)
             local hov = animHover(self, "Hov", self:IsHovered())
-            draw.RoundedBox(4, 0, 0, w, h, LerpColor(hov, c505050, c100100100))
-            draw.RoundedBox(2, 0, h / 2 - 8 * hov, 3, 16 * hov, c2552100)
+            draw.RoundedBox(4, 0, 0, w, h, LerpColor(hov, C.C50, C.C100))
+            draw.RoundedBox(2, 0, h / 2 - 8 * hov, 3, 16 * hov, C.Yellow)
         end
 
         btn.DoClick = function()
@@ -531,8 +518,8 @@ builders.button = function(parent, o)
     button.Paint = function(self, w, h)
         if getDisabled(o) then draw.RoundedBox(10, 0, 0, w, h, cDisabledTint) end
         local hov = animHover(self, "Hov", self:IsHovered())
-        local bg = self:IsDown() and c505050 or LerpColor(hov, c909090, c100100100)
-        draw.RoundedBox(10, 0, 0, w, h, LerpColor(hov * 0.35, c2552100, color_white))
+        local bg = self:IsDown() and C.C50 or LerpColor(hov, C.C90, C.C100)
+        draw.RoundedBox(10, 0, 0, w, h, LerpColor(hov * 0.35, C.Yellow, color_white))
         draw.RoundedBox(9, 1, 1, w - 2, h - 2, bg)
     end
 
@@ -577,7 +564,7 @@ builders.group = function(parent, o)
     local inner = vgui.Create("DPanel", box)
     inner:SetPos(6, 6)
     inner:SetWide(ww - 12)
-    inner.Paint = function(self, w, h) draw.RoundedBox(4, 0, 0, w, h, c505050) end
+    inner.Paint = function(self, w, h) draw.RoundedBox(4, 0, 0, w, h, C.C50) end
 
     local bottom = layoutRows(inner, o.rows, 15)
     inner:SetTall(bottom + 15)
@@ -702,7 +689,6 @@ local function disabledWhen(opt, cvar, value, reason)
 end
 
 local function buildSpec()
-    local L = language.GetPhrase
     local scrW, scrH = ScrW(), ScrH()
     local ls2, lv2 = { "None" }, { "" }
     for i = 2, #ls do
@@ -1112,11 +1098,11 @@ function btb.createOptions(panel)
                 panel:SetVisible(false)
                 category.panel = panel
 
-                local translation = language.GetPhrase("btb.translated.by")
+                local translation = L("btb.translated.by")
                 local lang = GetConVar("gmod_language"):GetString()
                 if lang ~= "en" and translation ~= "///" then
                     local translationLabel = vgui.Create("DLabel", panel)
-                    translationLabel:SetText(language.GetPhrase("btb.translated.by.label") .. translation)
+                    translationLabel:SetText(L("btb.translated.by.label") .. translation)
                     translationLabel:SetPos((contentPanel:GetWide() - 400) / 2, 420)
                     translationLabel:SetSize(400, 20)
                     translationLabel:SetTextColor(Color(80, 80, 80, 200))
@@ -1124,7 +1110,7 @@ function btb.createOptions(panel)
                 end
 
                 local versionlabel = vgui.Create("DLabel", panel)
-                versionlabel:SetText(language.GetPhrase("btb.options.version.label") .. " " .. btb.currentVersion .. " | " .. jit.arch .. " :: " .. jit.os)
+                versionlabel:SetText(L("btb.options.version.label") .. " " .. btb.currentVersion .. " | " .. jit.arch .. " :: " .. jit.os)
                 versionlabel:SetPos((contentPanel:GetWide() - 250) / 2, 440)
                 versionlabel:SetSize(250, 20)
                 versionlabel:SetTextColor(Color(80, 80, 80, 200))
@@ -1171,7 +1157,7 @@ local function confirmAction(id, timeout)
     local state = confirmations[id]
     if not state or now > state.expires then
         confirmations[id] = { expires = now + (timeout or 5) }
-        notification.AddLegacy("[BattleBeats] " .. (language.GetPhrase("btb.options.misc.button_conf")), NOTIFY_HINT, timeout or 5)
+        notification.AddLegacy("[BattleBeats] " .. (L("btb.options.misc.button_conf")), NOTIFY_HINT, timeout or 5)
         surface.PlaySound("ambient/water/drip" .. math.random(1, 4) .. ".wav")
         return false
     end
@@ -1196,7 +1182,7 @@ end
 concommand.Add("battlebeats_restore_defaults", function()
     if not confirmAction("restore_defaults", 5) then return end
 
-    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.restore_tip_conf"), NOTIFY_GENERIC, 3)
+    notification.AddLegacy("[BattleBeats] " .. L("btb.options.misc.restore_tip_conf"), NOTIFY_GENERIC, 3)
     surface.PlaySound("buttons/button14.wav")
 
     RunConsoleCommand("battlebeats_detection_mode", "1")
@@ -1260,29 +1246,28 @@ end)
 concommand.Add("battlebeats_clean_cache", function()
     if not confirmAction("clean_cache", 5) then return end
 
-    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.clean_cache_tip_conf"), NOTIFY_GENERIC, 3)
+    notification.AddLegacy("[BattleBeats] " .. L("btb.options.misc.clean_cache_tip_conf"), NOTIFY_GENERIC, 3)
     surface.PlaySound("buttons/button14.wav")
 
     RunConsoleCommand("battlebeats_seen_version", "0")
     cookie.Delete("battlebeats_start_track")
     cookie.Delete('BattleBeats_FirstTime')
-    cookie.Delete("battlebeats_high_volume_time")
-    cookie.Delete("battlebeats_high_volume_warn")
     cookie.Delete("battlebeats_last_track")
     cookie.Delete("battlebeats_vol_expanded")
+
+    file.Delete("battlebeats/trackmeta.txt")
+    btb.trackMeta = {}
 end)
 
 concommand.Add("battlebeats_delete_data", function()
     if not confirmAction("delete_data", 5) then return end
 
-    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.delete_data_tip_conf"), NOTIFY_GENERIC, 3)
+    notification.AddLegacy("[BattleBeats] " .. L("btb.options.misc.delete_data_tip_conf"), NOTIFY_GENERIC, 3)
     surface.PlaySound("buttons/button14.wav")
 
     cookie.Delete("battlebeats_selected_packs")
     cookie.Delete("battlebeats_start_track")
     cookie.Delete('BattleBeats_FirstTime')
-    cookie.Delete("battlebeats_high_volume_time")
-    cookie.Delete("battlebeats_high_volume_warn")
     cookie.Delete("battlebeats_last_track")
     cookie.Delete("battlebeats_vol_expanded")
     RunConsoleCommand("battlebeats_seen_version", "0")
@@ -1292,12 +1277,14 @@ concommand.Add("battlebeats_delete_data", function()
     btb.musicPlaylists = {}
     file.Delete("battlebeats/track_data.json")
     btb.trackData = {}
+    file.Delete("battlebeats/trackmeta.txt")
+    btb.trackMeta = {}
 end)
 
 concommand.Add("battlebeats_clean_unused_tracks", function()
     if not confirmAction("clean_unused_tracks", 5) then return end
 
-    notification.AddLegacy("[BattleBeats] " .. language.GetPhrase("btb.options.misc.clean_unused_tracks_tip_conf"), NOTIFY_GENERIC, 3)
+    notification.AddLegacy("[BattleBeats] " .. L("btb.options.misc.clean_unused_tracks_tip_conf"), NOTIFY_GENERIC, 3)
     surface.PlaySound("buttons/button14.wav")
 
     cleanupInvalidTracks(btb.packVolume)

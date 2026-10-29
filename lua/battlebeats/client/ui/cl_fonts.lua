@@ -47,3 +47,16 @@ surface.CreateFont("BattleBeats_Rename_Font", {
     weight = 500,
     italic = true
 })
+
+surface.CreateFont("BattleBeats_Meta", {
+    font = "Trebuchet MS",
+    size = 15,
+    weight = 500,
+    extended = true
+})
+surface.CreateFont("BattleBeats_Chip", {
+    font = "Trebuchet MS",
+    size = 18,
+    weight = 700,
+    extended = true
+})

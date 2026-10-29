@@ -48,42 +48,14 @@ local effects = {
     },
 }
 
-local cYellow = Color(255, 210, 0)
-local cBg = Color(20, 20, 20, 215)
-local cCard = Color(45, 45, 45)
-local cCardIn = Color(56, 56, 56)
-local c50 = Color(50, 50, 50)
-local c70 = Color(70, 70, 70)
-local c90 = Color(90, 90, 90)
-local c100 = Color(100, 100, 100)
-local cTrack = Color(22, 22, 22)
-local cText = Color(230, 230, 230)
-local cDim = Color(140, 140, 140)
-local cShadow = Color(0, 0, 0, 70)
-local cOff = Color(0, 0, 0, 200)
+local shared = BATTLEBEATS.uiShared
+local LerpColor = shared.LerpColor
+local ColA = shared.ColA
+local animHover = shared.animHover
+local makeSwitch = shared.makeSwitch
 
-local ring, ringI = {}, 0
-for i = 1, 32 do ring[i] = Color(0, 0, 0, 255) end
-local function LerpColor(t, from, to)
-    ringI = ringI % 32 + 1
-    local c = ring[ringI]
-    c.r = Lerp(t, from.r, to.r)
-    c.g = Lerp(t, from.g, to.g)
-    c.b = Lerp(t, from.b, to.b)
-    c.a = Lerp(t, from.a or 255, to.a or 255)
-    return c
-end
-local function ColA(col, a)
-    ringI = ringI % 32 + 1
-    local c = ring[ringI]
-    c.r, c.g, c.b, c.a = col.r, col.g, col.b, a
-    return c
-end
-
-local function animHover(self, key, active, speed)
-    self[key] = Lerp(FrameTime() * (speed or 12), self[key] or 0, active and 1 or 0)
-    return self[key]
-end
+local C = shared.Colors
+local TL, TC, TR, TT = TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP
 
 local function valueText(v, dec, suffix)
     local s = string.format("%." .. (dec or 0) .. "f", v)
@@ -135,40 +107,6 @@ local function drawPolys(polys, col)
     for i = 1, #polys do surface.DrawPoly(polys[i]) end
 end
 
-local function makeSwitch(parent, x, y, getState, onClick)
-    local sw = vgui.Create("DPanel", parent)
-    sw:SetPos(x, y)
-    sw:SetSize(40, 20)
-    sw:SetCursor("hand")
-    sw.Anim = getState() and 1 or 0
-
-    sw.Paint = function(self, w, h)
-        local target = getState() and 1 or 0
-        self.Anim = Lerp(FrameTime() * 10, self.Anim, target)
-        if math.abs(self.Anim - target) < 0.002 then self.Anim = target end
-        local t = self.Anim
-
-        local hov = animHover(self, "Hov", self:IsHovered())
-        local ks = 16 + hov * 2
-        local knobX = Lerp(t, 2, w - ks - 2)
-        local knobY = (h - ks) / 2
-
-        local track = LerpColor(t, c90, cYellow)
-        draw.RoundedBox(h / 2, 0, 0, w, h, LerpColor(hov * 0.3, track, color_white))
-        draw.RoundedBox(ks / 2, knobX, knobY + 1, ks, ks, cShadow)
-        draw.RoundedBox(ks / 2, knobX, knobY, ks, ks, LerpColor(t, cText, c90))
-    end
-
-    sw.OnMousePressed = function(self, code)
-        if code ~= MOUSE_LEFT then return end
-        local new = not getState()
-        surface.PlaySound(new and "btb_switch_on.mp3" or "btb_switch_off.mp3")
-        onClick(new)
-    end
-
-    return sw
-end
-
 local function makeButton(parent, x, y, w, h, text, onClick, arrow)
     local b = vgui.Create("DButton", parent)
     b:SetPos(x, y)
@@ -177,12 +115,11 @@ local function makeButton(parent, x, y, w, h, text, onClick, arrow)
     b:SetCursor("hand")
     b.Paint = function(self, pw, ph)
         local hov = animHover(self, "Hov", self:IsHovered())
-        local bg = self:IsDown() and c50 or LerpColor(hov, c90, c100)
-        draw.RoundedBox(10, 0, 0, pw, ph, LerpColor(hov * 0.35, cYellow, color_white))
+        local bg = self:IsDown() and C.C50 or LerpColor(hov, C.C90, C.C100)
+        draw.RoundedBox(10, 0, 0, pw, ph, LerpColor(hov * 0.35, C.Yellow, color_white))
         draw.RoundedBox(9, 1, 1, pw - 2, ph - 2, bg)
         local t = isfunction(text) and text() or text
-        draw.SimpleText(t, "DermaDefaultBold", pw / 2 - (arrow and 6 or 0), ph / 2, color_white, TEXT_ALIGN_CENTER,
-            TEXT_ALIGN_CENTER)
+        draw.SimpleText(t, "DermaDefaultBold", pw / 2 - (arrow and 6 or 0), ph / 2, color_white, TC, TC)
         if arrow then
             local ax, ay = pw - 18, ph / 2
             surface.SetDrawColor(255, 255, 255, 120 + 135 * hov)
@@ -265,30 +202,30 @@ local function fader(parent, o)
         for db = o.min, o.max, 5 do
             local y = valToY(db)
             local len = db == 0 and 12 or 6
-            surface.SetDrawColor(db == 0 and c100 or c70)
+            surface.SetDrawColor(db == 0 and C.C100 or C.C70)
             surface.DrawLine(cx - 8 - len, y, cx - 8, y)
             surface.DrawLine(cx + 8, y, cx + 8 + len, y)
         end
 
-        draw.RoundedBox(3, cx - 3, top + HH, 6, bot - top - 2 * HH, cTrack)
+        draw.RoundedBox(3, cx - 3, top + HH, 6, bot - top - 2 * HH, C.Track)
 
         local y0, yv = valToY(0), valToY(v)
         local fy = math.min(y0, yv)
         local fh = math.abs(y0 - yv)
         if fh > 0 then
-            draw.RoundedBox(2, cx - 3, fy, 6, fh, LerpColor(hov * 0.3, cYellow, color_white))
+            draw.RoundedBox(2, cx - 3, fy, 6, fh, LerpColor(hov * 0.3, C.Yellow, color_white))
         end
 
         local hw, hh = 32, HH * 2
-        draw.RoundedBox(6, cx - hw / 2, yv - HH + 2, hw, hh, cShadow)
-        draw.RoundedBox(6, cx - hw / 2, yv - HH, hw, hh, LerpColor(hov * 0.5, c50, cYellow))
-        draw.RoundedBox(5, cx - hw / 2 + 1, yv - HH + 1, hw - 2, hh - 2, LerpColor(hov, c90, c100))
-        surface.SetDrawColor(cYellow)
+        draw.RoundedBox(6, cx - hw / 2, yv - HH + 2, hw, hh, C.Shadow)
+        draw.RoundedBox(6, cx - hw / 2, yv - HH, hw, hh, LerpColor(hov * 0.5, C.C50, C.Yellow))
+        draw.RoundedBox(5, cx - hw / 2 + 1, yv - HH + 1, hw - 2, hh - 2, LerpColor(hov, C.C90, C.C100))
+        surface.SetDrawColor(C.Yellow)
         surface.DrawRect(cx - 10, yv - 1, 20, 2)
 
         local txt = v == 0 and "0.0" or string.format("%+.1f", v)
-        draw.SimpleText(txt, "DermaDefaultBold", cx, 2, v == 0 and cDim or cYellow, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
-        draw.SimpleText(o.label, "DermaDefault", cx, h - 4, cText, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
+        draw.SimpleText(txt, "DermaDefaultBold", cx, 2, v == 0 and C.Dim or C.Yellow, TC, TT)
+        draw.SimpleText(o.label, "DermaDefault", cx, h - 4, C.Text, TC, TEXT_ALIGN_BOTTOM)
     end
 
     return p
@@ -366,17 +303,17 @@ local function knob(parent, o)
             self.ptr = { buildPointer(kcx, kcy, br * 0.3, br * 0.9, ang, 1.5) }
         end
 
-        draw.SimpleText(o.label, "DermaDefaultBold", kcx, 0, ColA(cText, 255 * k), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+        draw.SimpleText(o.label, "DermaDefaultBold", kcx, 0, ColA(C.Text, 255 * k), TC, TT)
 
-        drawPolys(knobBg, ColA(c70, 255 * k))
-        drawPolys(self.valArc, ColA(LerpColor(hov * 0.3, cYellow, color_white), 255 * k))
+        drawPolys(knobBg, ColA(C.C70, 255 * k))
+        drawPolys(self.valArc, ColA(LerpColor(hov * 0.3, C.Yellow, color_white), 255 * k))
 
-        draw.RoundedBox(br, kcx - br, kcy - br + 1, br * 2, br * 2, ColA(cShadow, cShadow.a * k))
-        draw.RoundedBox(br, kcx - br, kcy - br, br * 2, br * 2, ColA(LerpColor(hov, c90, c100), 255 * k))
-        drawPolys(self.ptr, ColA(cYellow, 255 * k))
+        draw.RoundedBox(br, kcx - br, kcy - br + 1, br * 2, br * 2, ColA(C.Shadow, C.Shadow.a * k))
+        draw.RoundedBox(br, kcx - br, kcy - br, br * 2, br * 2, ColA(LerpColor(hov, C.C90, C.C100), 255 * k))
+        drawPolys(self.ptr, ColA(C.Yellow, 255 * k))
 
         draw.SimpleText(valueText(self.Value, o.dec, o.suffix), "DermaDefaultBold", kcx, kcy + kr + 6,
-            ColA(hov > 0.5 and cYellow or cText, 255 * k), TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            ColA(hov > 0.5 and C.Yellow or C.Text, 255 * k), TC, TT)
     end
     return p
 end
@@ -421,14 +358,14 @@ function BassFX.OpenMenu(px, py)
     f.isMinimalized = false
 
     f.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, cBg)
-        surface.SetDrawColor(cYellow)
+        draw.RoundedBox(12, 0, 0, w, h, C.Bg)
+        surface.SetDrawColor(C.Yellow)
         surface.DrawRect(0, head - 1, w, 1)
-        draw.SimpleText("BassFX", "Trebuchet24", 30, head / 2 - 5, cYellow, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        draw.SimpleText("BattleBeats", "HudSelectionText", 18, head / 2 + 8, cYellow, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText("BassFX", "Trebuchet24", 30, head / 2 - 5, C.Yellow, TL, TC)
+        draw.SimpleText("BattleBeats", "HudSelectionText", 18, head / 2 + 8, C.Yellow, TL, TC)
         local on = isOn()
-        draw.SimpleText(unavailable and "Unavailable" or (on and "Enabled" or "Disabled"), "DermaDefaultBold", 178, head / 2 - 1, on and color_white or cDim, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, cYellow)
+        draw.SimpleText(unavailable and "Unavailable" or (on and "Enabled" or "Disabled"), "DermaDefaultBold", 178, head / 2 - 1, on and color_white or C.Dim, TL, TC)
+        BATTLEBEATS.drawRoundedOutline(12, 0, 0, w, h, 1, C.Yellow)
     end
 
     f:BTB_SetButtons(true, -5, 6, true)
@@ -471,15 +408,15 @@ function BassFX.OpenMenu(px, py)
         local m = DermaMenu()
         m:SetMaxHeight(320)
         m:SetMinimumWidth(btn:GetWide())
-        m.Paint = function(_, w, h) draw.RoundedBox(6, 0, 0, w, h, c50) end
+        m.Paint = function(_, w, h) draw.RoundedBox(6, 0, 0, w, h, C.C50) end
         for _, n in ipairs(names) do
             local opt = m:AddOption(n, function() applyPreset(n) end)
             opt:SetFont("DermaDefaultBold")
             opt.Paint = function(s, w, h)
                 s:SetTextColor(color_white)
                 local hv = animHover(s, "Hov", s:IsHovered())
-                draw.RoundedBox(4, 0, 0, w, h, LerpColor(hv, c50, c100))
-                draw.RoundedBox(2, 0, h / 2 - 8 * hv, 3, 16 * hv, cYellow)
+                draw.RoundedBox(4, 0, 0, w, h, LerpColor(hv, C.C50, C.C100))
+                draw.RoundedBox(2, 0, h / 2 - 8 * hv, 3, 16 * hv, C.Yellow)
             end
         end
         local x, y = btn:LocalToScreen(0, btn:GetTall() + 2)
@@ -493,12 +430,12 @@ function BassFX.OpenMenu(px, py)
     content.PaintOver = function(self, w, h)
         self.Off = Lerp(FrameTime() * 8, self.Off or 0, isOn() and 0 or 1)
         if self.Off < 0.01 then return end
-        draw.RoundedBoxEx(12, 0, 0, w, h, ColA(cOff, cOff.a * self.Off), false, false, true, true)
+        draw.RoundedBoxEx(12, 0, 0, w, h, ColA(C.Off, C.Off.a * self.Off), false, false, true, true)
 
         if unavailable then
-            draw.SimpleText("Work In Progress", "Trebuchet24", w / 2, h / 2 - 22, Color(255, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            --draw.SimpleText("BassFX module unavailable", "Trebuchet24", w / 2, h / 2 - 22, Color(255, 100, 100), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-            --draw.SimpleText("gmcl_bassfx_win64.dll or lua/autorun/client/bass.lua is missing", "DermaDefault", w / 2, h / 2 + 8, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+            draw.SimpleText("Work In Progress", "Trebuchet24", w / 2, h / 2 - 22, Color(255, 100, 100), TC, TC)
+            --draw.SimpleText("BassFX module unavailable", "Trebuchet24", w / 2, h / 2 - 22, Color(255, 100, 100), TC, TC)
+            --draw.SimpleText("gmcl_bassfx_win64.dll or lua/autorun/client/bass.lua is missing", "DermaDefault", w / 2, h / 2 + 8, color_white, TC, TC)
         end
     end
 
@@ -507,9 +444,9 @@ function BassFX.OpenMenu(px, py)
     left:SetPos(12, 8)
     left:SetSize(440, ch - 8)
     left.Paint = function(_, w, h)
-        draw.RoundedBox(10, 0, 0, w, h, cCard)
-        draw.SimpleText("EQUALIZER", "DermaDefaultBold", 16, 10, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-        draw.SimpleText("dB", "DermaDefault", w - 16, 10, cDim, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+        draw.RoundedBox(10, 0, 0, w, h, C.Card)
+        draw.SimpleText("EQUALIZER", "DermaDefaultBold", 16, 10, color_white, TL, TT)
+        draw.SimpleText("dB", "DermaDefault", w - 16, 10, C.Dim, TR, TT)
     end
 
     local CURVE_H = 96
@@ -549,11 +486,11 @@ function BassFX.OpenMenu(px, py)
                 curveYs[n] = curveY(curveVal(x), h)
             end
         end
-        draw.RoundedBox(8, 0, 0, w, h, cCardIn)
+        draw.RoundedBox(8, 0, 0, w, h, C.CardIn)
         local y0 = curveY(0, h)
-        surface.SetDrawColor(c90)
+        surface.SetDrawColor(C.C90)
         surface.DrawLine(6, y0, w - 6, y0)
-        surface.SetDrawColor(c70)
+        surface.SetDrawColor(C.C70)
         surface.DrawLine(6, curveY(7.5, h), w - 6, curveY(7.5, h))
         surface.DrawLine(6, curveY(-7.5, h), w - 6, curveY(-7.5, h))
         surface.SetDrawColor(255, 210, 0, 18)
@@ -563,7 +500,7 @@ function BassFX.OpenMenu(px, py)
             local y = curveYs[n]
             surface.DrawRect(x, math.min(y0, y), cStep, math.abs(y0 - y))
         end
-        surface.SetDrawColor(cYellow)
+        surface.SetDrawColor(C.Yellow)
         for i = 2, n do
             local x = 6 + (i - 2) * cStep
             surface.DrawLine(x, curveYs[i - 1], x + cStep, curveYs[i])
@@ -595,8 +532,8 @@ function BassFX.OpenMenu(px, py)
     right:SetPos(464, 8)
     right:SetSize(fw - 464 - 12, ch - 8)
     right.Paint = function(_, w, h)
-        draw.RoundedBox(10, 0, 0, w, h, cCard)
-        draw.SimpleText("EFFECTS", "DermaDefaultBold", 16, 10, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        draw.RoundedBox(10, 0, 0, w, h, C.Card)
+        draw.SimpleText("EFFECTS", "DermaDefaultBold", 16, 10, color_white, TL, TT)
     end
 
     local rowh = 112
@@ -621,10 +558,10 @@ function BassFX.OpenMenu(px, py)
 
         row.Paint = function(self, w, h)
             self.Anim = Lerp(FrameTime() * 10, self.Anim, on and 1 or 0)
-            draw.RoundedBox(8, 0, 0, w, h, cCardIn)
-            draw.RoundedBoxEx(8, 0, 0, 4, h, ColA(cYellow, 255 * self.Anim), true, false, true, false)
+            draw.RoundedBox(8, 0, 0, w, h, C.CardIn)
+            draw.RoundedBoxEx(8, 0, 0, 4, h, ColA(C.Yellow, 255 * self.Anim), true, false, true, false)
             draw.SimpleText(e.label, "DermaDefaultBold", 16, 50,
-                LerpColor(self.Anim, cDim, color_white), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+                LerpColor(self.Anim, C.Dim, color_white), TL, TT)
         end
 
         makeSwitch(row, 16, 24, function() return on end, function(v)

@@ -559,7 +559,7 @@ end
 local function updSub(s)
     local ch = s.channel
     if not s.stopAt then
-        local alive = IsValid(ch) and (btb.currentStation == ch or CurTime() - s.startedAt < 1)
+        local alive = IsValid(ch) and ((btb.currentStation == ch or btb.currentPreviewStation == ch) or CurTime() - s.startedAt < 1)
         if alive then
             s.t = ch:GetTime() or s.t
         else

@@ -209,6 +209,7 @@ local echoStep = 0.025 -- s, delay is quantized to this
 local echoGain = 200 -- echo energy -> fWetDryMix [%]
 local echoMaxWet = 30 -- fWetDryMix cap [%]
 local echoMinWet = 2 -- below this the echo is not used (once on, it stays until half of this)
+local echoOpenPow = 2 -- echo level *= (1 - open)^echoOpenPow
 
 -- tunnels/corridors: distances are very uneven (short to the sides, long along the axis), sound is guided
 local tunnelElongMin = 4 -- axis length / mean free path: below this no tunnel
@@ -218,6 +219,12 @@ local tunnelFeedback = 10 -- extra echo feedback [%] at full tunnelness (repeats
 local tunnelReverbCut = 0.25 -- full tunnel: reverb level * 0.75 (the echo should lead there); 0 = off
 local probeJitter = 0.15 -- axis probe: random jitter of the candidate direction
 local probeSmooth = 0.3 -- axis probe: share of a fresh measurement mixed into the smoothed distance
+
+local coupleMin = 2          -- dFar / lambda, below this no coupling
+local coupleFull = 6         -- ... at or above this fully coupled
+local coupleShare = 0.6      -- how much of the far space counts as "my room" at full coupling
+local coupleEchoWet = 12     -- extra echo wet [%] at full coupling
+local echoEndMin = 14        -- m, an axis end this far gives a delay >= echoMinDelay (2*d/spd >= 0.08)
 
 -- clutter: how much of the surroundings is covered by props (furniture) that the brush-only rays cannot see
 local clutterMaxD = 524 -- units (~10 m), only props this close count
@@ -602,19 +609,29 @@ local function tunnelness(est)
     return math.Clamp((est.dFar / est.lambda - tunnelElongMin) / (tunnelElongFull - tunnelElongMin), 0, 1) * (1 - est.open)
 end
 
+local function coupling(est)
+    if not (est.dFar and est.lambda) then return 0 end
+    return math.Clamp((est.dFar / est.lambda - coupleMin) / (coupleFull - coupleMin), 0, 1) * (1 - est.open)
+end
+
 local function publish(est)
     local k = roomAcousticsStr:GetFloat()
     local reverb
+    local coup = coupling(est)
+    local lam = est.lambda
+    if est.dFar then
+        lam = est.lambda + coup * coupleShare * math.max(0, est.dFar * 0.5 - est.lambda)
+    end
     if est.lambda then
         local cl = roomAcousticsClutter:GetBool() and math.Clamp(est.clutter * clutterGain, 0, 1) or 0
         local m = math.Clamp((1 - est.open) * est.absorb * (1 - clutterAbsorb * cl), 0.02, 0.98) -- energy kept per bounce; open space 'absorbs' too
-        local t60 = eyringK * est.lambda / (-math.log(m))
+        local t60 = eyringK * lam / (-math.log(m))
         local ms = math.Clamp(t60 * 1000, reverbMinMS, reverbMaxMS)
         dbgT60 = ms
 
         local wetRaw = est.ret * k * (1 + confBoost * (est.conf - 0.5)) * (1 - est.open) ^ openPow * (1 - clutterWet * cl) * (1 - tunnelReverbCut * tunnelness(est))
         dbgRaw = wetRaw
-        local gate = math.min(1, (est.lambda / sizeRef) ^ sizePow)
+        local gate = math.min(1, (lam / sizeRef) ^ sizePow)
         dbgGate = gate
         local wet = math.min(wetRaw * gate, maxWet)
         local db = wet > 1e-4 and math.Clamp(20 * math.log10(wet), minDB, maxDB) or minDB
@@ -629,15 +646,24 @@ local function publish(est)
     dbgTun = tun
     local delay = est.delay
     local delayL, delayR
-    if tun > 0.3 and est.axisA then
+    if (tun > 0.3 or coup > 0.3) and est.axisA then
         local dA, dB = est.axisA, est.axisB
         if est.escA and not est.escB then dA = dB elseif est.escB and not est.escA then dB = dA end
-        delayL, delayR = 2 * dA / spd, 2 * dB / spd
-        delay = delayL
+        -- an end that is too close would give a fake <80ms "echo": mirror the longer one
+        if dA < echoEndMin and dB >= echoEndMin then
+            dA = dB
+        elseif dB < echoEndMin and dA >= echoEndMin then
+            dB = dA
+        end
+        if math.max(dA, dB) >= echoEndMin then
+            delayL, delayR = 2 * dA / spd, 2 * dB / spd
+            delay = delayL
+        end
     end
 
     if roomAcousticsEcho:GetBool() and delay then
-        local wetPct = math.min(est.e * k * echoGain + tunnelEchoWet * tun * k, echoMaxWet)
+        local echoOpen = (1 - est.open) ^ echoOpenPow
+        local wetPct = math.min((est.e * k * echoGain + tunnelEchoWet * tun * k) * echoOpen, echoMaxWet)
         local thr = room["echo#1"] and echoMinWet * 0.5 or echoMinWet -- hysteresis
         if wetPct >= thr then
             local function quant(t)

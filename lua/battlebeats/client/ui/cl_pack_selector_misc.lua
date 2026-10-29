@@ -1,76 +1,16 @@
-local c909090 = Color(90, 90, 90)
-local c000200 = Color(0, 0, 0, 200)
-local c200200200 = Color(200, 200, 200)
-local c2552100 = Color(255, 210, 0)
-local c2001500 = Color(200, 150, 0)
-local c404040 = Color(40, 40, 40)
-
 local btb = BATTLEBEATS
 
-local SEG = 6
-local ang_step = math.rad(90 / SEG)
-local quarter = {}
-for i = 0, SEG do
-    local a = i * ang_step
-    quarter[i] = { math.cos(a), math.sin(a) }
-end
+local shared = btb.uiShared
+local LerpColor = shared.LerpColor
+local ColA = shared.ColA
+local animHover = shared.animHover
+local drawBlur = shared.drawBlur
+local makeSearch = shared.makeSearch
+local makeScroll = shared.makeScroll
 
-function btb.drawRoundedOutline(radius, x, y, w, h, thickness, col)
-    if radius > math.min(w, h) / 2 then radius = math.min(w, h) / 2 end
-    if thickness < 1 then thickness = 1 end
-
-    local inner_r = math.max(radius - thickness, 0.01)
-    surface.SetDrawColor(col.r or col[1], col.g or col[2], col.b or col[3], col.a or col[4] or 255)
-    surface.DrawRect(x + radius, y, w - radius * 2, thickness)
-    surface.DrawRect(x + radius, y + h - thickness, w - radius * 2, thickness)
-    surface.DrawRect(x, y + radius, thickness, h - radius * 2)
-    surface.DrawRect(x + w - thickness, y + radius, thickness, h - radius * 2)
-    draw.NoTexture()
-
-    local rotations = {
-        { cx = x + radius, cy = y + radius, cx_mul = -1, cy_mul = -1 }, -- TL
-        { cx = x + w - radius, cy = y + radius, cx_mul = 1,  cy_mul = -1 }, -- TR
-        { cx = x + w - radius, cy = y + h - radius, cx_mul = 1,  cy_mul = 1 }, -- BR
-        { cx = x + radius, cy = y + h - radius, cx_mul = -1, cy_mul = 1 }, -- BL
-    }
-
-    local poly = {}
-    for _, r in ipairs(rotations) do
-        local cx, cy = r.cx, r.cy
-        local cxm, cym = r.cx_mul, r.cy_mul
-
-        local reverse_order = (cxm * cym < 0)
-
-        for i = 0, SEG - 1 do
-            local s = quarter[i]
-            local e = quarter[i + 1]
-
-            local sxo = cx + s[1] * cxm * radius
-            local syo = cy + s[2] * cym * radius
-            local exo = cx + e[1] * cxm * radius
-            local eyo = cy + e[2] * cym * radius
-
-            local sxi = cx + s[1] * cxm * inner_r
-            local syi = cy + s[2] * cym * inner_r
-            local exi = cx + e[1] * cxm * inner_r
-            local eyi = cy + e[2] * cym * inner_r
-
-            if reverse_order then
-                poly[1] = { x = sxo, y = syo }
-                poly[2] = { x = sxi, y = syi }
-                poly[3] = { x = exi, y = eyi }
-                poly[4] = { x = exo, y = eyo }
-            else
-                poly[1] = { x = sxo, y = syo }
-                poly[2] = { x = exo, y = eyo }
-                poly[3] = { x = exi, y = eyi }
-                poly[4] = { x = sxi, y = syi }
-            end
-
-            surface.DrawPoly(poly)
-        end
-    end
-end
+local C = shared.Colors
+local TL, TC, TR, TT = TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP
+local L = language.GetPhrase
 
 --MARK:Steamworks info
 local buttonWidth, buttonHeight, spacing = 200, 30, 40
@@ -94,12 +34,12 @@ local function createInfoBox(panel, x)
     box:SetSize(buttonWidth, buttonHeight)
     box:SetPos(x, 120)
     box.Paint = function(self, w, h)
-        draw.RoundedBox(10, 0, 0, w, h, c2001500)
-        draw.RoundedBox(9, 1, 1, w - 2, h - 2, c404040)
+        draw.RoundedBox(10, 0, 0, w, h, C.Yellow)
+        draw.RoundedBox(9, 1, 1, w - 2, h - 2, C.C40)
     end
     local label = vgui.Create("DLabel", box)
     label:SetFont("DermaDefault")
-    label:SetTextColor(c200200200)
+    label:SetTextColor(C.C200)
     label:Center()
     box.label = label
     return box
@@ -107,7 +47,7 @@ end
 
 local function updateBox(box, text, color)
     box.label:SetText(text)
-    box.label:SetTextColor(color or c200200200)
+    box.label:SetTextColor(color or C.C200)
     box.label:SizeToContents()
     box.label:Center()
 end
@@ -130,263 +70,6 @@ local function applyInfo(panel, result)
     updateBox(panel.infoPanels[1], ssize .. ": " .. size, getSizeColor(size))
     updateBox(panel.infoPanels[2], screated .. ": " .. date)
     updateBox(panel.infoPanels[3], sauthor .. ": " .. owner)
-end
-
-local c202020215 = Color(20, 20, 20, 215)
-local c707070255 = Color(70, 70, 70, 255)
-local c808080255 = Color(80, 80, 80, 255)
-local c150150150 = Color(150, 150, 150)
-local c100100100 = Color(100, 100, 100)
-local c606060 = Color(60, 60, 60)
-local blur = Material("pp/blurscreen")
-local function drawBlur(panel, amount)
-    local x, y = panel:LocalToScreen(0, 0)
-    surface.SetMaterial(blur)
-    surface.SetDrawColor(255, 255, 255)
-    for i = 1, 3 do
-        blur:SetFloat("$blur", (i / 3) * (amount or 6))
-        blur:Recompute()
-        render.UpdateScreenEffectTexture()
-        surface.DrawTexturedRect(-x, -y, ScrW(), ScrH())
-    end
-end
---MARK: Import frame
-function btb.openImportFrame(frame)
-    local background = vgui.Create("DPanel", frame)
-    background:SetSize(frame:GetWide(), frame:GetTall())
-    background:Center()
-    background.Paint = function(self)
-        drawBlur(self, 2)
-    end
-    local importFrame
-    local playlistFrame = vgui.Create("DPanel", background)
-    playlistFrame:SetSize(400, 220)
-    playlistFrame:Center()
-    playlistFrame.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, c202020215)
-        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
-    end
-    local playlistBtn = vgui.Create("DButton", playlistFrame)
-    playlistBtn:SetSize(360, 80)
-    playlistBtn:SetPos(20, 20)
-    playlistBtn:SetText("#btb.ps.button_create")
-    playlistBtn:SetFont("BattleBeats_Font")
-    playlistBtn:SetTextColor(color_white)
-    playlistBtn:BTB_SetButton(c2552100, c707070255, c808080255)
-    playlistBtn.DoClick = function()
-        btb.openPlaylistEditor(nil, function()
-            RefreshList()
-        end)
-        background:Remove()
-    end
-    local importBtn = vgui.Create("DButton", playlistFrame)
-    importBtn:SetSize(360, 80)
-    importBtn:SetPos(20, 120)
-    importBtn:SetText("#btb.ps.button_import")
-    importBtn:SetFont("BattleBeats_Font")
-    importBtn:SetTextColor(color_white)
-    importBtn:BTB_SetButton(c2552100, c707070255, c808080255)
-    importBtn.DoClick = function()
-        playlistFrame:Remove()
-        if IsValid(importFrame) then return end
-        surface.PlaySound("btb_button_click.mp3")
-        importFrame = vgui.Create("DPanel", frame)
-        importFrame:SetSize(500, 230)
-        importFrame:Center()
-        importFrame.Paint = function(self, w, h)
-            drawBlur(self, 3)
-            draw.RoundedBox(12, 0, 0, w, h, c202020215)
-            btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
-        end
-        btb.importBox = vgui.Create("DTextEntry", importFrame)
-        btb.importBox:SetSize(460, 80)
-        btb.importBox:SetPos(20, 20)
-        btb.importBox:SetMultiline(true)
-        btb.importBox.Paint = function(self, w, h)
-            draw.RoundedBox(4, 0, 0, w, h, c808080255)
-            self:DrawTextEntryText(color_white, color_white, color_white)
-            if self:GetText() == "" and not self:IsEditing() then
-                draw.SimpleText("#btb.playlist.import.code", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
-        end
-        btb.plNameBox = vgui.Create("DTextEntry", importFrame)
-        btb.plNameBox:SetMaximumCharCount(30)
-        btb.plNameBox:SetSize(460, 30)
-        btb.plNameBox:SetPos(20, 110)
-        btb.plNameBox:SetFont("BattleBeats_Font")
-        btb.plNameBox.Paint = function(self, w, h)
-            draw.RoundedBox(4, 0, 0, w, h, c808080255)
-            self:DrawTextEntryText(color_white, color_white, color_white)
-            if self:GetText() == "" and not self:IsEditing() then
-                draw.SimpleText("#btb.playlist.create.enter_name", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
-        end
-        local infoLabel = vgui.Create("DLabel", importFrame)
-        infoLabel:SetPos(20, 150)
-        infoLabel:SetSize(460, 20)
-        infoLabel:SetTextColor(color_white)
-        infoLabel:SetFont("CenterPrintText")
-        infoLabel:SetContentAlignment(5)
-        infoLabel:SetText("No data loaded")
-        local decodedData = nil
-        local missing = {}
-        local importClean = vgui.Create("DButton", importFrame)
-        local importKeep = vgui.Create("DButton", importFrame)
-        importClean:SetEnabled(false)
-        importKeep:SetEnabled(false)
-        importClean:SetTooltip("#btb.ps.button_import_clean_tip")
-        importClean:SetTooltipPanelOverride("BattleBeatsTooltip")
-        importKeep:SetTooltip("#btb.ps.button_import_keep_tip")
-        importKeep:SetTooltipPanelOverride("BattleBeatsTooltip")
-        importClean:SetTextColor(c100100100)
-        importKeep:SetTextColor(c100100100)
-        importClean:SetCursor("no")
-        importKeep:SetCursor("no")
-        importClean:SetFont("CenterPrintText")
-        importKeep:SetFont("CenterPrintText")
-        btb.importBox.OnTextChanged = function(self)
-            timer.Remove("BTB_ImportDecodeTimer")
-            timer.Create("BTB_ImportDecodeTimer", 0.3, 1, function()
-                if not IsValid(self) then return end
-                local text = self:GetValue()
-                decodedData = nil
-                missing = {}
-                local data = btb.importPlaylist(text)
-                if not data then
-                    infoLabel:SetText("#btb.playlist.import.invalid_code")
-                    importClean:SetEnabled(false)
-                    importKeep:SetEnabled(false)
-                    importClean:SetCursor("no")
-                    importKeep:SetCursor("no")
-                    importClean:SetTextColor(c100100100)
-                    importKeep:SetTextColor(c100100100)
-                    return
-                end
-                decodedData = data
-                local function check(list)
-                    for _, track in ipairs(list or {}) do
-                        if not file.Exists(track.path, "GAME") then
-                            table.insert(missing, track.path)
-                        end
-                    end
-                end
-                check(data.ambient)
-                check(data.combat)
-                if #missing > 0 then
-                    importClean:SetEnabled(true)
-                    importKeep:SetEnabled(true)
-                    importClean:SetCursor("hand")
-                    importKeep:SetCursor("hand")
-                    importClean:SetTextColor(color_white)
-                    importKeep:SetTextColor(color_white)
-                    infoLabel:SetText(language.GetPhrase("btb.playlist.import.missing_tracks") .. ": " .. table.concat(missing, ", "))
-                else
-                    importClean:SetEnabled(true)
-                    importKeep:SetEnabled(false)
-                    importClean:SetCursor("hand")
-                    importKeep:SetCursor("no")
-                    importClean:SetTextColor(color_white)
-                    importKeep:SetTextColor(c100100100)
-                    infoLabel:SetText("#btb.playlist.import.all_good")
-                end
-            end)
-        end
-
-        importClean:SetSize(140, 30)
-        importClean:SetPos(20, 180)
-        importClean:SetText("#btb.ps.button_import_clean")
-        importClean.DoClick = function()
-            if not decodedData then return end
-            background:Remove()
-            local name = btb.plNameBox:GetValue()
-            if name == "" then
-                notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
-                surface.PlaySound("buttons/button11.wav")
-                return
-            end
-            for packName, _ in pairs(btb.musicPacks or {}) do
-                if name == packName then
-                    if not isEdit or editedTitle ~= title then
-                        notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
-                        surface.PlaySound("buttons/button11.wav")
-                        return
-                    end
-                end
-            end
-
-            local function filter(list)
-                local new = {}
-                for _, track in ipairs(list or {}) do
-                    if file.Exists(track.path, "GAME") then
-                        table.insert(new, track)
-                    end
-                end
-                return new
-            end
-            notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
-            surface.PlaySound("buttons/button3.wav")
-            decodedData.ambient = filter(decodedData.ambient)
-            decodedData.combat = filter(decodedData.combat)
-            btb.musicPlaylists[name] = decodedData
-            btb.validateAndTransformPlaylist(name, decodedData)
-            btb.savePlaylists()
-            importFrame:Remove()
-            RefreshList()
-        end
-        importClean.Paint = function(self, w, h)
-            draw.RoundedBox(8, 0, 0, w, h,
-                self:IsEnabled() and (self:IsHovered() and c100100100 or c808080255) or c606060)
-        end
-
-        importKeep:SetSize(140, 30)
-        importKeep:SetPos(180, 180)
-        importKeep:SetText("#btb.ps.button_import_keep")
-        importKeep.DoClick = function()
-            if not decodedData then return end
-            background:Remove()
-            local name = btb.plNameBox:GetValue()
-            if name == "" then
-                notification.AddLegacy("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, 3)
-                surface.PlaySound("buttons/button11.wav")
-                return
-            end
-            for packName, _ in pairs(btb.musicPacks or {}) do
-                if name == packName then
-                    if not isEdit or editedTitle ~= title then
-                        notification.AddLegacy("#btb.playlist.create.name_error", NOTIFY_ERROR, 3)
-                        surface.PlaySound("buttons/button11.wav")
-                        return
-                    end
-                end
-            end
-            notification.AddLegacy("#btb.playlist.import.succ", NOTIFY_GENERIC, 3)
-            surface.PlaySound("buttons/button3.wav")
-            btb.musicPlaylists[name] = decodedData
-            btb.validateAndTransformPlaylist(name, decodedData)
-            btb.savePlaylists()
-            importFrame:Remove()
-            RefreshList()
-        end
-        importKeep.Paint = function(self, w, h)
-            draw.RoundedBox(8, 0, 0, w, h,
-                self:IsEnabled() and (self:IsHovered() and c100100100 or c808080255) or c606060)
-        end
-
-        local cancelBtn = vgui.Create("DButton", importFrame)
-        cancelBtn:SetSize(140, 30)
-        cancelBtn:SetPos(340, 180)
-        cancelBtn:SetText("#btb.main.volume_cancel")
-        cancelBtn:SetTextColor(color_white)
-        cancelBtn:SetFont("CenterPrintText")
-        cancelBtn.DoClick = function()
-            background:Remove()
-            importFrame:Remove()
-        end
-        cancelBtn.Paint = function(self, w, h)
-            draw.RoundedBox(8, 0, 0, w, h, self:IsHovered() and c100100100 or c808080255)
-        end
-    end
-    return playlistFrame
 end
 
 function btb.createInfoPanel(panel, packData, callback)
@@ -421,430 +104,697 @@ function btb.createInfoPanel(panel, packData, callback)
     end)
 end
 
---MARK:Volume edit
-function btb.openVolumeEditor(panel, track, pack, func)
-    local background = vgui.Create("DPanel", panel)
-    background:SetSize(panel:GetWide(), panel:GetTall())
-    background:Center()
-    background.Paint = function(self)
-        drawBlur(self, 2)
+--MARK: UI helpers
+local function fitText(text, font, maxW)
+    surface.SetFont(font)
+    if surface.GetTextSize(text) <= maxW then return text end
+    while #text > 1 and surface.GetTextSize(text .. "…") > maxW do
+        local off = utf8.offset(text, -1) or #text
+        text = string.sub(text, 1, off - 1)
     end
-    local frame = vgui.Create("DPanel", background)
-    frame:SetSize(360, 150)
-    frame:Center()
-    frame.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, c000200)
-        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
+    return text .. "…"
+end
+
+local function isCtrl() return input.IsKeyDown(KEY_LCONTROL) or input.IsKeyDown(KEY_RCONTROL) end
+local function isShift() return input.IsKeyDown(KEY_LSHIFT) or input.IsKeyDown(KEY_RSHIFT) end
+
+local function makeButton(parent, x, y, w, h, text, onClick, opts)
+    opts = opts or {}
+    local b = vgui.Create("DButton", parent)
+    b:SetPos(x, y)
+    b:SetSize(w, h)
+    b:SetText("")
+    b:SetCursor("hand")
+    if opts.tip then
+        b:SetTooltip(opts.tip)
+        b:SetTooltipPanelOverride("BattleBeatsTooltip")
     end
-    frame:BTB_SetTitle("Volume Boost", true)
-
-    local warning = vgui.Create("DLabel", frame)
-    warning:SetFont("DermaDefault")
-    warning:SetTextColor(Color(255, 200, 120))
-    warning:SetSize(340, 30)
-    warning:SetPos(10, 85)
-    warning:SetWrap(true)
-    warning:SetText("Volume boost multiplies final volume. Raising base volume makes the boost stronger (e.g 2x can become 4x)")
-
-    local current = 100
-    if track then
-        current = btb.getTrackData(track).vol or 100
-    elseif pack then
-        current = btb.packVolume[pack] or 100
+    b.Paint = function(self, pw, ph)
+        local enabled = not opts.enabled or opts.enabled()
+        local hov = animHover(self, "Hov", enabled and self:IsHovered())
+        local down = enabled and self:IsDown()
+        local accent = isfunction(opts.accent) and opts.accent() or opts.accent or C.Yellow
+        local isTab = opts.active ~= nil
+        local act = isTab and opts.active()
+        self.Act = Lerp(FrameTime() * 12, self.Act or (act and 1 or 0), act and 1 or 0)
+        local a = enabled and 255 or 90
+        local outBase = isTab and LerpColor(self.Act, C.C70, accent) or accent
+        draw.RoundedBox(10, 0, 0, pw, ph, ColA(LerpColor(hov * 0.35, outBase, color_white), a))
+        local bgc = down and C.C50 or LerpColor(hov, C.C90, C.C100)
+        if isTab then bgc = LerpColor(self.Act * 0.3, C.C50, accent) end
+        draw.RoundedBox(9, 1, 1, pw - 2, ph - 2, ColA(bgc, a))
+        local t = isfunction(text) and text() or text
+        draw.SimpleText(t, opts.font or "DermaDefaultBold", pw / 2, ph / 2, enabled and color_white or C.Dim, TC, TC)
     end
-
-    local bar = vgui.Create("DPanel", frame)
-    bar:SetSize(320, 8)
-    bar:SetPos(20, 65)
-    bar:SetCursor("hand")
-
-    local valueLabel = vgui.Create("DLabel", frame)
-    valueLabel:SetFont("DermaDefaultBold")
-    valueLabel:SetTextColor(color_white)
-    valueLabel:SetSize(200, 20)
-    valueLabel:SetPos(80, 40)
-    valueLabel:SetContentAlignment(5)
-
-    local leftBtn = vgui.Create("DButton", frame)
-    leftBtn:SetText("<")
-    leftBtn:SetFont("CreditsText")
-    leftBtn:SetTextColor(color_white)
-    leftBtn:SetSize(20, 20)
-    leftBtn:SetPos(3, 58)
-    leftBtn.Paint = function(self, w, h)
-        local bgColor = Color(0, 0, 0, 0)
-        draw.RoundedBox(8, 0, 0, w, h, bgColor)
+    b.DoClick = function()
+        if opts.enabled and not opts.enabled() then return end
+        surface.PlaySound("btb_tab_switch.mp3")
+        onClick(b)
     end
+    return b
+end
 
-    local rightBtn = vgui.Create("DButton", frame)
-    rightBtn:SetText(">")
-    rightBtn:SetFont("CreditsText")
-    rightBtn:SetTextColor(color_white)
-    rightBtn:SetSize(20, 20)
-    rightBtn:SetPos(340, 58)
-    rightBtn.Paint = function(self, w, h)
-        local bgColor = Color(0, 0, 0, 0)
-        draw.RoundedBox(8, 0, 0, w, h, bgColor)
+local function makeCard(parent, x, y, w, h)
+    local p = vgui.Create("DPanel", parent)
+    p:SetPos(x, y)
+    p:SetSize(w, h)
+    p.Paint = function(self, pw, ph)
+        draw.RoundedBox(10, 0, 0, pw, ph, C.Card)
     end
+    return p
+end
 
-    local value = current
-
-    local function updateLabel()
-        local offset = value - 100
-        if offset == 0 then
-            valueLabel:SetText("0%")
-        elseif offset > 0 then
-            valueLabel:SetText("+" .. offset .. "%")
-        else
-            valueLabel:SetText(offset .. "%")
-        end
-    end
-
-    bar.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, c909090)
-        local progress = value / 200
-        local center = w * 0.5
-        local pos = w * progress
-        if pos >= center then
-            draw.RoundedBox(0, center, 0, pos - center, h, c2552100)
-        else
-            draw.RoundedBox(0, pos, 0, center - pos, h, c2552100)
-        end
-    end
-    frame.PaintOver = function()
-        surface.SetDrawColor(255, 255, 255, 180)
-        local center = 20 + bar:GetWide() / 2
-        surface.DrawRect(center - 1, bar:GetY() - 1, 2, bar:GetTall() + 2)
-    end
-
-    local dot = vgui.Create("DPanel", frame)
-    dot:SetMouseInputEnabled(false)
-    dot:SetSize(12, 12)
-
-    dot.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, color_white)
-    end
-
-    dot.Think = function(self)
-        local progress = value / 200
-        local x = 20 + bar:GetWide() * progress - 6
-        self:SetPos(x, 65 + bar:GetTall() / 2 - 6)
-    end
-
-    local function applyValue(val)
-        value = math.Clamp(math.floor(val), 0, 200)
-
-        if track then
-            if value == 100 then
-                btb.setTrackData(track, "vol", nil)
+local function makeEntry(parent, x, y, w, h, placeholder, font, multiline)
+    font = font or "DermaDefault"
+    local ph = string.sub(placeholder or "", 1, 1) == "#" and L(placeholder) or (placeholder or "")
+    local e = vgui.Create("DTextEntry", parent)
+    e:SetPos(x, y)
+    e:SetSize(w, h)
+    e:SetFont(font)
+    if multiline then e:SetMultiline(true) end
+    e:SetDrawLanguageID(false)
+    e.Paint = function(self, pw, phh)
+        local foc = animHover(self, "Foc", self:HasFocus())
+        draw.RoundedBox(6, 0, 0, pw, phh, LerpColor(foc, C.C70, C.Yellow))
+        draw.RoundedBox(5, 1, 1, pw - 2, phh - 2, LerpColor(foc * 0.5, C.Track, C.C50))
+        self:DrawTextEntryText(color_white, C.Select, color_white)
+        if self:GetText() == "" and not self:IsEditing() then
+            if multiline then
+                draw.SimpleText(ph, font, 8, 6, C.Dim, TL, TT)
             else
-                btb.setTrackData(track, "vol", value)
+                draw.SimpleText(ph, font, 8, phh / 2, C.Dim, TL, TC)
             end
-            updateLabel()
-            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
-            if not sName then sName = IsValid(btb.currentPreviewStation) and
-                btb.currentPreviewStation:GetFileName() or nil end
-            if sName == track then
-                if IsValid(btb.currentStation) then
-                    local targetVolume = btb.adjustVolume(sName)
-                    btb.currentStation:SetVolume(targetVolume)
-                elseif IsValid(btb.currentPreviewStation) then
-                    local targetVolume = btb.adjustVolume(sName, nil, true)
-                    btb.currentPreviewStation:SetVolume(targetVolume)
+        end
+    end
+    return e
+end
+
+local function createModal(parent, w, h, title)
+    if isstring(title) then title = L(title) end
+
+    local bg = vgui.Create("DPanel", parent)
+    bg:SetPos(0, 0)
+    bg:SetSize(parent:GetWide(), parent:GetTall())
+    bg:SetKeyboardInputEnabled(true)
+    bg:SetAlpha(0)
+    bg:AlphaTo(255, 0.12, 0)
+    bg.Paint = function(self, pw, ph)
+        drawBlur(self, 2)
+        surface.SetDrawColor(0, 0, 0, 90)
+        surface.DrawRect(0, 0, pw, ph)
+    end
+    bg.Cancel = function(self) self:Remove() end
+
+    local frame = vgui.Create("DPanel", bg)
+    frame:SetSize(w, h)
+    frame:Center()
+    frame.Paint = function(self, pw, ph)
+        draw.RoundedBox(12, 0, 0, pw, ph, C.Bg)
+        surface.SetDrawColor(C.Yellow)
+        surface.DrawRect(0, 36 - 1, pw, 1)
+        draw.SimpleText(fitText(title or "", "Trebuchet24", pw - 64), "Trebuchet24", 16, 36 / 2, C.Yellow, TL, TC)
+        if self.PaintExtra then self:PaintExtra(pw, ph) end
+        btb.drawRoundedOutline(12, 0, 0, pw, ph, 1, C.Yellow)
+    end
+
+    bg.OnKeyCodePressed = function(self, key)
+        if key == KEY_ESCAPE then
+            gui.HideGameUI()
+            self:Cancel()
+            return
+        end
+        local focus = vgui.GetKeyboardFocus()
+        if IsValid(focus) and isfunction(focus.IsEditing) and focus:IsEditing() then return end
+        if self.onKey then self.onKey(key) end
+    end
+    bg:RequestFocus()
+
+    return bg, frame
+end
+
+local function notify(text, kind, sound)
+    notification.AddLegacy(text, kind or NOTIFY_GENERIC, 3)
+    if sound then surface.PlaySound(sound) end
+end
+
+-- from my roblox chat bubbles addon
+local function wrapText(text, font, maxWidth)
+    surface.SetFont(font)
+    local words = string.Explode(" ", text)
+    local lines = {}
+    local currentLine = ""
+    for i = 1, #words do
+        local word = words[i]
+        ::retry_word::
+        local testLine = currentLine .. (currentLine == "" and "" or " ") .. word
+        local w = surface.GetTextSize(testLine)
+        if w > maxWidth then
+            if currentLine == "" then
+                for j = 1, #word do
+                    local substr = string.sub(word, 1, j)
+                    local sw = surface.GetTextSize(substr)
+                    if sw > maxWidth then
+                        local cut = j > 1 and string.sub(word, 1, j - 1) or string.sub(word, 1, 1)
+                        word = j > 1 and string.sub(word, j) or string.sub(word, 2)
+                        table.insert(lines, cut)
+                        goto retry_word
+                    end
+                end
+                currentLine = word
+            else
+                table.insert(lines, currentLine)
+                currentLine = ""
+                goto retry_word
+            end
+        else
+            currentLine = testLine
+        end
+    end
+    if currentLine ~= "" then
+        table.insert(lines, currentLine)
+    end
+    return lines
+end
+
+-- wrapText that also respects explicit line breaks
+local function wrapMulti(text, font, maxWidth)
+    local out = {}
+    for _, para in ipairs(string.Explode("\n", text)) do
+        local lines = wrapText(para, font, maxWidth)
+        if #lines == 0 then lines = { "" } end
+        for _, l in ipairs(lines) do out[#out + 1] = l end
+    end
+    return out
+end
+
+--MARK: Import frame
+local function openImportDialog(frame)
+    local bg, box = createModal(frame, 520, 416, "#btb.ps.button_import")
+    local timerName = "BTB_ImportDecodeTimer"
+    local state = { data = nil, missing = {}, invalid = false }
+
+    local codeBox = makeEntry(box, 16, 48, 488, 84, "#btb.playlist.import.code", "BattleBeats_Checkbox_Font", true)
+    local nameBox = makeEntry(box, 16, 142, 488, 30, "#btb.playlist.create.enter_name", "BattleBeats_Font")
+    nameBox:SetMaximumCharCount(30)
+    btb.importBox = codeBox
+    btb.plNameBox = nameBox
+
+    local function nameTaken()
+        local n = string.Trim(nameBox:GetValue() or "")
+        if n == "" then return false end
+        return (btb.musicPacks and btb.musicPacks[n]) ~= nil or (btb.musicPlaylists and btb.musicPlaylists[n]) ~= nil
+    end
+
+    nameBox.PaintOver = function(self, w, h)
+        if not nameTaken() then return end
+        btb.drawRoundedOutline(6, 0, 0, w, h, 1, C.Warn)
+        draw.SimpleText(fitText(L("btb.playlist.create.name_error"), "DermaDefault", w / 2), "DermaDefault", w - 8, h / 2, C.Warn, TR, TC)
+    end
+
+    local card = makeCard(box, 16, 180, 488, 168)
+    card.Paint = function(self, w, h)
+        draw.RoundedBox(10, 0, 0, w, h, C.Card)
+        if state.invalid then
+            draw.SimpleText(L("btb.playlist.import.invalid_code"), "DermaDefaultBold", 14, 12, C.Warn, TL, TT)
+        elseif not state.data then
+            draw.SimpleText("No data loaded", "DermaDefaultBold", 14, 12, C.Dim, TL, TT)
+        else
+            local info = "Ambient: " .. #(state.data.ambient or {}) .. "   ·   Combat: " .. #(state.data.combat or {})
+            draw.SimpleText(info, "DermaDefaultBold", 14, 12, color_white, TL, TT)
+            if #state.missing > 0 then
+                draw.SimpleText(L("btb.playlist.import.missing_tracks") .. ": " .. #state.missing, "DermaDefaultBold", w - 14, 12, C.Warn, TR, TT)
+            else
+                draw.SimpleText(L("btb.playlist.import.all_good"), "DermaDefaultBold", w - 14, 12, C.Good, TR, TT)
+            end
+        end
+    end
+
+    local missScroll = makeScroll(card)
+    missScroll:SetPos(8, 36)
+    missScroll:SetSize(472, 124)
+
+    local function rebuildMissing()
+        missScroll:Clear()
+        for _, p in ipairs(state.missing) do
+            local row = vgui.Create("DPanel", missScroll)
+            row:Dock(TOP)
+            row:DockMargin(0, 0, 0, 2)
+            row:SetTall(22)
+            row:SetTooltip(p)
+            row:SetTooltipPanelOverride("BattleBeatsTooltip")
+            row.Paint = function(self, w, h)
+                draw.RoundedBox(5, 0, 0, w, h, C.Missing)
+                draw.SimpleText(fitText(p, "DermaDefault", w - 16), "DermaDefault", 8, h / 2, C.Warn, TL, TC)
+            end
+        end
+    end
+
+    local function decode()
+        local text = string.Trim(codeBox:GetValue() or "")
+        state.data, state.missing, state.invalid = nil, {}, false
+        if text == "" then
+            rebuildMissing()
+            return
+        end
+        local data = btb.importPlaylist(text)
+        if not data then
+            state.invalid = true
+            rebuildMissing()
+            return
+        end
+        state.data = data
+        local function check(list)
+            for _, track in ipairs(list or {}) do
+                if not file.Exists(track.path, "GAME") then
+                    table.insert(state.missing, track.path)
                 end
             end
+        end
+        check(data.ambient)
+        check(data.combat)
+        rebuildMissing()
+    end
+
+    codeBox.OnChange = function()
+        timer.Remove(timerName)
+        timer.Create(timerName, 0.3, 1, function()
+            if IsValid(box) then decode() end
+        end)
+    end
+
+    local function doImport(keepMissing)
+        local data = state.data
+        if not data then return end
+        local name = string.Trim(nameBox:GetValue() or "")
+        if name == "" then
+            notify("#btb.playlist.create.enter_name_error", NOTIFY_ERROR, "buttons/button11.wav")
+            nameBox:RequestFocus()
+            return
+        end
+        if nameTaken() then
+            notify("#btb.playlist.create.name_error", NOTIFY_ERROR, "buttons/button11.wav")
+            nameBox:RequestFocus()
+            return
+        end
+
+        local imported = table.Copy(data)
+        if not keepMissing then
+            local function filter(list)
+                local new = {}
+                for _, track in ipairs(list or {}) do
+                    if file.Exists(track.path, "GAME") then new[#new + 1] = track end
+                end
+                return new
+            end
+            imported.ambient = filter(imported.ambient)
+            imported.combat = filter(imported.combat)
+        end
+        if #(imported.ambient or {}) + #(imported.combat or {}) == 0 then
+            notify("#btb.playlist.create.tracks_error", NOTIFY_ERROR, "buttons/button11.wav")
+            return
+        end
+
+        notify("#btb.playlist.import.succ", NOTIFY_GENERIC, "buttons/button3.wav")
+        btb.musicPlaylists[name] = imported
+        btb.validateAndTransformPlaylist(name, imported)
+        btb.savePlaylists()
+        bg:Remove()
+        if isfunction(RefreshList) then RefreshList() end
+    end
+
+    makeButton(box, 16, 364, 170, 34, L("btb.ps.button_import_clean"), function() doImport(false) end, {
+        enabled = function() return state.data ~= nil end,
+        tip = "#btb.ps.button_import_clean_tip"
+    })
+    makeButton(box, 194, 364, 170, 34, L("btb.ps.button_import_keep"), function() doImport(true) end, {
+        enabled = function() return state.data ~= nil and #state.missing > 0 end,
+        tip = "#btb.ps.button_import_keep_tip"
+    })
+    makeButton(box, 372, 364, 132, 34, L("btb.main.volume_cancel"), function() bg:Remove() end)
+
+    nameBox.OnEnter = function() doImport(false) end
+
+    bg.OnRemove = function()
+        timer.Remove(timerName)
+    end
+
+    codeBox:RequestFocus()
+    return bg
+end
+
+function btb.openImportFrame(frame)
+    local bg, box = createModal(frame, 420, 220, "Add playlist")
+
+    makeButton(box, 16, 52, 388, 70, L("btb.ps.button_create"), function()
+        bg:Remove()
+        btb.openPlaylistEditor(nil, function()
+            if isfunction(RefreshList) then RefreshList() end
+        end)
+    end, { font = "BattleBeats_Font" })
+
+    makeButton(box, 16, 134, 388, 70, L("btb.ps.button_import"), function()
+        bg:Remove()
+        openImportDialog(frame)
+    end, { font = "BattleBeats_Font" })
+
+    return box
+end
+
+--MARK: Volume edit
+function btb.openVolumeEditor(panel, track, pack, func)
+    local bg, box = createModal(panel, 440, 252, "Volume Boost")
+
+    local subject = ""
+    if track then
+        subject = btb.getTrackData(track).alias or btb.FormatTrackName(track)
+    elseif pack then
+        subject = btb.stripPackPrefix(L(pack))
+    end
+
+    local value = 100
+    if track then
+        value = btb.getTrackData(track).vol or 100
+    elseif pack then
+        value = (btb.packVolume or {})[pack] or 100
+    end
+    local original = value
+
+    local function refreshLive()
+        local main = IsValid(btb.currentStation) and btb.currentStation or nil
+        local prev = (not main and IsValid(btb.currentPreviewStation)) and btb.currentPreviewStation or nil
+        local st = main or prev
+        if not st then return end
+        local sName = st:GetFileName()
+        if not sName then return end
+        if track then
+            if sName ~= track then return end
+        elseif btb.getTrackData(sName, true).pack ~= pack then
+            return
+        end
+        if main then
+            st:SetVolume(btb.adjustVolume(sName))
+        else
+            st:SetVolume(btb.adjustVolume(sName, nil, true))
+        end
+    end
+
+    local function applyValue(v)
+        local nv = math.Clamp(math.floor(v), 0, 200)
+        if nv == value then return end
+        value = nv
+        if track then
+            btb.setTrackData(track, "vol", value ~= 100 and value or nil)
         elseif pack then
             btb.packVolume = btb.packVolume or {}
-            if value == 100 then
-                btb.packVolume[pack] = nil
-            else
-                btb.packVolume[pack] = value
-            end
-            updateLabel()
-            local sName = IsValid(btb.currentStation) and btb.currentStation:GetFileName() or nil
-            if not sName then sName = IsValid(btb.currentPreviewStation) and
-                btb.currentPreviewStation:GetFileName() or nil end
-            if pack == btb.getTrackData(sName, true).pack then
-                if IsValid(btb.currentStation) then
-                    local targetVolume = btb.adjustVolume(sName)
-                    btb.currentStation:SetVolume(targetVolume)
-                elseif IsValid(btb.currentPreviewStation) then
-                    local targetVolume = btb.adjustVolume(sName, nil, true)
-                    btb.currentPreviewStation:SetVolume(targetVolume)
-                end
-            end
+            btb.packVolume[pack] = value ~= 100 and value or nil
+        else
+            return
         end
+        refreshLive()
     end
 
-    local function applySnap(val)
-        local offset = val - 100
-        if offset >= -5 and offset <= 5 then
-            return 100
+    local function snap(v)
+        if math.abs(v - 100) <= 5 then return 100 end
+        return v
+    end
+
+    local function step(d)
+        applyValue(value + d * (isShift() and 10 or 1))
+    end
+
+    local barX, barW, pad = 44, 352, 9
+    box.PaintExtra = function(self, w, h)
+        draw.SimpleText(fitText(subject, "DermaDefault", w - 40), "DermaDefault", w / 2, 52, C.Dim, TC, TC)
+        local off = value - 100
+        local txt = off == 0 and "0%" or (off > 0 and ("+" .. off .. "%") or (off .. "%"))
+        local col = off > 0 and C.Yellow or (off < 0 and C.Cut or color_white)
+        draw.SimpleText(txt, "Trebuchet24", w / 2, 78, col, TC, TC)
+        draw.SimpleText("-100%", "DermaDefault", barX + pad, 134, C.Dim, TL, TC)
+        draw.SimpleText("0%", "DermaDefault", barX + barW / 2, 134, C.Dim, TC, TC)
+        draw.SimpleText("+100%", "DermaDefault", barX + barW - pad, 134, C.Dim, TR, TC)
+    end
+
+    local bar = vgui.Create("DPanel", box)
+    bar:SetPos(barX, 100)
+    bar:SetSize(barW, 28)
+    bar:SetCursor("hand")
+
+    local function barPos(w, v) return pad + (w - pad * 2) * (v / 200) end
+
+    bar.Paint = function(self, w, h)
+        local ty = h / 2 - 4
+        draw.RoundedBox(4, pad, ty, w - pad * 2, 8, C.Track)
+        local center = w / 2
+        local pos = barPos(w, value)
+        local col = value >= 100 and C.Yellow or C.Cut
+        if pos >= center then
+            draw.RoundedBox(0, center, ty, pos - center, 8, col)
+        else
+            draw.RoundedBox(0, pos, ty, center - pos, 8, col)
         end
-        return val
+        surface.SetDrawColor(255, 255, 255, 140)
+        surface.DrawRect(center - 1, ty - 4, 2, 16)
+        local hov = animHover(self, "Hov", self:IsHovered() or self.dragging)
+        local r = 7 + hov * 2
+        draw.RoundedBox(r, pos - r, h / 2 - r, r * 2, r * 2, color_white)
     end
 
-    local function updateValue(x)
-        local progress = math.Clamp(x / bar:GetWide(), 0, 1)
-        local newValue = progress * 200
-        newValue = applySnap(newValue)
-        applyValue(newValue)
-    end
-
-    leftBtn.DoClick = function()
-        applyValue(value - 1)
-    end
-
-    rightBtn.DoClick = function()
-        applyValue(value + 1)
+    local function updateFromCursor(self)
+        local x = self:CursorPos()
+        local w = self:GetWide()
+        local progress = math.Clamp((x - pad) / (w - pad * 2), 0, 1)
+        local nv = progress * 200
+        if not isCtrl() then nv = snap(nv) end
+        applyValue(nv)
     end
 
     bar.OnMousePressed = function(self, code)
-        if code == MOUSE_LEFT then
-            local x = self:CursorPos()
-            updateValue(x)
-            self.IsDragging = true
-        end
+        if code ~= MOUSE_LEFT then return end
+        self.dragging = true
+        self:MouseCapture(true)
+        updateFromCursor(self)
     end
-
+    bar.OnMouseReleased = function(self)
+        self.dragging = false
+        self:MouseCapture(false)
+    end
     bar.Think = function(self)
-        if self.IsDragging and input.IsMouseDown(MOUSE_LEFT) then
-            local x = self:CursorPos()
-            updateValue(x)
-        elseif self.IsDragging then
-            self.IsDragging = false
+        if not self.dragging then return end
+        if not input.IsMouseDown(MOUSE_LEFT) then
+            self.dragging = false
+            self:MouseCapture(false)
+            return
+        end
+        updateFromCursor(self)
+    end
+    bar.OnMouseWheeled = function(self, delta) applyValue(value + delta * (isShift() and 5 or 1)) end
+    bg.OnMouseWheeled = bar.OnMouseWheeled
+
+    makeButton(box, 10, 100, 28, 28, "<", function() step(-1) end, { tip = "-1% (Shift: -10%)" })
+    makeButton(box, 402, 100, 28, 28, ">", function() step(1) end, { tip = "+1% (Shift: +10%)" })
+
+    local warning = vgui.Create("DLabel", box)
+    warning:SetFont("DermaDefault")
+    warning:SetTextColor(Color(255, 200, 120))
+    warning:SetPos(20, 152)
+    warning:SetSize(400, 36)
+    warning:SetWrap(true)
+    warning:SetText("Volume boost multiplies final volume. Raising base volume makes the boost stronger (e.g 2x can become 4x)")
+
+    local function cancel()
+        applyValue(original)
+        bg:Remove()
+    end
+    bg.Cancel = cancel
+
+    makeButton(box, 20, 204, 110, 32, "Reset", function() applyValue(100) end, {
+        enabled = function() return value ~= 100 end,
+        tip = "Back to 0%"
+    })
+    makeButton(box, 200, 204, 100, 32, L("btb.main.volume_cancel"), cancel)
+    makeButton(box, 310, 204, 110, 32, L("btb.ps.ts.rmb.assign_save"), function() bg:Remove() end)
+
+    bg.onKey = function(key)
+        if key == KEY_LEFT then
+            step(-1)
+        elseif key == KEY_RIGHT then
+            step(1)
+        elseif key == KEY_ENTER or key == KEY_PAD_ENTER then
+            bg:Remove()
         end
     end
 
-    frame.OnRemove = function()
-        if isfunction(func) then
-            func()
-        end
-        if not track then
-            btb.savePackVolumes()
-        end
+    bg.OnRemove = function()
+        if isfunction(func) then func() end
+        if not track then btb.savePackVolumes() end
     end
-
-    local saveBtn = vgui.Create("DButton", frame)
-    saveBtn:SetPos((frame:GetWide() - 150) / 2, 120)
-    saveBtn:SetSize(150, 25)
-    saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
-    saveBtn:SetFont("CreditsText")
-    saveBtn:SetTextColor(color_white)
-    saveBtn.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
-    end
-
-    saveBtn.DoClick = function() background:Remove() end
-
-    updateLabel()
 end
 
 --MARK: Track trim
-local c808080255 = Color(80, 80, 80, 255)
-local c707070255 = Color(70, 70, 70, 255)
-local c255100100 = Color(255, 100, 100)
-local c100255100 = Color(100, 255, 100)
 function btb.openTrimEditor(panel, track, func)
+    local minTrim = 30
     local trackLength = 0
     local trimData = btb.getTrackData(track).trim or {}
+    local state = "loading"
+    local slider
 
-    local background = vgui.Create("DPanel", panel)
-    background:SetSize(panel:GetWide(), panel:GetTall())
-    background:Center()
-    background.Paint = function(self)
-        drawBlur(self, 2)
-    end
+    local title = L("btb.ps.ts.rmb.trim_title") .. ": " .. btb.FormatTrackName(track)
+    local bg, box = createModal(panel, 560, 234, title)
 
-    local frame = vgui.Create("DPanel", background)
-    frame:SetSize(500, 130)
-    frame:Center()
-    frame.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, c000200)
-        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
-    end
-
-    local title = language.GetPhrase("btb.ps.ts.rmb.trim_title")
-    frame:BTB_SetTitle(title .. ": " .. btb.FormatTrackName(track), true)
-
-    local slider = vgui.Create("DPanel", frame)
-    slider:SetPos(20, 55)
-    slider:SetSize(460, 25)
-    slider:SetVisible(false)
-
-    sound.PlayFile(track, "noplay", function(station, errCode, errStr)
-        if errCode or errStr then
-            local error = vgui.Create("DLabel", frame)
-            error:SetPos((frame:GetWide() / 2) - 200, 60)
-            error:SetSize(400, 40)
-            error:SetText("There was an error with getting track data!")
-            error:SetContentAlignment(5)
-            error:SetFont("BattleBeats_Checkbox_Font")
-            error:SetTextColor(color_white)
+    box.PaintExtra = function(self, w, h)
+        if state ~= "ok" then
+            if state == "loading" then
+                draw.SimpleText("Loading track data...", "BattleBeats_Checkbox_Font", w / 2, 95, C.Dim, TC, TC)
+            elseif state == "error" then
+                draw.SimpleText("There was an error with getting track data!", "BattleBeats_Checkbox_Font", w / 2, 95, C.Warn, TC, TC)
+            else
+                draw.SimpleText("Cannot trim track because it's too short!", "BattleBeats_Checkbox_Font", w / 2, 88, color_white, TC, TC)
+                draw.SimpleText("(track needs to be at least 30 seconds long)", "BattleBeats_Checkbox_Font", w / 2, 108, C.Dim, TC, TC)
+            end
             return
         end
-        if station then
-            trackLength = math.floor(station:GetLength())
-            station:Stop()
-            slider.startValue = trimData.start or 0
-            slider.endValue = trimData.finish or trackLength
-            if slider.endValue > 30 then
-                slider:SetVisible(true)
-                slider.draggingStart = false
-                slider.draggingEnd = false
+        local s, e = slider.startValue, slider.endValue
+        draw.SimpleText("Start  " .. btb.FormatTime(s), "DermaDefaultBold", 24, 114, C.Start, TL, TC)
+        draw.SimpleText("Selected  " .. btb.FormatTime(e - s) .. "  /  " .. btb.FormatTime(trackLength), "DermaDefaultBold", w / 2, 114, color_white, TC, TC)
+        draw.SimpleText("End  " .. btb.FormatTime(e), "DermaDefaultBold", w - 24, 114, C.End, TR, TC)
+    end
 
-                slider.Paint = function(self, w, h)
-                    draw.RoundedBox(4, 0, 5, w, h - 10, c909090)
-                    if trackLength <= 0 then return end
+    local pad = 8
+    slider = vgui.Create("DPanel", box)
+    slider:SetPos(24, 62)
+    slider:SetSize(512, 32)
+    slider:SetVisible(false)
+    slider:SetCursor("hand")
+    slider.startValue, slider.endValue = 0, 0
 
-                    local startFrac = self.startValue / trackLength
-                    local endFrac = self.endValue / trackLength
-                    local startPos = w * startFrac
-                    local endPos = w * endFrac
+    local function toPos(w, v) return pad + (w - pad * 2) * (v / math.max(trackLength, 1)) end
+    local function fromPos(w, x) return ((x - pad) / (w - pad * 2)) * trackLength end
 
-                    draw.RoundedBox(4, startPos, 5, endPos - startPos, h - 10, c2552100)
+    slider.Paint = function(self, w, h)
+        if state ~= "ok" then slider:SetCursor("arrow") return end
+        if trackLength <= 0 then return end
+        local ty = h / 2 - 5
+        draw.RoundedBox(5, pad, ty, w - pad * 2, 10, C.Track)
+        local sp, ep = toPos(w, self.startValue), toPos(w, self.endValue)
+        draw.RoundedBox(3, sp, ty, ep - sp, 10, ColA(C.Yellow, 200))
+        local hov = animHover(self, "Hov", self:IsHovered() or self.dragging ~= nil)
+        local hw = 8 + hov * 2
+        draw.RoundedBox(4, sp - hw / 2, 2, hw, h - 4, C.Start)
+        draw.RoundedBox(4, ep - hw / 2, 2, hw, h - 4, C.End)
+    end
 
-                    draw.RoundedBox(4, startPos - 4, 0, 8, h, c100255100)
-                    draw.RoundedBox(4, endPos - 4, 0, 8, h, c255100100)
-
-                    local startText = btb.FormatTime(self.startValue)
-                    local endText = btb.FormatTime(self.endValue)
-                    draw.SimpleTextOutlined(startText .. " - " .. endText, "BattleBeats_Checkbox_Font", w * 0.5, h * 0.5, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 255))
-                end
-
-                slider.OnMousePressed = function(self)
-                    if trackLength <= 0 then return end
-                    local x = self:LocalCursorPos()
-                    local w = self:GetWide()
-                    local startPos = (self.startValue / trackLength) * w
-                    local endPos = (self.endValue / trackLength) * w
-                    if math.abs(x - startPos) < math.abs(x - endPos) then
-                        self.draggingStart = true
-                    else
-                        self.draggingEnd = true
-                    end
-                    self:MouseCapture(true)
-                end
-
-                slider.OnMouseReleased = function(self)
-                    self.draggingStart = false
-                    self.draggingEnd = false
-                    self:MouseCapture(false)
-                end
-
-                slider.Think = function(self)
-                    if not self.draggingStart and not self.draggingEnd then return end
-                    if trackLength <= 0 then return end
-                    local x = self:LocalCursorPos()
-                    local w = self:GetWide()
-                    local newValue = math.Clamp((x / w) * trackLength, 0, trackLength)
-                    if self.draggingStart then
-                        self.startValue = math.Clamp(newValue, 0, self.endValue - 30)
-                    elseif self.draggingEnd then
-                        self.endValue = math.Clamp(newValue, self.startValue + 30, trackLength)
-                    end
-                end
-
-                local saveButton = vgui.Create("DButton", frame)
-                saveButton:SetPos(60, 90)
-                saveButton:SetSize(150, 25)
-                saveButton:SetText("#btb.ps.ts.rmb.assign_save")
-                saveButton:SetFont("CreditsText")
-                saveButton:SetTextColor(color_white)
-
-                saveButton.Paint = function(self, w, h)
-                    local bgColor = self:IsHovered() and c808080255 or c707070255
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                end
-
-                saveButton.DoClick = function()
-                    if slider.endValue - slider.startValue < 30 then
-                        notification.AddLegacy("Track must be at least 30 seconds", NOTIFY_ERROR, 3)
-                        return
-                    end
-
-                    local startVal = math.floor(slider.startValue)
-                    local endVal = math.floor(slider.endValue)
-
-                    local trim = {}
-                    if startVal > 0 then
-                        trim.start = startVal
-                    end
-                    if endVal < trackLength then
-                        trim.finish = endVal
-                    end
-
-                    if next(trim) == nil then
-                        btb.setTrackData(track, "trim", nil)
-                        notification.AddLegacy("Trim removed", NOTIFY_GENERIC, 3)
-                    else
-                        btb.setTrackData(track, "trim", trim)
-                        notification.AddLegacy("Trim set: " .. startVal .. "s - " .. endVal .. "s", NOTIFY_GENERIC, 3)
-                    end
-
-                    if isfunction(func) then
-                        func()
-                    end
-
-                    surface.PlaySound("buttons/button14.wav")
-                    background:Remove()
-                end
-
-                local cancelButton = vgui.Create("DButton", frame)
-                cancelButton:SetPos(290, 90)
-                cancelButton:SetSize(150, 25)
-                cancelButton:SetText("#btb.main.volume_cancel")
-                cancelButton:SetFont("CreditsText")
-                cancelButton:SetTextColor(color_white)
-
-                cancelButton.Paint = function(self, w, h)
-                    local bgColor = self:IsHovered() and c808080255 or c707070255
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                end
-
-                cancelButton.DoClick = function()
-                    background:Remove()
-                end
-            elseif slider.endValue <= 30 then
-                local frameTitle = vgui.Create("DLabel", frame)
-                frameTitle:SetPos((frame:GetWide() / 2) - 200, 30)
-                frameTitle:SetSize(400, 40)
-                frameTitle:SetText("Cannot trim track because it's too short!")
-                frameTitle:SetContentAlignment(5)
-                frameTitle:SetFont("BattleBeats_Checkbox_Font")
-                frameTitle:SetTextColor(color_white)
-                local frameTitle2 = vgui.Create("DLabel", frame)
-                frameTitle2:SetPos((frame:GetWide() / 2) - 200, 45)
-                frameTitle2:SetSize(400, 40)
-                frameTitle2:SetText("(track needs to be at least 30 seconds long)")
-                frameTitle2:SetContentAlignment(5)
-                frameTitle2:SetFont("BattleBeats_Checkbox_Font")
-                frameTitle2:SetTextColor(color_white)
-
-                local cancelButton = vgui.Create("DButton", frame)
-                cancelButton:SetPos((frame:GetWide() - 150) / 2, 90)
-                cancelButton:SetSize(150, 25)
-                cancelButton:SetText("#btb.main.volume_cancel")
-                cancelButton:SetFont("CreditsText")
-                cancelButton:SetTextColor(color_white)
-
-                cancelButton.Paint = function(self, w, h)
-                    local bgColor = self:IsHovered() and c808080255 or c707070255
-                    draw.RoundedBox(4, 0, 0, w, h, bgColor)
-                end
-
-                cancelButton.DoClick = function()
-                    background:Remove()
-                end
-            end
+    local function updateDrag(self)
+        local x = self:CursorPos()
+        local v = math.Round(math.Clamp(fromPos(self:GetWide(), x), 0, trackLength))
+        if self.dragging == "start" then
+            self.startValue = math.Clamp(v, 0, self.endValue - minTrim)
+        elseif self.dragging == "end" then
+            self.endValue = math.Clamp(v, self.startValue + minTrim, trackLength)
         end
+    end
+
+    slider.OnMousePressed = function(self, code)
+        if code ~= MOUSE_LEFT or trackLength <= 0 then return end
+        local x = self:CursorPos()
+        local w = self:GetWide()
+        local sp, ep = toPos(w, self.startValue), toPos(w, self.endValue)
+        self.dragging = math.abs(x - sp) < math.abs(x - ep) and "start" or "end"
+        self:MouseCapture(true)
+        updateDrag(self)
+    end
+    slider.OnMouseReleased = function(self)
+        self.dragging = nil
+        self:MouseCapture(false)
+    end
+    slider.Think = function(self)
+        if not self.dragging then return end
+        if not input.IsMouseDown(MOUSE_LEFT) then
+            self.dragging = nil
+            self:MouseCapture(false)
+            return
+        end
+        updateDrag(self)
+    end
+
+    local function nudge(which, d)
+        if state ~= "ok" then return end
+        local stepv = (isShift() and 10 or 1) * d
+        if which == "start" then
+            slider.startValue = math.Clamp(slider.startValue + stepv, 0, slider.endValue - minTrim)
+        else
+            slider.endValue = math.Clamp(slider.endValue + stepv, slider.startValue + minTrim, trackLength)
+        end
+    end
+
+    local function ok() return state == "ok" end
+    makeButton(box, 24, 138, 80, 28, "Start -1s", function() nudge("start", -1) end, { enabled = ok, tip = "Shift: 10s" })
+    makeButton(box, 108, 138, 80, 28, "Start +1s", function() nudge("start", 1) end, { enabled = ok, tip = "Shift: 10s" })
+    makeButton(box, 240, 138, 80, 28, "Reset", function()
+        slider.startValue, slider.endValue = 0, trackLength
+    end, { enabled = ok, accent = C.Warn, tip = "Remove trim" })
+    makeButton(box, 372, 138, 80, 28, "End -1s", function() nudge("end", -1) end, { enabled = ok, tip = "Shift: 10s" })
+    makeButton(box, 456, 138, 80, 28, "End +1s", function() nudge("end", 1) end, { enabled = ok, tip = "Shift: 10s" })
+
+    local function save()
+        if state ~= "ok" then return end
+        if slider.endValue - slider.startValue < minTrim then
+            notify("Track must be at least 30 seconds", NOTIFY_ERROR)
+            return
+        end
+
+        local startVal = math.floor(slider.startValue)
+        local endVal = math.floor(slider.endValue)
+
+        local trim = {}
+        if startVal > 0 then trim.start = startVal end
+        if endVal < trackLength then trim.finish = endVal end
+
+        if next(trim) == nil then
+            btb.setTrackData(track, "trim", nil)
+            notify("Trim removed")
+        else
+            btb.setTrackData(track, "trim", trim)
+            notify("Trim set: " .. startVal .. "s - " .. endVal .. "s")
+        end
+
+        if isfunction(func) then func() end
+
+        surface.PlaySound("buttons/button14.wav")
+        bg:Remove()
+    end
+
+    makeButton(box, 125, 186, 150, 32, L("btb.ps.ts.rmb.assign_save"), save, { enabled = ok, tip = "Enter" })
+    makeButton(box, 285, 186, 150, 32, L("btb.main.volume_cancel"), function() bg:Remove() end)
+
+    bg.onKey = function(key)
+        if key == KEY_ENTER or key == KEY_PAD_ENTER then save() end
+    end
+
+    sound.PlayFile(track, "noplay", function(station, errCode, errStr)
+        if not IsValid(box) then
+            if IsValid(station) then station:Stop() end
+            return
+        end
+        if errCode or errStr or not IsValid(station) then
+            state = "error"
+            return
+        end
+        trackLength = math.floor(station:GetLength())
+        station:Stop()
+        if trackLength <= minTrim then
+            state = "short"
+            return
+        end
+        slider.startValue = math.Clamp(trimData.start or 0, 0, trackLength - minTrim)
+        slider.endValue = math.Clamp(trimData.finish or trackLength, slider.startValue + minTrim, trackLength)
+        slider:SetVisible(true)
+        state = "ok"
     end)
 end
 
 --MARK:NPC assign
-
 local function getIcon(npc)
-    local candidates = {npc.id, npc.class, npc.name and string.lower(string.Replace(npc.name, " ", "_")) or nil}
+    local candidates = { npc.id, npc.class, npc.name and string.lower(string.Replace(npc.name, " ", "_")) or nil }
     if npc.data and npc.data.Model then
         local modelName = string.GetFileFromFilename(npc.data.Model or "")
         modelName = string.StripExtension(modelName or "")
@@ -940,49 +890,6 @@ local function getCachedNPCList()
     return npcList
 end
 
-local c808080220 = Color(80, 80, 80, 220)
-local c454545220 = Color(45, 45, 45, 220)
-local c505050 = Color(50,50,50)
-
--- from my roblox chat bubbles addon
-local function wrapText(text, font, maxWidth)
-    surface.SetFont(font)
-    local words = string.Explode(" ", text)
-    local lines = {}
-    local currentLine = ""
-    for i = 1, #words do
-        local word = words[i]
-        ::retry_word::
-        local testLine = currentLine .. (currentLine == "" and "" or " ") .. word
-        local w = surface.GetTextSize(testLine)
-        if w > maxWidth then
-            if currentLine == "" then
-                for j = 1, #word do
-                    local substr = string.sub(word, 1, j)
-                    local sw = surface.GetTextSize(substr)
-                    if sw > maxWidth then
-                        local cut = j > 1 and string.sub(word, 1, j - 1) or string.sub(word, 1, 1)
-                        word = j > 1 and string.sub(word, j) or string.sub(word, 2)
-                        table.insert(lines, cut)
-                        goto retry_word
-                    end
-                end
-                currentLine = word
-            else
-                table.insert(lines, currentLine)
-                currentLine = ""
-                goto retry_word
-            end
-        else
-            currentLine = testLine
-        end
-    end
-    if currentLine ~= "" then
-        table.insert(lines, currentLine)
-    end
-    return lines
-end
-
 local function getCachedWrappedText(text, font, maxWidth)
     local key = text .. "|" .. font .. "|" .. maxWidth
     if NPCAssignCache.wrappedText[key] then
@@ -994,136 +901,113 @@ local function getCachedWrappedText(text, font, maxWidth)
 end
 
 function btb.createAssignFrame(panel, title, defaultClass, defaultPriority, onSave)
-    local background = vgui.Create("DPanel", panel)
-    background:SetSize(panel:GetWide(), panel:GetTall())
-    background:Center()
-    background.Paint = function(self)
-        drawBlur(self, 2)
+    local priority = math.Clamp(tonumber(defaultPriority) or 1, 1, 5)
+    local curID = string.Trim(string.lower(defaultClass or ""))
+    local shown = 0
+    local npcTiles = {}
+    local textEntry, searchEntry
+
+    local bg, frame = createModal(panel, 640, 560, title)
+    local searchDebounceName = "BTB_AssignNPCSearchDebounce_" .. tostring(frame)
+
+    frame.PaintExtra = function(self, w, h)
+        draw.SimpleText(
+        L("btb.ps.ts.rmb.assign_priority") ~= "btb.ps.ts.rmb.assign_priority" and L("btb.ps.ts.rmb.assign_priority") or
+        "Priority", "DermaDefaultBold", 430, 60, C.Dim, TR, TC)
+        draw.SimpleText(shown .. " / " .. #npcTiles .. " NPCs", "DermaDefault", 18, 126, C.Dim, TL, TC)
+        draw.SimpleText("Double-click a tile to save", "DermaDefault", w - 18, 126, C.Dim, TR, TC)
     end
 
-    local frame = vgui.Create("DPanel", background)
-    frame:SetSize(620, 520)
-    frame:Center()
-    frame.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, c000200)
-        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
-        surface.SetDrawColor(c2552100)
-        surface.DrawRect(0, 65, w, 1)
-    end
-    frame:BTB_SetTitle(title, true)
-
-    local textEntry = vgui.Create("DTextEntry", frame)
-    textEntry:SetPos(120, 30)
-    textEntry:SetSize(250, 20)
+    textEntry = makeEntry(frame, 16, 46, 330, 28, "#btb.ps.ts.rmb.assign_enter_class", "BattleBeats_Checkbox_Font")
     textEntry:SetText(defaultClass or "")
-    textEntry:SetFont("BattleBeats_Checkbox_Font")
-    textEntry.Paint = function(self, w, h)
-        draw.RoundedBox(6, 0, 0, w, h, c808080255)
-        self:DrawTextEntryText(color_white, color_white, color_white)
-        if self:GetText() == "" and not self:IsEditing() then
-            draw.SimpleText("#btb.ps.ts.rmb.assign_enter_class", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-        end
+    textEntry.OnChange = function(self)
+        curID = string.Trim(string.lower(self:GetText() or ""))
     end
 
     local helpBtn = vgui.Create("DImage", frame)
-    helpBtn:SetPos(382, 32.5)
-    helpBtn:SetSize(15, 15)
+    helpBtn:SetPos(354, 52)
+    helpBtn:SetSize(16, 16)
     helpBtn:SetImage("icon16/help.png")
     helpBtn:SetMouseInputEnabled(true)
     helpBtn:BTB_SetImageTooltip("assignhelp.png", "#btb.ps.ts.rmb.assign_img_tip")
 
-    local priorityCombo = vgui.Create("DComboBox", frame)
-    priorityCombo:SetPos(410, 30)
-    priorityCombo:SetSize(100, 20)
-
-    local priorityNames = {
-        [1] = "1 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_highest"),
-        [2] = "2",
-        [3] = "3",
-        [4] = "4",
-        [5] = "5 " .. language.GetPhrase("btb.ps.ts.rmb.assign_priority_lowest")
-    }
-
+    -- priority selector (1 = highest, 5 = lowest)
     for i = 1, 5 do
-        priorityCombo:AddChoice(priorityNames[i], i)
-    end
-
-    priorityCombo:SetValue(priorityNames[defaultPriority or 1])
-
-    local searchEntry = vgui.Create("DTextEntry", frame)
-    searchEntry:SetPos(10, 76)
-    searchEntry:SetSize(600, 22)
-    searchEntry:SetFont("BattleBeats_Checkbox_Font")
-    searchEntry.Paint = function(self, w, h)
-        draw.RoundedBox(6, 0, 0, w, h, c808080255)
-        self:DrawTextEntryText(color_white, color_white, color_white)
-        if self:GetText() == "" and not self:IsEditing() then
-            draw.SimpleText("Search NPC...", "BattleBeats_Checkbox_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        local tip
+        if i == 1 then
+            tip = "1 " .. L("btb.ps.ts.rmb.assign_priority_highest")
+        elseif i == 5 then
+            tip = "5 " .. L("btb.ps.ts.rmb.assign_priority_lowest")
         end
+        makeButton(frame, 438 + (i - 1) * 38, 46, 34, 28, tostring(i), function() priority = i end, {
+            active = function() return priority == i end,
+            tip = tip
+        })
     end
 
-    local scroll = vgui.Create("DScrollPanel", frame)
-    scroll:SetPos(10, 110)
-    scroll:SetSize(600, 360)
-    scroll:GetVBar():SetWide(0)
+    local scroll = makeScroll(frame)
+    scroll:SetPos(16, 140)
+    scroll:SetSize(608, 366)
 
     local iconLayout = vgui.Create("DIconLayout", scroll)
     iconLayout:Dock(TOP)
-    iconLayout:SetWide(scroll:GetWide())
-    iconLayout:SetSpaceX(13)
+    iconLayout:SetWide(scroll:GetWide() - 8)
+    iconLayout:SetSpaceX(10)
     iconLayout:SetSpaceY(10)
 
-    local function getSelectedNPCID()
-        return string.Trim(string.lower(textEntry:GetText() or ""))
-    end
-
-    local npcList = getCachedNPCList()
-    local searchDebounceName = "BTB_AssignNPCSearchDebounce_" .. tostring(frame)
-    local npcTiles = {}
     local function createNPCTile(npc)
         local tile = iconLayout:Add("DButton")
-        tile:SetSize(140, 150)
+        tile:SetSize(138, 146)
         tile:SetText("")
         tile.NPCIDLower = string.lower(tostring(npc.id))
-        tile.SearchText = string.lower(tostring(npc.name))
+        tile.SearchText = string.lower(L(tostring(npc.name)) ..
+        " " .. tostring(npc.id) .. " " .. tostring(npc.class) .. " " .. L(tostring(npc.category)))
         tile.Paint = function(self, w, h)
-            local selected = getSelectedNPCID() ~= "" and self.NPCIDLower == getSelectedNPCID()
-            if selected then
-                draw.RoundedBox(6, 0, 0, w, h, c2552100)
-                draw.RoundedBox(5, 1, 1, w - 2, h - 2, c808080255)
-                return
-            end
-            draw.RoundedBox(6, 0, 0, w, h, self:IsHovered() and c808080220 or c454545220)
+            local hov = animHover(self, "Hov", self:IsHovered())
+            local selected = curID ~= "" and self.NPCIDLower == curID
+            local sel = Lerp(FrameTime() * 14, self.SelAnim or (selected and 1 or 0), selected and 1 or 0)
+            self.SelAnim = sel
+            draw.RoundedBox(8, 0, 0, w, h, LerpColor(sel, LerpColor(hov, C.Card, C.C90), C.Yellow))
+            draw.RoundedBox(7, 1, 1, w - 2, h - 2, LerpColor(sel * 0.25, LerpColor(hov, C.CardIn, C.C70), C.Yellow))
         end
-        tile:SetTooltip("|Name:| " .. language.GetPhrase(npc.name or "N/A") .. "\n|Category:| " .. language.GetPhrase(npc.category or "N/A") .. "\n|Class:| " .. npc.class .. "\n|Key:| ||" .. npc.id .. "<255,255,255>||")
+        tile:SetTooltip("|Name:| " .. L(npc.name or "N/A") .. "\n|Category:| " .. L(npc.category or "N/A") .. "\n|Class:| " .. npc.class .. "\n|Key:| ||" .. npc.id .. "<255,255,255>||")
         tile:SetTooltipPanelOverride("BattleBeatsTooltip")
 
         local icon = vgui.Create("DImage", tile)
-        icon:SetPos(25, 10)
+        icon:SetPos(24, 8)
         icon:SetSize(90, 90)
         icon:SetImage(getCachedIcon(npc))
         icon:SetKeepAspect(true)
         icon:SetMouseInputEnabled(false)
 
         local nameLabel = vgui.Create("DPanel", tile)
-        nameLabel:SetPos(5, 105)
-        nameLabel:SetSize(130, 40)
+        nameLabel:SetPos(4, 102)
+        nameLabel:SetSize(130, 38)
         nameLabel:SetMouseInputEnabled(false)
-        local lines = getCachedWrappedText(language.GetPhrase(npc.name or "N/A"), "CreditsText", 130)
+        local lines = getCachedWrappedText(L(npc.name or "N/A"), "CreditsText", 130)
+        if #lines > 2 then lines = { lines[1], lines[2] .. "…" } end
         nameLabel.Paint = function(self, w, h)
             local lineH = 16
             local totalH = #lines * lineH
             local startY = (h - totalH) / 2
             for i, line in ipairs(lines) do
-                draw.SimpleText(line, "CreditsText", w / 2, startY + (i - 1) * lineH + lineH / 2, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText(line, "CreditsText", w / 2, startY + (i - 1) * lineH + lineH / 2, color_white, TC, TC)
             end
         end
 
-        tile.DoClick = function()
+        local function select()
             textEntry:SetText(npc.id)
+            curID = tile.NPCIDLower
             textEntry:RequestFocus()
             textEntry:SetCaretPos(#npc.id)
+        end
+        tile.DoClick = function()
+            select()
             surface.PlaySound("ui/buttonclickrelease.wav")
+        end
+        tile.DoDoubleClick = function()
+            select()
+            onSave(string.Trim(textEntry:GetText() or ""), math.Clamp(priority, 1, 5), bg)
         end
 
         npcTiles[#npcTiles + 1] = tile
@@ -1131,10 +1015,12 @@ function btb.createAssignFrame(panel, title, defaultClass, defaultPriority, onSa
 
     local function filterNPCTiles(filter)
         filter = string.Trim(string.lower(filter or ""))
+        shown = 0
         for _, tile in ipairs(npcTiles) do
             if IsValid(tile) then
                 local visible = filter == "" or string.find(tile.SearchText or "", filter, 1, true) ~= nil
                 tile:SetVisible(visible)
+                if visible then shown = shown + 1 end
             end
         end
         iconLayout:InvalidateLayout(true)
@@ -1150,95 +1036,77 @@ function btb.createAssignFrame(panel, title, defaultClass, defaultPriority, onSa
         end)
     end
 
-    for _, npc in ipairs(npcList) do
+    for _, npc in ipairs(getCachedNPCList()) do
         createNPCTile(npc)
     end
-
     filterNPCTiles("")
 
-    searchEntry.OnChange = function(self)
-        local value = self:GetValue()
+    scroll.PaintOver = function(self, w, h)
+        if shown == 0 then
+            draw.SimpleText("No NPCs found", "Trebuchet18", w / 2, h / 2, C.Dim, TC, TC)
+        end
+    end
+
+    searchEntry = makeSearch(frame, 16, 84, 608, 28, "Search NPC (name, class, category)...", function(v)
         timer.Remove(searchDebounceName)
         timer.Create(searchDebounceName, 0.08, 1, function()
-            if IsValid(self) then
-                filterNPCTiles(value)
+            if IsValid(frame) then filterNPCTiles(v) end
+        end)
+    end, "DermaDefault")
+
+    if curID ~= "" then
+        timer.Simple(0.1, function()
+            if not IsValid(scroll) then return end
+            for _, tile in ipairs(npcTiles) do
+                if IsValid(tile) and tile.NPCIDLower == curID then
+                    scroll:ScrollToChild(tile)
+                    break
+                end
             end
         end)
     end
 
-    local saveBtn = vgui.Create("DButton", frame)
-    saveBtn:SetPos(150, 485)
-    saveBtn:SetSize(150, 25)
-    saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
-    saveBtn:SetFont("CreditsText")
-    saveBtn:SetTextColor(color_white)
-    saveBtn.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
+    local function doSave()
+        onSave(string.Trim(textEntry:GetText() or ""), math.Clamp(priority, 1, 5), bg)
     end
+    textEntry.OnEnter = doSave
 
-    saveBtn.DoClick = function()
-        local class = textEntry:GetText():gsub("^%s*(.-)%s*$", "%1")
-        local _, prio = priorityCombo:GetSelected()
-        prio = math.Clamp(prio or defaultPriority or 1, 1, 5)
-        onSave(class, prio, background)
-    end
+    makeButton(frame, 165, 518, 150, 30, L("btb.ps.ts.rmb.assign_save"), doSave, { tip = "Enter" })
+    makeButton(frame, 325, 518, 150, 30, L("btb.main.volume_cancel"), function()
+        bg:Cancel()
+    end)
 
-    local cancelBtn = vgui.Create("DButton", frame)
-    cancelBtn:SetPos(320, 485)
-    cancelBtn:SetSize(150, 25)
-    cancelBtn:SetText("#btb.main.volume_cancel")
-    cancelBtn:SetFont("CreditsText")
-    cancelBtn:SetTextColor(color_white)
-    cancelBtn.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
-    end
-
-    cancelBtn.DoClick = function()
+    bg.Cancel = function(self)
         timer.Remove(searchDebounceName)
-        background:Remove()
+        self:Remove()
     end
-
-    background.OnRemove = function()
+    bg.OnRemove = function()
         timer.Remove(searchDebounceName)
     end
 
+    if IsValid(searchEntry) then searchEntry:RequestFocus() end
     return textEntry, searchEntry
 end
 
+--MARK: Rename track
 function btb.changeName(panel, track, func)
     local tname = btb.FormatTrackName(track)
     local td = btb.getTrackData(track)
     local currentAlias = td.alias or tname
-    local background = vgui.Create("DPanel", panel)
-    background:SetSize(panel:GetWide(), panel:GetTall())
-    background:Center()
-    background.Paint = function(self)
-        drawBlur(self, 2)
-    end
 
-    local frame = vgui.Create("DPanel", background)
-    frame:SetSize(400, 110)
-    frame:Center()
-    frame.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, c000200)
-        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
-    end
-    frame:BTB_SetTitle("#btb.ps.ts.rmb.set_name_title", true)
+    local bg, box = createModal(panel, 440, 170, "#btb.ps.ts.rmb.set_name_title")
 
-    local entry = vgui.Create("DTextEntry", frame)
-    entry:SetPos(10, 30)
-    entry:SetSize(380, 40)
-    entry:SetText(currentAlias)
+    local entry = makeEntry(box, 16, 48, 408, 36, tname, "BattleBeats_Font")
     entry:SetMaximumCharCount(56)
-    entry:SetCaretPos(string.len(currentAlias))
-    entry:RequestFocus()
-    entry:SetFont("BattleBeats_Font")
-    entry.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, c707070255)
-        self:DrawTextEntryText(color_white, color_white, color_white)
-        if self:GetText() == "" and not self:IsEditing() then
-            draw.SimpleText(tname, "BattleBeats_Font", 5, h / 2, c150150150, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+    entry:SetText(currentAlias)
+
+    box.PaintExtra = function(self, w, h)
+        local text = entry:GetValue() or ""
+        local cur = string.Trim(text)
+        if cur ~= "" and cur ~= tname then
+            draw.SimpleText(fitText("Original: " .. tname, "DermaDefault", w - 110), "DermaDefault", 18, 98, C.Dim, TL, TC)
         end
+        draw.SimpleText((utf8.len(text) or #text) .. "/" .. 56, "DermaDefault", w - 18, 98, C.Dim, TR, TC)
     end
 
     local function saveAlias()
@@ -1248,101 +1116,114 @@ function btb.changeName(panel, track, func)
         else
             btb.setTrackData(track, "alias", text)
         end
-        func()
-        background:Remove()
+        if isfunction(func) then func() end
+        bg:Remove()
     end
 
-    entry.OnEnter = function ()
-        saveAlias()
-    end
+    entry.OnEnter = saveAlias
 
-    local saveBtn = vgui.Create("DButton", frame)
-    saveBtn:SetPos(45, 75)
-    saveBtn:SetSize(150, 25)
-    saveBtn:SetText("#btb.ps.ts.rmb.assign_save")
-    saveBtn:SetFont("CreditsText")
-    saveBtn:SetTextColor(color_white)
-    saveBtn.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
-    end
+    makeButton(box, 16, 118, 100, 32, "Reset", function()
+        entry:SetText(tname)
+        entry:RequestFocus()
+        entry:SetCaretPos(#tname)
+    end, {
+        enabled = function() return string.Trim(entry:GetValue() or "") ~= tname end,
+        tip = "Restore the original track name"
+    })
+    makeButton(box, 216, 118, 100, 32, L("btb.ps.ts.rmb.assign_save"), saveAlias, { tip = "Enter" })
+    makeButton(box, 324, 118, 100, 32, L("btb.main.volume_cancel"), function() bg:Remove() end)
 
-    saveBtn.DoClick = function()
-        saveAlias()
-    end
-
-    local cancelBtn = vgui.Create("DButton", frame)
-    cancelBtn:SetPos(205, 75)
-    cancelBtn:SetSize(150, 25)
-    cancelBtn:SetText("#btb.main.volume_cancel")
-    cancelBtn:SetFont("CreditsText")
-    cancelBtn:SetTextColor(color_white)
-    cancelBtn.Paint = function(self, w, h)
-        draw.RoundedBox(4, 0, 0, w, h, self:IsHovered() and c808080255 or c707070255)
-    end
-    cancelBtn.DoClick = function() background:Remove() end
-
+    entry:RequestFocus()
+    entry:SelectAllText()
     return entry
 end
 
 --MARK:Subtitles
 function btb.openSubtitles(panel, trackName, subs)
-    local background = vgui.Create("DPanel", panel)
-    background:SetSize(panel:GetWide(), panel:GetTall())
-    background:Center()
-    background.Paint = function(self)
-        drawBlur(self, 2)
+    subs = subs or {}
+    local query = ""
+    local lineCount = 0
+
+    local title = L("#btb.ps.ts.rmb.show_lyrics_title") .. trackName
+    local bg, box = createModal(panel, 540, 520, title)
+
+    box.PaintExtra = function(self, w, h)
+        local info = lineCount .. " / " .. #subs .. " lines"
+        draw.SimpleText(info, "DermaDefault", 18, 86, C.Dim, TL, TC)
+        draw.SimpleText("Click a line to copy it", "DermaDefault", w - 18, 86, C.Dim, TR, TC)
     end
 
-    local frame = vgui.Create("DPanel", background)
-    frame:SetSize(500, 430)
-    frame:Center()
-    frame.Paint = function(self, w, h)
-        draw.RoundedBox(12, 0, 0, w, h, c000200)
-        btb.drawRoundedOutline(12, 0, 0, w, h, 1, c2552100)
-    end
-    local title = language.GetPhrase("#btb.ps.ts.rmb.show_lyrics_title")
-    frame:BTB_SetTitle(title .. trackName, true)
-
-    local scroll = vgui.Create("DScrollPanel", frame)
-    scroll:SetSize(480, 360)
-    scroll:SetPos(10, 30)
-
-    local rich = vgui.Create("RichText", scroll)
-    rich:SetSize(480, 360)
-    rich:SetVerticalScrollbarEnabled(true)
-    rich:SetWrap(true)
-    rich.PerformLayout = function(self)
-        if self:GetFont() ~= "ChatFont" then self:SetFontInternal("ChatFont") end
-        self:SetFGColor(color_white)
-    end
-
-    local lastEnd = 0
-    for _, sub in ipairs(subs) do
-        if lastEnd > 0 and (sub.start - lastEnd) > 5 then
-            rich:AppendText("\n")
+    local scroll = makeScroll(box)
+    scroll:SetPos(16, 98)
+    scroll:SetSize(508, 372)
+    scroll.PaintOver = function(self, w, h)
+        if lineCount == 0 then
+            draw.SimpleText(#subs == 0 and "No subtitles" or "No matches", "Trebuchet18", w / 2, h / 2, C.Dim, TC, TC)
         end
-        local m = math.floor(sub.start / 60)
-        local s = math.floor(sub.start % 60)
-        local ts = string.format("[%02d:%02d]", m, s)
-        rich:InsertColorChange(255, 210, 0, 255)
-        rich:AppendText(ts .. " ")
-        rich:InsertColorChange(255, 255, 255, 255)
-        rich:AppendText(sub.text .. "\n")
-        lastEnd = sub['end']
     end
 
-    local cancelButton = vgui.Create("DButton", frame)
-    cancelButton:SetPos((frame:GetWide() - 150) / 2, 400)
-    cancelButton:SetSize(150, 25)
-    cancelButton:SetText("#btb.main.volume_cancel")
-    cancelButton:SetFont("CreditsText")
-    cancelButton:SetTextColor(color_white)
-    cancelButton.Paint = function(self, w, h)
-        local bgColor = self:IsHovered() and c808080255 or c707070255
-        draw.RoundedBox(4, 0, 0, w, h, bgColor)
+    local function stamp(t)
+        return string.format("[%02d:%02d]", math.floor(t / 60), math.floor(t % 60))
+    end
+    local function matches(sub)
+        return query == "" or string.find(string.lower(tostring(sub.text or "")), query, 1, true) ~= nil
     end
 
-    cancelButton.DoClick = function()
-        background:Remove()
+    local function rebuild()
+        scroll:Clear()
+        lineCount = 0
+        local lastEnd = 0
+        for _, sub in ipairs(subs) do
+            if matches(sub) then
+                lineCount = lineCount + 1
+                local text = tostring(sub.text or "")
+                local lines = wrapMulti(text, "ChatFont", 428)
+                local ts = stamp(sub.start or 0)
+                local gap = (query == "" and lastEnd > 0 and ((sub.start or 0) - lastEnd) > 5) and 10 or 0
+
+                local row = vgui.Create("DButton", scroll)
+                row:Dock(TOP)
+                row:DockMargin(0, gap, 0, 2)
+                row:SetTall(#lines * 16 + 8)
+                row:SetText("")
+                row:SetCursor("hand")
+                row.Paint = function(self, w, h)
+                    local hov = animHover(self, "Hov", self:IsHovered())
+                    draw.RoundedBox(6, 0, 0, w, h, LerpColor(hov, C.Card, C.C70))
+                    draw.SimpleText(ts, "DermaDefaultBold", 8, 4, C.Yellow, TL, TT)
+                    for i, line in ipairs(lines) do
+                        draw.SimpleText(line, "ChatFont", 62, 4 + (i - 1) * 16, color_white, TL, TT)
+                    end
+                end
+                row.DoClick = function()
+                    SetClipboardText(text)
+                    notify("Line copied", NOTIFY_GENERIC)
+                end
+            end
+            lastEnd = sub['end'] or sub.start or lastEnd
+        end
+        scroll:GetCanvas():InvalidateLayout(true)
+        scroll:InvalidateLayout(true)
     end
+
+    makeSearch(box, 16, 46, 508, 28, "Search lyrics...", function(v)
+        query = string.lower(string.Trim(v or ""))
+        rebuild()
+    end, "DermaDefault")
+
+    makeButton(box, 140, 480, 120, 30, "Copy all", function()
+        local out = {}
+        local withTime = isShift()
+        for _, sub in ipairs(subs) do
+            if matches(sub) then
+                local text = tostring(sub.text or "")
+                out[#out + 1] = withTime and (stamp(sub.start or 0) .. " " .. text) or text
+            end
+        end
+        SetClipboardText(table.concat(out, "\n"))
+        notify("Copied " .. #out .. " lines")
+    end, { tip = "Copy shown lines (Shift: with timestamps)" })
+    makeButton(box, 280, 480, 120, 30, L("btb.main.volume_cancel"), function() bg:Remove() end)
+
+    rebuild()
 end

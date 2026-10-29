@@ -119,6 +119,7 @@ hook.Add("HUDPaint", "BattleBeats_FadeDebug", function()
     l.sep()
     l.row("total length", IsValid(st) and btb.FormatTime(st:GetLength()) or IsValid(pv) and btb.FormatTime(pv:GetLength()) or "NONE")
     l.row("cur time", IsValid(st) and btb.FormatTime(st:GetTime()) or IsValid(pv) and btb.FormatTime(pv:GetTime()) or "NONE")
+    l.row("state",({ [0] = "STOPPED", [1] = "PLAYING", [2] = "PAUSED", [3] = "STALLED" })[IsValid(st) and st:GetState() or IsValid(pv) and pv:GetState()] or "INVALID")
 
     -- DYNAMIC
     r.section("FADE STATES")

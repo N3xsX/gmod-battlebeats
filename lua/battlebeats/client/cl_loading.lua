@@ -453,8 +453,9 @@ local function loadPatchNotes()
             Color(255, 255, 255), "! Check out the new features:"
         )
         chat.AddText(
-            Color(150, 255, 150), "- Added subtitles localization support\n",
-            Color(150, 255, 150), "- Slightly tweaked the settings UI"
+            Color(150, 255, 150), "- Remastered playlist editor, with multi-select, undo / redo and keyboard shortcuts\n",
+            Color(150, 255, 150),"- Remastered track selector, with a faster list, combinable filters and bulk actions\n",
+            Color(150, 255, 150),"- Remastered main UI, with a new volume control and pack verification shown in the UI"
         )
         chat.AddText(
             Color(255, 255, 255), "See workshop page for detailed changelog!"
@@ -501,7 +502,7 @@ hook.Add("InitPostEntity", "BattleBeats_StartMusic", function()
     --
     loadSavedPacks()
     btb.ValidatePacks()
-    --loadPatchNotes()
+    loadPatchNotes()
 end)
 
 concommand.Add("battlebeats_reload_packs", function()
