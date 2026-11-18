@@ -1,4 +1,5 @@
 --MARK: MATH
+-- Note: sin / cos / tan work in degrees
 local mt = {}
 mt.add = function(a, b)
     return a + b
@@ -19,10 +20,12 @@ mt.pow = function(a, b)
     return a ^ b
 end
 mt.min = function(a, b, c)
-    return math.min(a, b, c)
+    if c ~= nil then return math.min(a, b, c) end
+    return math.min(a, b)
 end
 mt.max = function(a, b, c)
-    return math.max(a, b, c)
+    if c ~= nil then return math.max(a, b, c) end
+    return math.max(a, b)
 end
 mt.abs = function(a)
     return math.abs(a)
@@ -45,14 +48,15 @@ end
 mt.tan = function(a)
     return math.tan(math.rad(a))
 end
+-- A clamped between B (min) and C (max)
 mt.clamp = function(a, b, c)
-    return math.Clamp(a, b, c)
+    return math.Clamp(a, b, c or 0)
 end
 
 BATTLEBEATS.RegisterNode("logic.MATH", {
     category = "Logic",
     title = "Math",
-    desc = "Performs mathematical operations",
+    desc = "Performs mathematical operations. sin/cos/tan use degrees. clamp: A between B (min) and C (max). min/max: C is optional",
 
     inputs = {
         { id = "a", type = "number" },
@@ -117,7 +121,7 @@ BATTLEBEATS.RegisterNode("logic.MATH", {
         if not fn then return end
         local a = ctx:Read(node, "a")
         local b = ctx:Read(node, "b")
-        local c = ctx:Read(node, "c")
+        local c = ctx:ReadOptional(node, "c")
         ctx:Write(node, "out", fn(a, b, c))
     end
 })

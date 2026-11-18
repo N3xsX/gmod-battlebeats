@@ -40,6 +40,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/nodegraph/cl_runtime.lua")
 
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/logic.lua")
+    AddCSLuaFile("battlebeats/client/nodegraph/nodes/dynamics.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/file.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/debug.lua")
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/audio.lua")
@@ -47,6 +48,7 @@ if SERVER then
     AddCSLuaFile("battlebeats/client/nodegraph/nodes/math.lua")
 
     AddCSLuaFile("battlebeats/client/nodegraph/cl_zones.lua")
+    AddCSLuaFile("battlebeats/client/nodegraph/cl_soundscripts.lua")
 
     AddCSLuaFile("battlebeats/client/ui/cl_notifications.lua")
 
@@ -88,6 +90,7 @@ if CLIENT then
     include("battlebeats/client/nodegraph/cl_runtime.lua")
 
     include("battlebeats/client/nodegraph/nodes/logic.lua")
+    include("battlebeats/client/nodegraph/nodes/dynamics.lua")
     include("battlebeats/client/nodegraph/nodes/file.lua")
     include("battlebeats/client/nodegraph/nodes/debug.lua")
     include("battlebeats/client/nodegraph/nodes/audio.lua")
@@ -95,6 +98,7 @@ if CLIENT then
     include("battlebeats/client/nodegraph/nodes/math.lua")
 
     include("battlebeats/client/nodegraph/cl_zones.lua")
+    include("battlebeats/client/nodegraph/cl_soundscripts.lua")
 
     include("battlebeats/client/ui/cl_notifications.lua")
 
@@ -116,5 +120,5 @@ if CLIENT then
     include("battlebeats/client/cl_loading.lua")
 
     includeNF("battlebeats", "subtitles")
-    includeNF("battlebeats", "graphs")
+    includeNF("battlebeats", "soundscripts")
 end

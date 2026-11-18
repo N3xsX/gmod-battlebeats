@@ -9,7 +9,7 @@ BATTLEBEATS.RegisterNode("debug.PRINT", {
     },
 
     oninputschanged = function(ctx, node)
-        print(ctx:ReadBool(node, "in"))
+        print(string.format("[BattleBeats Print] tick %d | node %s | %s", ctx.tick, tostring(node.id), tostring(ctx:Read(node, "in"))))
     end
 })
 --MARK: PRINT STRING
@@ -23,7 +23,7 @@ BATTLEBEATS.RegisterNode("debug.PRINT_STRING", {
     },
 
     oninputschanged = function(ctx, node)
-        print(ctx:ReadString(node, "in"))
+        print(string.format("[BattleBeats Print] tick %d | node %s | %s", ctx.tick, tostring(node.id), ctx:ReadString(node, "in")))
     end
 })
 --MARK: COMMAND TRIGGER
@@ -38,5 +38,8 @@ BATTLEBEATS.RegisterNode("debug.COMMAND_TRIGGER", {
 })
 
 concommand.Add("btb_runtime_debugnode_fire", function()
-    BATTLEBEATS.FireNodeByClass("debug.COMMAND_TRIGGER", "out")
+    local ok, res = BATTLEBEATS.FireNodeByClass("debug.COMMAND_TRIGGER", "out")
+    if not ok then
+        print("[BattleBeats] Manual trigger failed: " .. tostring(res))
+    end
 end)

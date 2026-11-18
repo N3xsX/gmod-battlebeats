@@ -6,6 +6,7 @@ local envCheckInterval = 0.5
 local envTraceDist = 2000
 local envSampleDist = 400
 
+btb.envOpenness = nil
 local envOpenness = 5
 local envScore = 1
 local lastEnvOpenness = envOpenness
@@ -126,6 +127,7 @@ local function checkEnvironment()
     envScore = envScore * lightFactor
     envScore = envScore + viewScore * (1 - envScore) * 0.35
     envOpenness = math.Clamp(math.floor(envScore * 7) + 1, 1, 4)
+    btb.envOpenness = envOpenness
 
     if envOpenness ~= lastEnvOpenness then
         lastEnvOpenness = envOpenness
@@ -155,6 +157,7 @@ cvars.AddChangeCallback("battlebeats_dynamic_volume_env", function(_, _, newValu
         btb.Debug.Remove("environment")
         btb.SetFade("environment", nil, 1, false)
         lastEnvOpenness = -1
+        btb.envOpenness = nil
     end
 end)
 

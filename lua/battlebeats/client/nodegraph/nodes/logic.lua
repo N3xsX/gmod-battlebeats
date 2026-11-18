@@ -16,154 +16,67 @@ BATTLEBEATS.RegisterNode("logic.BUFFER", {
         ctx:Write(node, "out", ctx:Read(node, "in"))
     end
 })
---MARK: AND
-BATTLEBEATS.RegisterNode("logic.AND", {
-    category = "Logic Gates",
-    title = "AND",
-    icon = "nodegraph/lg/AND.png",
-    desc = "Outputs true only when both inputs are true⋅\nInput	Output\nA	B	Q\n0	0	0\n0	1	0\n1	0	0\n1	1	1",
 
-    inputs = {
-        { id = "a", type = "number" },
-        { id = "b", type = "number" }
-    },
+--MARK: LOGIC GATES
+local function gate(class, title, desc, fn, startHigh)
+    BATTLEBEATS.RegisterNode(class, {
+        category = "Logic Gates",
+        title = title,
+        icon = "nodegraph/lg/" .. title .. ".png",
+        desc = desc,
 
-    outputs = {
-        { id = "out", type = "boolean" }
-    },
+        inputs = {
+            { id = "a", type = "number" },
+            { id = "b", type = "number" }
+        },
 
-    oninputschanged = function(ctx, node)
-        local a = ctx:ReadBool(node, "a")
-        local b = ctx:ReadBool(node, "b")
-        ctx:Write(node, "out", (a and b) and 1 or 0)
-    end
-})
---MARK: NAND
-BATTLEBEATS.RegisterNode("logic.NAND", {
-    category = "Logic Gates",
-    title = "NAND",
-    icon = "nodegraph/lg/NAND.png",
-    desc = "Outputs false only when both inputs are true",
+        outputs = {
+            { id = "out", type = "boolean" }
+        },
 
-    inputs = {
-        { id = "a", type = "number" },
-        { id = "b", type = "number" }
-    },
+        oninputschanged = function(ctx, node)
+            local a = ctx:ReadBool(node, "a")
+            local b = ctx:ReadBool(node, "b")
+            ctx:Write(node, "out", fn(a, b) and 1 or 0)
+        end,
 
-    outputs = {
-        { id = "out", type = "boolean" }
-    },
+        init = startHigh and function(node)
+            node.currentState.out = 1
+            node.nextState.out = 1
+        end or nil
+    })
+end
 
-    oninputschanged = function(ctx, node)
-        local a = ctx:ReadBool(node, "a")
-        local b = ctx:ReadBool(node, "b")
-        ctx:Write(node, "out", not (a and b) and 1 or 0)
-    end,
+gate("logic.AND", "AND",
+    "Outputs true only when both inputs are true",
+    function(a, b) return a and b end)
 
-    init = function(node)
-        node.currentState.out = 1
-        node.nextState.out = 1
-    end,
-})
---MARK: OR
-BATTLEBEATS.RegisterNode("logic.OR", {
-    category = "Logic Gates",
-    title = "OR",
-    icon = "nodegraph/lg/OR.png",
-    desc = "Outputs true when at least one input is true",
+gate("logic.NAND", "NAND",
+    "Outputs false only when both inputs are true",
+    function(a, b) return not (a and b) end, true)
 
-    inputs = {
-        { id = "a", type = "number" },
-        { id = "b", type = "number" }
-    },
+gate("logic.OR", "OR",
+    "Outputs true when at least one input is true",
+    function(a, b) return a or b end)
 
-    outputs = {
-        { id = "out", type = "boolean" }
-    },
+gate("logic.NOR", "NOR",
+    "Outputs true only when all inputs are false",
+    function(a, b) return not (a or b) end, true)
 
-    oninputschanged = function(ctx, node)
-        local a = ctx:ReadBool(node, "a")
-        local b = ctx:ReadBool(node, "b")
-        ctx:Write(node, "out", (a or b) and 1 or 0)
-    end
-})
---MARK: NOR
-BATTLEBEATS.RegisterNode("logic.NOR", {
-    category = "Logic Gates",
-    title = "NOR",
-    icon = "nodegraph/lg/NOR.png",
-    desc = "Outputs true only when all inputs are false",
+gate("logic.XOR", "XOR",
+    "Outputs true when exactly one input is true",
+    function(a, b) return a ~= b end)
 
-    inputs = {
-        { id = "a", type = "number" },
-        { id = "b", type = "number" }
-    },
+gate("logic.XNOR", "XNOR",
+    "Outputs true when both inputs have the same value",
+    function(a, b) return a == b end)
 
-    outputs = {
-        { id = "out", type = "boolean" }
-    },
-
-    oninputschanged = function(ctx, node)
-        local a = ctx:ReadBool(node, "a")
-        local b = ctx:ReadBool(node, "b")
-        ctx:Write(node, "out", (a or b) and 0 or 1)
-    end,
-
-    init = function(node)
-        node.currentState.out = 1
-        node.nextState.out = 1
-    end,
-})
---MARK: XOR
-BATTLEBEATS.RegisterNode("logic.XOR", {
-    category = "Logic Gates",
-    title = "XOR",
-    icon = "nodegraph/lg/XOR.png",
-    desc = "Outputs true when exactly one input is true",
-
-    inputs = {
-        { id = "a", type = "number" },
-        { id = "b", type = "number" }
-    },
-
-    outputs = {
-        { id = "out", type = "boolean" }
-    },
-
-    oninputschanged = function(ctx, node)
-        local a = ctx:ReadBool(node, "a")
-        local b = ctx:ReadBool(node, "b")
-        ctx:Write(node, "out", (a ~= b) and 1 or 0)
-    end
-})
---MARK: XNOR
-BATTLEBEATS.RegisterNode("logic.XNOR", {
-    category = "Logic Gates",
-    title = "XNOR",
-    icon = "nodegraph/lg/XNOR.png",
-    desc = "Outputs true when both inputs have the same value",
-
-    inputs = {
-        { id = "a", type = "number" },
-        { id = "b", type = "number" }
-    },
-
-    outputs = {
-        { id = "out", type = "boolean" }
-    },
-
-    oninputschanged = function(ctx, node)
-        local a = ctx:ReadBool(node, "a")
-        local b = ctx:ReadBool(node, "b")
-        ctx:Write(node, "out", (a == b) and 1 or 0)
-    end
-})
 --MARK: NOT
 BATTLEBEATS.RegisterNode("logic.NOT", {
     category = "Logic Gates",
     title = "NOT",
     icon = "nodegraph/lg/NOT.png",
-    desc = "Inverts the input value⋅\nInput	Output\nA	Q\n0	1\n1	0",
+    desc = "Inverts the input value",
 
     inputs = {
         { id = "in", type = "number" }
@@ -183,6 +96,7 @@ BATTLEBEATS.RegisterNode("logic.NOT", {
         node.nextState.out = 1
     end,
 })
+
 --MARK: FALLING EDGE
 BATTLEBEATS.RegisterNode("logic.FALLING_EDGE", {
     category = "Logic",
@@ -200,10 +114,13 @@ BATTLEBEATS.RegisterNode("logic.FALLING_EDGE", {
     oninputschanged = function(ctx, node)
         local v = ctx:ReadBool(node, "in")
         local old = node.memory.old or false
-        ctx:Write(node, "out", (old and not v) and 1 or 0)
+        if old and not v then
+            ctx:Pulse(node, "out")
+        end
         node.memory.old = v
     end
 })
+
 --MARK: RISING EDGE
 BATTLEBEATS.RegisterNode("logic.RISING_EDGE", {
     category = "Logic",
@@ -221,10 +138,13 @@ BATTLEBEATS.RegisterNode("logic.RISING_EDGE", {
     oninputschanged = function(ctx, node)
         local v = ctx:ReadBool(node, "in")
         local old = node.memory.old or false
-        ctx:Write(node, "out", (not old and v) and 1 or 0)
+        if not old and v then
+            ctx:Pulse(node, "out")
+        end
         node.memory.old = v
     end
 })
+
 --MARK: TOGGLE
 BATTLEBEATS.RegisterNode("logic.TOGGLE", {
     category = "Logic",
@@ -255,6 +175,7 @@ BATTLEBEATS.RegisterNode("logic.TOGGLE", {
         node.memory.state = false
     end
 })
+
 --MARK: TRUE
 BATTLEBEATS.RegisterNode("logic.TRUE", {
     category = "Logic",
@@ -270,6 +191,7 @@ BATTLEBEATS.RegisterNode("logic.TRUE", {
         node.nextState.out = 1
     end
 })
+
 --MARK: FALSE
 BATTLEBEATS.RegisterNode("logic.FALSE", {
     category = "Logic",
@@ -285,6 +207,7 @@ BATTLEBEATS.RegisterNode("logic.FALSE", {
         node.nextState.out = 0
     end
 })
+
 --MARK: ONCE
 BATTLEBEATS.RegisterNode("logic.ONCE", {
     category = "Logic",
@@ -300,13 +223,10 @@ BATTLEBEATS.RegisterNode("logic.ONCE", {
     },
 
     oninputschanged = function(ctx, node)
-        local v = ctx:ReadBool(node, "in")
-
-        if v and not node.memory.fired then
-            ctx:Write(node, "out")
+        if node.memory.fired then return end
+        if ctx:ReadBool(node, "in") then
             node.memory.fired = true
-        else
-            ctx:Write(node, "out", 0)
+            ctx:Pulse(node, "out")
         end
     end,
 
@@ -314,6 +234,7 @@ BATTLEBEATS.RegisterNode("logic.ONCE", {
         node.memory.fired = false
     end
 })
+
 --MARK: HOLD
 BATTLEBEATS.RegisterNode("logic.HOLD", {
     category = "Logic",
@@ -329,7 +250,7 @@ BATTLEBEATS.RegisterNode("logic.HOLD", {
     },
 
     args = {
-        { id = "ticks", type = "number", default = 10 }
+        { id = "ticks", title = "Ticks", type = "number", default = 10, min = 0 }
     },
 
     init = function(node, args)
@@ -338,26 +259,33 @@ BATTLEBEATS.RegisterNode("logic.HOLD", {
     end,
 
     tick = function(ctx, node)
-        if node.memory.left > 0 then
-            node.memory.left = node.memory.left - 1
+        local left = node.memory.left
+        if left and left > 0 then
+            left = left - 1
+            node.memory.left = left
+            if left == 0 then
+                ctx:Write(node, "out", ctx:Read(node, "in"))
+            end
         end
     end,
 
     oninputschanged = function(ctx, node)
-        if node.memory.left > 0 then
+        if (node.memory.left or 0) > 0 then
             ctx:Write(node, "out", 0)
         else
             ctx:Write(node, "out", ctx:Read(node, "in"))
         end
     end,
 
-    shutdown = function(node)
+    shutdown = function(ctx, node)
         node.memory.left = nil
     end
 })
 
+--MARK: DELAY
 local function delayTick(ctx, node, delay)
     local q = node.memory.queue
+    if not q then return end
 
     q.last = q.last + 1
     q[q.last] = ctx:Read(node, "in")
@@ -374,6 +302,7 @@ local function delayTick(ctx, node, delay)
         end
     end
 end
+
 --MARK: DELAY TICK
 BATTLEBEATS.RegisterNode("logic.DELAY_TICKS", {
     category = "Logic",
@@ -389,7 +318,7 @@ BATTLEBEATS.RegisterNode("logic.DELAY_TICKS", {
     },
 
     args = {
-        {id = "ticks", title = "Ticks", type = "number", default = 10, min = 0 }
+        { id = "ticks", title = "Ticks", type = "number", default = 10, min = 0 }
     },
 
     init = function(node)
@@ -404,6 +333,7 @@ BATTLEBEATS.RegisterNode("logic.DELAY_TICKS", {
         node.memory.queue = nil
     end
 })
+
 --MARK: DELAY SECOND
 BATTLEBEATS.RegisterNode("logic.DELAY_SECONDS", {
     category = "Logic",
@@ -434,7 +364,17 @@ BATTLEBEATS.RegisterNode("logic.DELAY_SECONDS", {
         node.memory.queue = nil
     end
 })
+
 --MARK: COMPARATOR
+local compareOps = {
+    ["=="] = function(a, b) return a == b end,
+    ["!="] = function(a, b) return a ~= b end,
+    [">"]  = function(a, b) return a > b end,
+    ["<"]  = function(a, b) return a < b end,
+    [">="] = function(a, b) return a >= b end,
+    ["<="] = function(a, b) return a <= b end
+}
+
 BATTLEBEATS.RegisterNode("logic.COMPARATOR", {
     category = "Logic",
     title = "Comparator",
@@ -466,25 +406,19 @@ BATTLEBEATS.RegisterNode("logic.COMPARATOR", {
     end,
 
     oninputschanged = function(ctx, node, args)
+        local fn = compareOps[args.op]
+        if not fn then return end
         local a = ctx:Read(node, "a")
-        local b = args.useConstant and args.constant or ctx:Read(node, "b")
-        local result
-        if args.op == "==" then
-            result = a == b
-        elseif args.op == "!=" then
-            result = a ~= b
-        elseif args.op == ">" then
-            result = a > b
-        elseif args.op == "<" then
-            result = a < b
-        elseif args.op == ">=" then
-            result = a >= b
-        elseif args.op == "<=" then
-            result = a <= b
+        local b
+        if args.useConstant then
+            b = args.constant or 0
+        else
+            b = ctx:Read(node, "b")
         end
-        ctx:Write(node, "out", result and 1 or 0)
+        ctx:Write(node, "out", fn(a, b) and 1 or 0)
     end
 })
+
 --MARK: SELECT
 BATTLEBEATS.RegisterNode("logic.SELECT", {
     category = "Logic",
@@ -527,15 +461,18 @@ BATTLEBEATS.RegisterNode("logic.ON_CHANGED", {
     oninputschanged = function(ctx, node)
         local v = ctx:Read(node, "in")
         local old = node.memory.old
-        ctx:Write(node, "out", (old ~= nil and old ~= v) and 1 or 0)
+        if old ~= nil and old ~= v then
+            ctx:Pulse(node, "out")
+        end
         node.memory.old = v
     end
 })
 
+--MARK: LUA (wip)
 BATTLEBEATS.RegisterNode("logic.LUA", {
     category = "Logic",
     title = "Script",
-    desc = "saddsaasdadsdassd",
+    desc = "Work in progress - not implemented yet",
 
     inputs = {
         { id = "a", type = "number" },

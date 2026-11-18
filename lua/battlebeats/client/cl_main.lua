@@ -39,12 +39,15 @@ btb.fades = btb.fades or {}
 btb.fadeStates = btb.fadeStates or {}
 btb.threatLevel = 1
 
+btb.combatState = btb.combatState or { enemy = false, score = 0, close = 0 }
+btb.threatScore = 0
+
 --Dev
 btb.disableSwitch = btb.disableSwitch or false -- btb.isInCombat will still update
 btb.disableNextTrackTimer = btb.disableNextTrackTimer or false
 btb.disableCheckingTimer = btb.disableCheckingTimer or false
 
-btb.currentVersion = "3.0"
+btb.currentVersion = "3.0.0"
 CreateClientConVar("battlebeats_seen_version", "", true, false)
 
 CreateClientConVar("battlebeats_detection_mode", "1", true, true, "", 0, 1)
@@ -198,10 +201,24 @@ local function fade(p, a, b, t)
     return lerp(p, a, b)
 end
 
+btb.stopping = btb.stopping or setmetatable({}, { __mode = "k" })
+
+local function removeSoundTimers()
+    timer.Remove("BattleBeats_NextTrack")
+    timer.Remove("BattleBeats_CheckSound")
+end
+
 -- this is used only to start or stop tracks
 function btb.FadeMusic(st, fadeIn, fadeTime, isPreview)
     if not IsValid(st) then return end
     fadeTime = fadeTime or 2
+
+    if fadeIn then
+        btb.stopping[st] = nil
+    else
+        btb.stopping[st] = true
+        if st == btb.currentStation then removeSoundTimers() end
+    end
 
     local base = btb.adjustVolume(st:GetFileName(), nil, isPreview)
     if disableFade:GetBool() or fadeTime == 0 then
@@ -246,7 +263,11 @@ local function fadeTo(volume, fadeTime)
     fadeTime = fadeTime or 2
     local f = btb.globalFade
     local from = f and lerp(math.Clamp(f.t / f.time, 0, 1), f.from, f.to) or (btb.fadeMul or 1)
-    if from == volume then return end
+    if from == volume then
+        btb.globalFade = nil
+        btb.fadeMul = volume
+        return
+    end
     if fadeTime <= 0 then
         btb.fadeMul = volume
         btb.globalFade = nil
@@ -331,11 +352,6 @@ hook.Add("Think", "BattleBeats_FadeSystem", function()
         pv:SetVolume(btb.adjustVolume(pv:GetFileName(), nil, true))
     end
 end)
-
-local function removeSoundTimers()
-    if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
-    if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
-end
 
 --MARK:Random track
 --------------------------------------------------------------------------------------
@@ -585,6 +601,10 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, properties)
         lastCombatLength = 0
     end
 
+    if properties.noNotification then -- hide any previous notifications
+        btb.HideNotification()
+    end
+
     if (not time or replayNotification:GetBool() or persistentNotification:GetBool()) and showNotification:GetBool() and volumeSet:GetInt() > 0 then
         if not (allowEnforce:GetBool() and not allowNoti:GetBool()) then
             if not properties.noNotification then
@@ -640,16 +660,16 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, properties)
             end
 
             local startTime = time or 0
-            local playDuration = math.max(trackLength - startTime - 0.5, 1)
+            local playDuration = math.max(trackLength - startTime, 1)
 
             btb.print(3, "PlayNextTrack", "Track length:", math.Truncate(trackLength or 0, 1), "(s) | Will play for:", math.Truncate(playDuration or 0, 1), "(s)")
 
             timer.Create("BattleBeats_NextTrack", playDuration, 1, function() -- timer to play next track when current finishes
-                if btb.disableNextTrackTimer then return end
+                if btb.disableNextTrackTimer or btb.stopping[station] then return end
                 if properties.loop then
                     btb.print(3, "PlayNextTrack", "Looping track:", tostring(track))
                     if timer.Exists("BattleBeats_CheckSound") then timer.Remove("BattleBeats_CheckSound") end
-                    btb.PlayNextTrack(track, nil, 0, nil, priority, properties)
+                    btb.PlayNextTrack(track, nil, 0.1, nil, priority, properties)
                     return
                 end
                 btb.print(3, "PlayNextTrack", "Timer reached end. Selecting next track")
@@ -662,8 +682,15 @@ function btb.PlayNextTrack(track, time, cFadeIn, cFadeOut, priority, properties)
             end)
 
             timer.Create("BattleBeats_CheckSound", 1, 0, function() -- timer to check if track stops playing unexpectedly
+                if btb.stopping[station] then removeSoundTimers() return end
                 if not IsValid(station) or (station:GetState() ~= GMOD_CHANNEL_PLAYING and station:GetState() ~= GMOD_CHANNEL_STALLED) then
                     if btb.disableCheckingTimer then return end
+                    if properties.loop then
+                        btb.print(3, "PlayNextTrack", "Track stopped unexpectedly. Looping is enabled. Starting the same track:", tostring(track))
+                        if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
+                        btb.PlayNextTrack(track, nil, 0.1, nil, priority, properties)
+                        return
+                    end
                     btb.print(3, "PlayNextTrack", "Track stopped unexpectedly. Selecting next track")
                     timer.Remove("BattleBeats_CheckSound")
                     if timer.Exists("BattleBeats_NextTrack") then timer.Remove("BattleBeats_NextTrack") end
@@ -951,16 +978,95 @@ local combatPeak = 1
 local combatAfterglowTime = nil
 local combatAfterglowStage = -1
 
+local combatHold = { [1] = 12, [2] = 15, [3] = 20 }
+local envBonus = { [1] = 5, [2] = 3, [3] = 1, [4] = 0 }
+local closeNeeded = 3
+
+local smoothBonus = 0
+local effThreat = 1
+local effLastHigh = 0
+local holdUntil = 0
+local holdPeak = 1
+local lastIsEnemy = false
+
+local function resetCombatFadeTrackers()
+    lastThreatBoost = nil
+    lastCombatEnemyState = false
+    combatNoEnemyTime, combatFadeLevel = nil, nil
+    combatAfterglowTime, combatAfterglowStage = nil, -1
+end
+
+--MARK:Server state
+--------------------------------------------------------------------------------------
+
+net.Receive("BTB_CombatState", function()
+    local s = btb.combatState
+    s.enemy = net.ReadBool()
+    s.score = net.ReadUInt(6)
+    s.close = net.ReadUInt(8)
+end)
+
+local function computeThreat(score, close, curTime)
+    local env = btb.envOpenness
+    local prox = math.Clamp(close / closeNeeded, 0, 1)
+    local target = env and (envBonus[env] or 0) * prox or 0
+    smoothBonus = lerp(0.3, smoothBonus, target)
+
+    local s = score > 0 and (score + smoothBonus) or 0
+    btb.threatScore = s
+
+    local want = s >= 10 and 3 or s >= 5 and 2 or 1
+    if want >= effThreat then effLastHigh = curTime end
+    if want > effThreat or (want < effThreat and curTime - effLastHigh >= 5) then
+        effThreat = want
+        effLastHigh = curTime
+    end
+    return effThreat
+end
+
 timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
     local curTime = CurTime()
 
-    btb.isInCombat = ply:GetNWBool("BattleBeats_InCombat", false)
-    local isEnemy = ply:GetNWBool("BattleBeats_HasCombatEnemy", false)
-    btb.threatLevel = ply:GetNWInt("BattleBeats_ThreatLevel", 1)
+    local wasInCombat = btb.isInCombat
+    local cs = btb.combatState
+    local isEnemy = cs.enemy
 
+    if not enableCombat:GetBool() then
+        isEnemy = false
+        holdUntil = 0
+    end
+
+    if not ply:Alive() then isEnemy = false end
+
+    if isEnemy and (not wasInCombat or not lastIsEnemy) then
+        effThreat = 1
+        smoothBonus = 0
+        effLastHigh = curTime
+    end
+    lastIsEnemy = isEnemy
+
+    btb.threatLevel = dynamicVolume:GetBool() and isEnemy and computeThreat(cs.score, cs.close, curTime) or 1
+
+    if isEnemy then
+        holdPeak = wasInCombat and math.max(holdPeak, btb.threatLevel) or btb.threatLevel
+        holdUntil = curTime + (combatHold[holdPeak] or 12)
+    end
+    if not ply:Alive() then holdUntil = math.min(holdUntil, curTime + 1) end
+
+    btb.isInCombat = isEnemy or curTime < holdUntil
+    if not btb.isInCombat then
+        effThreat, btb.threatLevel, btb.threatScore = 1, 1, 0
+    end
+
+    local forced = false
     if forceCombat:GetBool() and enableCombat:GetBool() then
+        btb.isInCombat = true
+        forced = true
+    end
+
+    if hook.Run("BattleBeats_OverrideCombatState", btb.isInCombat) == true then
         btb.isInCombat = true
     end
 
@@ -1011,7 +1117,7 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
             btb.SetFade("threat", threatBoost, threatSwitch, true)
         end
 
-        local shouldLower = btb.isInCombat and not isEnemy
+        local shouldLower = btb.isInCombat and not isEnemy and not forced
         if shouldLower ~= lastCombatEnemyState then
             lastCombatEnemyState = shouldLower
             if shouldLower then
@@ -1046,9 +1152,10 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
     if btb.isInCombat ~= lastCombatState then
         if ambienceStartTime == nil then ambienceStartTime = curTime end
         lastCombatState = btb.isInCombat
-        --btb.FireNodeByClass("condition.IN_COMBAT_BTB", "isincombat", btb.isInCombat and 1 or 0)
+        pendingSwitch, pendingTrack = nil, nil
+        btb.FireNodeByClass("condition.IN_COMBAT_BTB", "isincombat", btb.isInCombat and 1 or 0)
         if btb.isInCombat then
-            --btb.FireNodeByClass("event.COMBAT_START_BTB", "start", 1)
+            btb.FireNodeByClass("event.COMBAT_START_BTB", "start", 1)
             combatStartTime = curTime
             combatPeak = btb.threatLevel
             combatAfterglowTime = nil
@@ -1065,7 +1172,7 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
                 btb.print(2, "Switch Track", "BattleBeats_ClientCombatCheck error:", tostring(err))
             end
         else
-            --btb.FireNodeByClass("event.AMBIENT_START_BTB", "start", 1)
+            btb.FireNodeByClass("event.AMBIENT_START_BTB", "start", 1)
             btb.SetFade("combat no enemies", nil, 3, false) -- just to be safe
             ambienceStartTime = curTime
             combatAfterglowTime = curTime
@@ -1079,10 +1186,11 @@ timer.Create("BattleBeats_ClientCombatCheck", 0.5, 0, function()
             if not success then
                 btb.print(2, "Switch Track", "BattleBeats_ClientCombatCheck error:", tostring(err))
             end
-            lastCombatTrackPriority = 0 
+            lastCombatTrackPriority = 0
         end
     elseif btb.isInCombat then
         combatPeak = math.max(combatPeak, btb.threatLevel)
+        if btb.disableCombat then return end
         if pendingSwitch then
             if curTime >= pendingSwitch.time then
                 local success, err = pcall(switchTrack, pendingSwitch.track)
@@ -1166,14 +1274,12 @@ cvars.AddChangeCallback("battlebeats_lower_volume_on_voice_chat", function(_, _,
 end)
 
 cvars.AddChangeCallback("battlebeats_dynamic_volume", function(_, _, newValue)
-    if tonumber(newValue) == 0 and btb.isInCombat then
+    if tonumber(newValue) == 0 then
         btb.SetFade("combat no enemies", nil, 1, false)
         btb.SetFade("threat", nil, 1, true)
-    elseif tonumber(newValue) == 0 and not btb.isInCombat then
-        combatAfterglowTime = nil
-        combatAfterglowStage = -1
-        btb.SetFade("combat afterglow", nil, 3, false)
+        btb.SetFade("combat afterglow", nil, 1, false)
     end
+    resetCombatFadeTrackers()
 end)
 
 cvars.AddChangeCallback("battlebeats_crossfade_type", function(_, _, newValue)
@@ -1316,7 +1422,12 @@ end)
 
 concommand.Add("battlebeats_restart", function()
     btb.errorCount = 0
-    btb.fadeStates = {}
+    timer.Remove("BattleBeats_ExplosionDSP")
+    for _, id in ipairs({"threat", "combat no enemies", "combat afterglow", "grenade dsp"}) do
+        btb.fadeStates[id] = nil
+    end
+    resetCombatFadeTrackers()
+    btb.SetFade("combat afterglow", nil, 0, false)
     if not table.IsEmpty(btb.currentPacks) then
         local track = btb.GetRandomTrack(btb.currentPacks, btb.isInCombat)
         if track then btb.PlayNextTrack(track) end

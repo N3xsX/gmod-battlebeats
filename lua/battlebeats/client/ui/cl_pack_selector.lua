@@ -41,6 +41,7 @@ btb.packIcons = {
     ["mp3p"] = Material("packicons/mp3p.jpg"),
     ["recordplayer"] = Material("packicons/recordplayer.jpg"),
     ["playlist"] = Material("btbplaylist.png"),
+    ["script"] = Material("btbscript.png"),
     ["na"] = Material("btbna.jpg")
 }
 
@@ -831,13 +832,13 @@ local function buildTabs(ui, onChange)
     bar:SetTall(40)
     bar.Paint = nil
 
-    local function addTab(dock, filter, phrase)
+    local function addTab(dock, filter, phrase, literal)
         local b = vgui.Create("DButton", bar)
         b:Dock(dock)
-        b:SetWide(500)
+        b:SetWide(320)
         b:SetText("")
         b:SetEnabled(not ui.debugMode)
-        local label = language.GetPhrase(phrase)
+        local label = literal and phrase or language.GetPhrase(phrase)
         b.OnCursorEntered = function() surface.PlaySound("ui/buttonrollover.wav") end
         b.Paint = function(self, w, h)
             local active = ui.currentFilter == filter
@@ -856,7 +857,137 @@ local function buildTabs(ui, onChange)
         end
     end
     addTab(LEFT, "packages", "btb.ps.tab_packs")
-    addTab(RIGHT, "playlists", "btb.ps.tab_playlists")
+    addTab(LEFT, "playlists", "btb.ps.tab_playlists")
+    addTab(FILL, "soundscripts", "Soundscripts", true)
+end
+
+--MARK:Soundscripts
+local function clipText(text, maxLen)
+    text = tostring(text or "")
+    if #text <= maxLen then return text end
+    return string.sub(text, 1, maxLen - 3) .. "..."
+end
+
+local function soundscriptInfoLine(entry)
+    local parts = {}
+    if entry.version ~= "" then parts[#parts + 1] = "v" .. entry.version end
+    if #entry.zoneSets > 0 then parts[#parts + 1] = "Zones: " .. #entry.zoneSets end
+    if entry.autostart then
+        if entry.maps then
+            parts[#parts + 1] = "Autostart: " .. table.concat(table.GetKeys(entry.maps), ", ")
+        else
+            parts[#parts + 1] = "Autostart"
+        end
+    end
+    return table.concat(parts, "  |  ")
+end
+
+local function buildSoundscriptPanel(ui, entry)
+    local id = entry.id
+    local function enabled() return btb.IsSoundscriptEnabled(id) end
+
+    local wrapper = ui.scrollPanel:Add("DPanel")
+    wrapper:Dock(TOP)
+    wrapper:SetTall(80)
+    wrapper:DockMargin(5, 0, 5, 8)
+    wrapper.Paint = nil
+
+    local panel = wrapper:Add("DPanel")
+    panel:SetSize(900, 80)
+    panel:SetAlpha(0)
+    panel:AlphaTo(255, 0.1)
+    wrapper.PerformLayout = function(self)
+        if IsValid(panel) then panel:CenterHorizontal(0.5) end
+    end
+
+    local iconMat = btb.packIcons["script"]
+    local info = soundscriptInfoLine(entry)
+    local desc = clipText(entry.desc, 110)
+
+    panel.Paint = function(self, w, h)
+        local hov = animHover(self, "Hov", self:IsHovered() or self:IsChildHovered())
+        draw.RoundedBox(6, 0, 0, w, h, LerpColor(hov, P.Idle, P.Hover))
+        btb.drawRoundedOutline(6, 0, 0, w, h, 1, enabled() and C.Yellow or P.Red)
+
+        surface.SetMaterial(iconMat)
+        surface.SetDrawColor(color_white)
+        surface.DrawTexturedRect(10, 7, 65, 65)
+
+        draw.SimpleTextOutlined(clipText(entry.title, 45), "BattleBeats_Font", 90, 22, color_white, TL, TC, 1, C.Off)
+        if info ~= "" then
+            draw.SimpleText(info, "DermaDefaultBold", 90, 46, C.C200, TL, TC)
+        end
+        if desc ~= "" then
+            draw.SimpleText(desc, "DermaDefault", 90, 62, P.TabIdle, TL, TC)
+        end
+    end
+
+    if entry.desc ~= "" then
+        panel:SetTooltip(entry.desc)
+        panel:SetTooltipPanelOverride("BattleBeatsTooltip")
+    end
+
+    /*panel.OnMouseReleased = function(self, keyCode)
+        if keyCode ~= MOUSE_RIGHT then return end
+        local menu = DermaMenu()
+        panelMenu = menu
+        menu.packPanel = panel
+        addOpt(menu, panel, "Reset to default", "icon16/arrow_undo.png", function()
+            btb.ResetSoundscriptState(id)
+        end, "Go back to the autostart rules defined by the script")
+        menu:Open()
+        menu.Paint = function(self, w, h)
+            draw.RoundedBox(10, 0, 0, w, h, C.Yellow)
+            draw.RoundedBox(9, 1, 1, w - 2, h - 2, C.C50)
+        end
+    end*/
+
+    local toggle = vgui.Create("DButton", panel)
+    toggle:SetSize(90, 30)
+    toggle:SetPos(800, 25)
+    toggle:SetText("")
+    toggle:SetCursor("hand")
+    toggle.Paint = function(self, w, h)
+        local hov = animHover(self, "Hov", self:IsHovered())
+        local on = enabled()
+        local base = on and C.Yellow or P.Red
+        draw.RoundedBox(6, 0, 0, w, h, LerpColor(hov, ColA(base, 200), base))
+        draw.SimpleText(language.GetPhrase(on and "btb.ps.pack_enabled" or "btb.ps.pack_disabled"),
+            "DermaDefaultBold", w / 2, h / 2, color_white, TC, TC)
+    end
+    toggle.DoClick = function()
+        if enabled() then
+            surface.PlaySound("btb_button_disable.mp3")
+            btb.SetSoundscriptEnabled(id, false)
+        else
+            surface.PlaySound("btb_button_enable.mp3")
+            btb.SetSoundscriptEnabled(id, true)
+        end
+    end
+end
+
+local function buildSoundscriptList(ui)
+    createBasePanel(ui.scrollPanel, 40, NOTE.INFO, nil, function(panel)
+        addLabel(panel, "Soundscripts are dynamic music graphs added by other addons")
+        addLabel(panel, "All enabled soundscripts are compiled together and run at the same time")
+    end)
+
+    local list = btb.GetSoundscripts and btb.GetSoundscripts() or {}
+    if #list == 0 then
+        local label = ui.scrollPanel:Add("DLabel")
+        label:Dock(TOP)
+        label:SetText("No soundscripts installed")
+        label:SetFont("BattleBeats_Font")
+        label:SetTall(50)
+        label:SetContentAlignment(5)
+        label:DockMargin(0, 55, 0, 0)
+        return
+    end
+
+    createCategoryDivider(ui, "Soundscripts")
+    for _, entry in ipairs(list) do
+        buildSoundscriptPanel(ui, entry)
+    end
 end
 
 local function buildPromo(ui)
@@ -1508,6 +1639,18 @@ local function openBTBmenu()
         ui.scrollPanel:Clear()
 
         buildTabs(ui, function() showPackList() end)
+
+        if ui.currentFilter == "soundscripts" then
+            buildSoundscriptList(ui)
+            syncVerifyButton(ui)
+            applyView()
+            if scroll > 0 then
+                ui.scrollPanel:InvalidateLayout(true)
+                ui.scrollBar:SetScroll(scroll)
+            end
+            return
+        end
+
         showConflicts(ui)
 
         if table.IsEmpty(btb.musicPacks) then buildPromo(ui) end
